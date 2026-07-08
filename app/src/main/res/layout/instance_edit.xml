@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_weight="1"
+        android:layout_height="0dp">
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Instance"
+                android:textAlignment="center"
+                android:textSize="48sp"
+                android:textStyle="bold"
+                android:layout_gravity="center"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Base URL"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditBaseURLEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="example.com"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="API endpoint"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditAPIEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="api.php"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Avatar endpoint"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditAvatarEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="ava.php"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="QR endpoint"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditQREditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="qrcode.php"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="API version"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditAPIVersionEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="10"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Instance password (blank if there is no)"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditPasswordEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="123qwe..."/>
+
+            <CheckBox
+                android:id="@+id/instanceEditCheckCertsCheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Enable certs check"
+                android:checked="true"
+                android:layout_marginBottom="8dp"/>
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/instanceEditSaveButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Save"
+        android:layout_margin="4dp"/>
+</LinearLayout>

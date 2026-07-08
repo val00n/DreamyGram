@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:descendantFocusability="blocksDescendants"
+    android:padding="8dp">
+    <ImageView
+        android:id="@+id/dialogAvatar"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/avatar_placeholder"/>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginLeft="8dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:id="@+id/dialogTitle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="User"
+                android:textColor="@android:color/primary_text_dark"
+                android:textSize="20sp"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+            <TextView
+                android:id="@+id/dialogLastTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right"
+                android:text="XX:XX"
+                android:textColor="@android:color/secondary_text_dark"
+                android:textSize="17sp"
+                android:paddingTop="2dp"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/dialogBottomText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:text="Bottom text"
+            android:textColor="@android:color/secondary_text_dark"
+            android:textSize="17sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </RelativeLayout>
+</LinearLayout>
