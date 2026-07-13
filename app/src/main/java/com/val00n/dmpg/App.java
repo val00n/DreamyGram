@@ -37,7 +37,7 @@ public class App extends Application {
         instanceManager = new InstanceManager(this);
         sessionManager = new SessionManager(this);
         //sessionManager.saveSession("GZwQDgEHrbCDpCEl4mmk6-5l5i55QFTr68kF__8zxdoO_sEesKm8-kBbs5q3Mudk", "http://mp.wunderwungiel.pl");
-        instanceManager.selectInstance(2);
+        //instanceManager.selectInstance(2);
         cm = (ConnectivityManager) this.getSystemService(this.CONNECTIVITY_SERVICE);
 
         instanceManager.loadInstances();

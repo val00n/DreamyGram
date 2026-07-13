@@ -4,15 +4,8 @@ import java.io.IOException;
 import java.util.Map;
 
 public class RestClient {
-    private final int TIMEOUT = 20000;
-
-    public long ping(String baseURL) throws IOException {
-        HttpRequest request = new HttpRequest(baseURL, "", "GET");
-        long start = System.currentTimeMillis();
-
-        HttpResponse response = HttpClient.send(request, TIMEOUT);
-        return System.currentTimeMillis() - start;
-    }
+    private final int CONNECT_TIMEOUT = 20000;
+    private final int READ_TIMEOUT = 30000;
 
     public String getString(String baseURL, String endpoint) throws IOException {
         return getString(baseURL, endpoint, null);
@@ -23,7 +16,7 @@ public class RestClient {
         request.addHeader("Accept", "application/json");
         request = addQueryParams(queryParams, request);
 
-        HttpResponse response = HttpClient.send(request, TIMEOUT);
+        HttpResponse response = HttpClient.send(request, CONNECT_TIMEOUT, READ_TIMEOUT);
         if (response.isSuccessfulCode()) {
             return response.readAsString();
         }
@@ -38,7 +31,7 @@ public class RestClient {
         HttpRequest request = new HttpRequest(baseURL, endpoint, "GET");
         request = addQueryParams(queryParams, request);
 
-        HttpResponse response = HttpClient.send(request, TIMEOUT);
+        HttpResponse response = HttpClient.send(request, CONNECT_TIMEOUT, READ_TIMEOUT);
         if (response.isSuccessfulCode()) {
             return response.readAsBytes();
         }
@@ -56,7 +49,7 @@ public class RestClient {
         if (body != null && body.length() > 0 && contentType != null && contentType.length() > 0)
             request.setBody(body, contentType);
 
-        HttpResponse response = HttpClient.send(request, TIMEOUT);
+        HttpResponse response = HttpClient.send(request, CONNECT_TIMEOUT, READ_TIMEOUT);
         if (response.isSuccessfulCode()) {
             return response.readAsString();
         }
@@ -74,7 +67,7 @@ public class RestClient {
         if (body != null && body.length() > 0 && contentType != null && contentType.length() > 0)
             request.setBody(body, contentType);
 
-        HttpResponse response = HttpClient.send(request, TIMEOUT);
+        HttpResponse response = HttpClient.send(request, CONNECT_TIMEOUT, READ_TIMEOUT);
         if (response.isSuccessfulCode()) {
             return response.readAsBytes();
         }

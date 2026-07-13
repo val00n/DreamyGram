@@ -2,9 +2,11 @@ package com.val00n.dmpg.services;
 
 import android.util.Log;
 import com.val00n.dmpg.App;
+import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.DialogItem;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.LoginResponse;
+import com.val00n.dmpg.network.HttpClient;
 import com.val00n.dmpg.network.RestClient;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,49 +38,49 @@ public class MPGramService {
         instance = instanceManager.getSelectedInstance();
     }
 
-    public void checkAuth(String userToken, final ApiCallback<LoginResponse> callback) {
+    public void checkAuth(String userToken, final ApiCallback<AuthResult> callback) {
         checkAuth(instance, userToken, callback);
     }
 
-    public void checkAuth(final Instance pickedInstance, String userToken, final ApiCallback<LoginResponse> callback) {
+    public void checkAuth(final Instance pickedInstance, String userToken, final ApiCallback<AuthResult> callback) {
         if (userToken == null || userToken.length() == 0) {
             if (callback != null) callback.onError(new IOException("No saved token"));
             return;
         }
 
+        // TODO: instance-side auto close session for inactive ones (on telegram sessions)
+
         final Map<String, String> queryParams = new HashMap<String, String>();
-        queryParams.put("method", "checkAuth");
+        queryParams.put("method", "getNotifySettings"); // i hate it. but i think this is only way to do something with telegram itself
         queryParams.put("v", pickedInstance.apiVersion);
 
         final Map<String, String> headers = new HashMap<String, String>();
         headers.put("X-MPGRAM-USER", userToken);
 
-        final long start = System.currentTimeMillis();
         new Thread(new Runnable() {
             @Override
             public void run() {
+                long ping = 0;
                 try {
+                    ping = HttpClient.ping(pickedInstance.baseURL + '/' + pickedInstance.apiEndpoint);
+
                     String stringResponse = restClient.postString(pickedInstance.baseURL, pickedInstance.apiEndpoint, queryParams, headers);
-                    long ping = System.currentTimeMillis() - start;
+                    boolean isLogged = stringResponse.contains("users") || stringResponse.contains("chats");
 
-                    Log.d(TAG, "checkAuth Raw Response: " + stringResponse);
+                    Log.d(TAG, "checkAuth Raw Response (" + pickedInstance.baseURL + "/" + pickedInstance.apiEndpoint + "): " + stringResponse);
 
-                    JSONObject parsedJson = (JSONObject) JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
-                    response.setPing(ping);
+                    AuthResult result = new AuthResult(isLogged, ping);
 
-                    if (callback != null) callback.onSuccess(response);
+                    if (callback != null) callback.onSuccess(result);
                 } catch (IOException e) {
-                    long ping = System.currentTimeMillis() - start;
                     String msg = e.getMessage();
 
                     if (msg != null && (msg.contains("401") || msg.contains("authentication challenge"))) {
                         // code 401 means that session is expired
                         // ugly as hell, needs refactor
-                        LoginResponse response = new LoginResponse();
-                        response.setResponse("0");
-                        response.setPing(ping);
-                        if (callback != null) callback.onSuccess(response);
+                        AuthResult result = new AuthResult(false, ping);
+
+                        if (callback != null) callback.onSuccess(result);
                     } else {
                         if (callback != null) callback.onError(e);
                     }

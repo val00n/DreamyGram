@@ -18,7 +18,16 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"/>
             <ImageButton
+                android:id="@+id/mainSearchButton"
                 android:src="@android:drawable/ic_menu_search"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:scaleType="centerInside"
+                android:padding="6dp"
+                android:layout_marginTop="1dp"/>
+            <ImageButton
+                android:id="@+id/mainSettingsButton"
+                android:src="@android:drawable/ic_menu_preferences"
                 android:layout_width="48dp"
                 android:layout_height="match_parent"
                 android:scaleType="centerInside"
@@ -37,5 +46,5 @@
         android:layout_gravity="center"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:visibility="gone"/>
+        android:visibility="visible"/>
 </FrameLayout>

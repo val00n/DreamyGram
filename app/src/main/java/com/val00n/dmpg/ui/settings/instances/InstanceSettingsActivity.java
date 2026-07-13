@@ -13,6 +13,7 @@ import android.widget.ListView;
 
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
+import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.LoginResponse;
 import com.val00n.dmpg.network.RestClient;
@@ -101,26 +102,25 @@ public class InstanceSettingsActivity extends Activity {
             final int index = i;
             final String token;
 
-            if (App.getSessionManager().loadSession(instance.baseURL) != null) {
-                token = App.getSessionManager().loadSession(instance.baseURL);
+            String savedSession = App.getSessionManager().loadSession(instance.baseURL);
+            if (savedSession != null) {
+                token = savedSession;
             } else {
-                token = "test";
+                token = "session_test"; // it is stupid lol
             }
 
-
-
-            mpgService.checkAuth(instance, token, new MPGramService.ApiCallback<LoginResponse>() {
+            mpgService.checkAuth(instance, token, new MPGramService.ApiCallback<AuthResult>() {
                 @Override
-                public void onSuccess(final LoginResponse response) {
+                public void onSuccess(final AuthResult response) {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            if ("1".equals(response.getResponse())) {
-                                instancesAdapter.updateItem(index, response.getPing(), 1);
+                            if (response.isLogged) {
+                                instancesAdapter.updateItem(index, response.ping, 1);
                             } else if (token.equals("test")) {
-                                instancesAdapter.updateItem(index, response.getPing(), 2);
+                                instancesAdapter.updateItem(index, response.ping, 2);
                             } else {
-                                instancesAdapter.updateItem(index, response.getPing(), -1);
+                                instancesAdapter.updateItem(index, response.ping, -1);
                             }
                         }
                     });
@@ -151,6 +151,9 @@ public class InstanceSettingsActivity extends Activity {
 
     private void showInstances(final ArrayList<Instance> instances) {
         if (instancesAdapter == null) {
+            instancesAdapter = new InstancesAdapter(this, instances);
+            instancesList.setAdapter(instancesAdapter);
+        } else if (instances.size() != instancesAdapter.getCount()) {
             instancesAdapter = new InstancesAdapter(this, instances);
             instancesList.setAdapter(instancesAdapter);
         } else {

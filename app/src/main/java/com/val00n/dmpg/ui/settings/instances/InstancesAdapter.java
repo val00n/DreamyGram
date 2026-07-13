@@ -65,6 +65,11 @@ public class InstancesAdapter extends BaseAdapter {
     }
 
     public void resetStatus() {
+        if (sessionStatus.length != items.size()) {
+            sessionStatus = new int[items.size()];
+            pingResults = new long[items.size()];
+        }
+
         for (int i = 0; i < items.size(); i++) {
             pingResults[i] = 0;
             sessionStatus[i] = 0;

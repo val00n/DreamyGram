@@ -9,10 +9,6 @@ public class LoginResponse {
     private String phoneCodeHash;   // "phone_code_hash" in JSON
     private String captchaID;       // "captcha_id" in JSON
     private String text;            // "text" in JSON
-    private long ping;              // not actually in JSON
-
-    public long getPing() { return ping; }
-    public void setPing(long ping) { this.ping = ping; }
 
     public String getResponse() { return response; }
     public void setResponse(String response) { this.response = response; }

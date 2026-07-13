@@ -14,6 +14,7 @@ import android.widget.Toast;
 
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
+import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.LoginResponse;
 import com.val00n.dmpg.services.InstanceManager;
@@ -129,7 +130,6 @@ public class StartupActivity extends Activity {
             Toast.makeText(this, "Network unavailable", Toast.LENGTH_SHORT).show();
         }
 
-        userToken = App.getSessionManager().loadSession(instance.baseURL);
         if (userToken == null || userToken.length() == 0) {
             hideEverything();
             welcomeLayout.setVisibility(View.VISIBLE);
@@ -139,14 +139,14 @@ public class StartupActivity extends Activity {
     private void checkSessionStatus() {
         if (isChecking) return;
         isChecking = true;
-        mpgService.checkAuth(userToken, new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.checkAuth(userToken, new MPGramService.ApiCallback<AuthResult>() {
             @Override
-            public void onSuccess(final LoginResponse response) {
+            public void onSuccess(final AuthResult response) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         isChecking = false;
-                        if ("1".equals(response.getResponse())) {
+                        if (response.isLogged) {
                             Log.d(TAG, "checkAuth: User has valid session");
                             navigateToMain();
                         } else {

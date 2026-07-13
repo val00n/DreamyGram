@@ -10,7 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 public class HttpClient {
-    private static final int DEFAULT_TIMEOUT = 20000;
+    private static final int DEFAULT_TIMEOUT = 25000;
+    private static final int DEFAULT_READ_TIMEOUT = 35000;
     private static String userAgent;
 
     public static void setUserAgent(String customUserAgent) {
@@ -18,17 +19,17 @@ public class HttpClient {
     }
 
     public static HttpResponse send(HttpRequest request) throws IOException {
-        return send(request, DEFAULT_TIMEOUT);
+        return send(request, DEFAULT_TIMEOUT, DEFAULT_READ_TIMEOUT);
     }
 
-    public static HttpResponse send(HttpRequest request, int timeoutMs) throws IOException {
+    public static HttpResponse send(HttpRequest request, int connectTimeout, int readTimeout) throws IOException {
         HttpURLConnection connection = null;
         try {
             URL url = new URL(request.buildUrl());
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod(request.getMethod());
-            connection.setConnectTimeout(timeoutMs);
-            connection.setReadTimeout(timeoutMs);
+            connection.setConnectTimeout(connectTimeout);
+            connection.setReadTimeout(readTimeout);
             connection.setInstanceFollowRedirects(true);
 
             // headers
@@ -79,5 +80,19 @@ public class HttpClient {
         }
         buffer.flush();
         return buffer.toByteArray();
+    }
+
+    public static long ping(String baseURL) throws IOException {
+        URL url = new URL(baseURL);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setConnectTimeout(DEFAULT_TIMEOUT);
+        connection.setReadTimeout(DEFAULT_TIMEOUT);
+
+        long start = System.currentTimeMillis();
+        connection.connect();
+        long elapsed = System.currentTimeMillis() - start;
+
+        connection.disconnect();
+        return elapsed;
     }
 }
