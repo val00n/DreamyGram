@@ -15,8 +15,10 @@ import android.widget.Toast;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.DialogItem;
+import com.val00n.dmpg.model.Dialogs;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.services.MPGramService;
+import com.val00n.dmpg.ui.chat.ChatActivity;
 import com.val00n.dmpg.ui.settings.SettingsActivity;
 import com.val00n.dmpg.ui.startup.StartupActivity;
 
@@ -31,11 +33,13 @@ public class MainActivity extends Activity {
     private DialogsAdapter dialogsAdapter;
     private ImageButton searchButton;
     private ImageButton settingsButton;
+    private Button loadMoreButton;
 
     private MPGramService mpgService;
     private Instance instance;
     private String userToken;
-    private ArrayList<DialogItem> dialogItems;
+    private Dialogs dialogs;
+    private int loadedDialogs;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,7 +57,8 @@ public class MainActivity extends Activity {
         dialogsListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Toast.makeText(MainActivity.this, "id: " + dialogItems.get(position).id, Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "id: " + dialogs.dialogItems.get(position).id, Toast.LENGTH_SHORT).show();
+                navigateToChat(dialogs.dialogItems.get(position).id, dialogs.dialogItems.get(position).displayName);
             }
         });
 
@@ -65,6 +70,7 @@ public class MainActivity extends Activity {
         });
 
         getDialogs();
+        addFooter();
     }
 
     protected void onResume() {
@@ -75,10 +81,13 @@ public class MainActivity extends Activity {
     }
 
     private void getDialogs() {
-        mpgService.getDialogs(userToken, new MPGramService.ApiCallback<ArrayList<DialogItem>>() {
+        loadedDialogs = 0;
+        mpgService.getDialogs(userToken, new MPGramService.ApiCallback<Dialogs>() {
             @Override
-            public void onSuccess(final ArrayList<DialogItem> result) {
-                showDialogs(result);
+            public void onSuccess(final Dialogs result) {
+                dialogs = result;
+                loadedDialogs += result.dialogItems.size();
+                showDialogs();
             }
 
             @Override
@@ -95,6 +104,89 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void addDialogs() {
+        if (loadedDialogs >= dialogs.count) {
+            Toast.makeText(MainActivity.this, "it all was loaded", Toast.LENGTH_SHORT).show();
+            return; // FIXME
+        }
+
+        loadMoreButton.setEnabled(false);
+        mpgService.getDialogs(dialogs.offsetPeer, dialogs.offsetId, dialogs.offsetDate, userToken, new MPGramService.ApiCallback<Dialogs>() {
+            @Override
+            public void onSuccess(final Dialogs result) {
+                loadedDialogs += result.dialogItems.size();
+
+                dialogs.offsetPeer = result.offsetPeer;
+                dialogs.offsetId = result.offsetId;
+                dialogs.offsetDate = result.offsetDate;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (DialogItem dialogItem : result.dialogItems) {
+                            dialogs.dialogItems.add(dialogItem);
+                        }
+
+                        showDialogs();
+                        Toast.makeText(MainActivity.this, "Successfully loaded", Toast.LENGTH_SHORT).show();
+                        loadMoreButton.setEnabled(true);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        loadMoreButton.setEnabled(true);
+                        Toast.makeText(MainActivity.this, "failed load: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+                Log.d(TAG, "onError: " + error.getMessage());
+            }
+        });
+    }
+
+    private void addFooter() {
+        View footer = getLayoutInflater().inflate(R.layout.dialogs_footer, dialogsListView, false);
+        dialogsListView.addFooterView(footer);
+
+        loadMoreButton = (Button) findViewById(R.id.dialogsFooterLoadButton);
+        loadMoreButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                addDialogs();
+            }
+        });
+    }
+
+    private void showDialogs() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (dialogsAdapter == null) {
+                    dialogsAdapter = new DialogsAdapter(MainActivity.this, dialogs.dialogItems, userToken);
+                    dialogsListView.setAdapter(dialogsAdapter);
+                } else {
+                    dialogsAdapter.notifyDataSetChanged();
+                }
+
+                progressBar.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void navigateToChat(String id, String name) {
+        Intent intent = new Intent(this, ChatActivity.class);
+
+        intent.putExtra("ID", id);
+        intent.putExtra("NAME", name);
+
+        startActivity(intent);
+    }
+
     private void navigateToSettings() {
         Intent intent = new Intent(this, SettingsActivity.class);
         startActivity(intent);
@@ -102,20 +194,7 @@ public class MainActivity extends Activity {
 
     private void navigateToStartup() {
         Intent intent = new Intent(this, StartupActivity.class);
-        //intent.putExtra("CHECK", true);
         startActivity(intent);
         finish();
-    }
-
-    private void showDialogs(final ArrayList<DialogItem> dialogItems) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                MainActivity.this.dialogItems = dialogItems;
-                dialogsAdapter = new DialogsAdapter(MainActivity.this, dialogItems, userToken);
-                dialogsListView.setAdapter(dialogsAdapter);
-                progressBar.setVisibility(View.GONE);
-            }
-        });
     }
 }

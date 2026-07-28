@@ -9,21 +9,23 @@ public class DialogItem {
     public String displayName;
     public String lastMessageText;
     public String lastMessageUser;
+    public String lastMessageId;
     public String mediaType;
     public String userAction;
-    public long lastMessageTimestamp;
-    public int unreadMessages; // TODO
-    public int mentions; // TODO
-    public boolean isPinned; // TODO
+    public long lastMessageTimestamp; // unixTime
+    public int unreadMessages;
+    public int mentionsCount;
+    public boolean isPinned;
     public boolean hasAvatar;
     public boolean isBot; // TODO
     public boolean isOnline; // TODO
     public boolean isChatOrChannel;
     public boolean isSticker;
-    public Bitmap cachedAvatar; // HUGE FUCKING TODO!!!! CACHE THEM
+    public Bitmap cachedAvatar; // HUGE FUCKING TODO!!!! DO GLOBAL CACHING OR SOME SHIT!!!
 
     public DialogItem() {
         this.unreadMessages = 0;
+        this.mentionsCount = 0;
         this.isPinned = false;
         this.isBot = false;
         this.hasAvatar = false;

@@ -42,7 +42,7 @@ public class App extends Application {
 
         instanceManager.loadInstances();
 
-        HttpClient.setUserAgent("CMPG/" + BuildConfig.VERSION_NAME + " (Android SDK " + Build.VERSION.RELEASE + "; " + Build.MODEL + ')');
+        HttpClient.setUserAgent("DMPG/" + BuildConfig.VERSION_NAME + " (Android SDK " + Build.VERSION.RELEASE + "; " + Build.MODEL + ')');
     }
 
     public static boolean isNetworkAvailable() {

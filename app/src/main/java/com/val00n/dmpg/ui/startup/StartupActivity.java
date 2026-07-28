@@ -38,7 +38,7 @@ public class StartupActivity extends Activity {
     private Button QRLoginButton;
     private Button phoneLoginButton;
     private Button instanceSettingsButton;
-    //Others
+    // Others
     private MPGramService mpgService;
     private Instance instance;
     private String userToken;
@@ -100,6 +100,10 @@ public class StartupActivity extends Activity {
             }
         });
 
+        if (getIntent().hasExtra("SKIP")) {
+            isMessagesSeen = true;
+        }
+
         init();
     }
 
@@ -114,13 +118,20 @@ public class StartupActivity extends Activity {
         hideEverything();
         startupProgressBar.setVisibility(View.VISIBLE);
 
+        isChecking = false;
+
         if (userToken == null || userToken.length() == 0) {
+            userToken = "instance_check";
+            Log.d(TAG, "onResume: nol");
+            checkSessionStatus();
+
             startupProgressBar.setVisibility(View.GONE);
             if (!isMessagesSeen)
                 welcomeLayout.setVisibility(View.VISIBLE);
             else
                 loginTypesLayout.setVisibility(View.VISIBLE);
         } else {
+            Log.d(TAG, "onResume: else");
             checkSessionStatus();
         }
     }
@@ -146,11 +157,23 @@ public class StartupActivity extends Activity {
                     @Override
                     public void run() {
                         isChecking = false;
+
+                        if (!instance.equals(App.getInstanceManager().getSelectedInstance())) {
+                            return;
+                        }
+
+                        Log.d(TAG, "run: ping " + response.ping);
+
+                        if (response.ping < 1) {
+                            Toast.makeText(StartupActivity.this, "Instance unavailable", Toast.LENGTH_SHORT).show();
+                        }
+
                         if (response.isLogged) {
                             Log.d(TAG, "checkAuth: User has valid session");
                             navigateToMain();
                         } else {
                             Log.d(TAG, "checkAuth: User has invalid/no session");
+                            hideEverything();
                             if (!isMessagesSeen)
                                 welcomeLayout.setVisibility(View.VISIBLE);
                             else
@@ -166,7 +189,10 @@ public class StartupActivity extends Activity {
                     @Override
                     public void run() {
                         isChecking = false;
+                        
                         Log.d(TAG, "AUTH onError: " + error.getMessage());
+                        Toast.makeText(StartupActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
+                        
                         hideEverything();
                         if (!isMessagesSeen)
                             welcomeLayout.setVisibility(View.VISIBLE);

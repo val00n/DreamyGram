@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
@@ -20,6 +21,7 @@ import com.val00n.dmpg.network.RestClient;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
 import com.val00n.dmpg.ui.main.MainActivity;
+import com.val00n.dmpg.ui.startup.StartupActivity;
 
 import java.util.ArrayList;
 
@@ -32,6 +34,7 @@ public class InstanceSettingsActivity extends Activity {
     private InstancesAdapter instancesAdapter;
     private Button checkButton;
     private Button addButton;
+    private Button logoutButton;
     private ArrayList<Instance> instances;
     // Others
     private MPGramService mpgService;
@@ -40,9 +43,12 @@ public class InstanceSettingsActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.instance_settings);
 
+        mpgService = new MPGramService();
+
         instancesList = (ListView) findViewById(R.id.instanceSettingsInstancesList);
         addButton = (Button) findViewById(R.id.instanceSettingsAddButton);
         checkButton = (Button) findViewById(R.id.instanceSettingsCheckButton);
+        logoutButton = (Button) findViewById(R.id.instanceSettingsLogoutButton);
 
         instancesList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -85,6 +91,49 @@ public class InstanceSettingsActivity extends Activity {
             }
         });
 
+        logoutButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                new AlertDialog.Builder(InstanceSettingsActivity.this)
+                        .setTitle("Logout")
+                        .setMessage("Please choose")
+                        .setPositiveButton("Every instance", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int i) {
+                                new AlertDialog.Builder(InstanceSettingsActivity.this)
+                                        .setTitle("ARE YOU SURE?")
+                                        .setMessage("Logout from every instance?")
+                                        .setPositiveButton("Logout", new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                            logoutEverywhere();
+                                            }
+                                        })
+                                        .setNegativeButton("Cancel", null)
+                                        .show();
+                            }
+                        })
+                        .setNeutralButton("Current instance", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int i) {
+                                new AlertDialog.Builder(InstanceSettingsActivity.this)
+                                        .setTitle("Are you sure?")
+                                        .setMessage("Logout from current instance?")
+                                        .setPositiveButton("Logout", new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                            logout();
+                                            }
+                                        })
+                                        .setNegativeButton("Cancel", null)
+                                        .show();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
+        });
+
         getInstances();
     }
 
@@ -94,7 +143,6 @@ public class InstanceSettingsActivity extends Activity {
     }
 
     private void checkInstances() {
-        mpgService = new MPGramService();
         instancesAdapter.resetStatus();
 
         for (int i = 0; i < instances.size(); i++) {
@@ -117,7 +165,7 @@ public class InstanceSettingsActivity extends Activity {
                         public void run() {
                             if (response.isLogged) {
                                 instancesAdapter.updateItem(index, response.ping, 1);
-                            } else if (token.equals("test")) {
+                            } else if (token.equals("session_test")) {
                                 instancesAdapter.updateItem(index, response.ping, 2);
                             } else {
                                 instancesAdapter.updateItem(index, response.ping, -1);
@@ -136,6 +184,85 @@ public class InstanceSettingsActivity extends Activity {
                     });
                 }
             });
+        }
+    }
+
+    private void logout() {
+        mpgService.logout(App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl()), new MPGramService.ApiCallback<LoginResponse>() {
+            @Override
+            public void onSuccess(LoginResponse result) {
+                if (result.getResponse().equals("1")) {
+                    App.getSessionManager().clearSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(InstanceSettingsActivity.this, "Successfully logged out", Toast.LENGTH_LONG).show();
+                            navigateToStartup();
+                        }
+                    });
+                } else {
+                    onError(new Exception("Invalid res: " + result.getResponse()));
+                }
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                Log.d(TAG, "onError: " + error.getMessage());
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(InstanceSettingsActivity.this, error.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void logoutEverywhere() {
+        SessionManager sm = App.getSessionManager();
+        ArrayList<Instance> instances = App.getInstanceManager().getInstances();
+        final int[] remaining = {0};
+
+        for (final Instance instance : instances) {
+            String instanceUserToken = sm.loadSession(instance.baseURL);
+            if (instanceUserToken != null && instanceUserToken.length() > 0) {
+                remaining[0]++;
+                mpgService.logout(instance, instanceUserToken, new MPGramService.ApiCallback<LoginResponse>() {
+                    @Override
+                    public void onSuccess(LoginResponse result) {
+                        if (result.getResponse().equals("1")) {
+                            App.getSessionManager().clearSession(instance.baseURL);
+                        }
+                        done();
+                    }
+
+                    @Override
+                    public void onError(Exception error) {
+                        Log.d(TAG, "onError: " + error.getMessage());
+                        done();
+                    }
+
+                    private void done() {
+                        remaining[0]--;
+                        if (remaining[0] == 0) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    Toast.makeText(InstanceSettingsActivity.this, "Successfully logged out", Toast.LENGTH_LONG).show();
+                                    navigateToStartup();
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        }
+
+        if (remaining[0] == 0) {
+            Toast.makeText(this, "No active sessions", Toast.LENGTH_SHORT).show();
+            return;
         }
     }
 
@@ -159,5 +286,12 @@ public class InstanceSettingsActivity extends Activity {
         } else {
             instancesAdapter.notifyDataSetChanged();
         }
+    }
+
+    private void navigateToStartup() {
+        Intent intent = new Intent(this, StartupActivity.class);
+        intent.putExtra("SKIP", true);
+        startActivity(intent);
+        finish();
     }
 }

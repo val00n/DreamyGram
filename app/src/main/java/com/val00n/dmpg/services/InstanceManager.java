@@ -58,6 +58,15 @@ public class InstanceManager {
         return selectedInstanceIndex;
     }
 
+    public boolean hasInstanceWithUrl(String url, int excludeIndex) {
+        for (int i = 0; i < instances.size(); i++) {
+            if (i != excludeIndex && instances.get(i).baseURL.equals(url)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void selectInstance(int index) {
         selectedInstanceIndex = index;
         saveSelectedIndex();
@@ -107,12 +116,11 @@ public class InstanceManager {
 
                     Instance instance = new Instance(obj.getNullable("baseURL").toString());
 
-                    instance.apiEndpoint = obj.getNullable("apiEndpoint").toString();
-                    instance.avatarEndpoint = obj.getNullable("avatarEndpoint").toString();
-                    instance.qrcodeEndpoint = obj.getNullable("qrcodeEndpoint").toString();
-                    instance.apiVersion = obj.getNullable("apiVersion").toString();
-                    instance.instancePassword = obj.getNullable("instancePassword").toString();
-                    instance.disableCertCheck = obj.getBoolean("disableCertCheck");
+                    instance.apiEndpoint = obj.getNullable("apiEndpoint") != null ? obj.getNullable("apiEndpoint").toString() : "api.php";
+                    instance.avatarEndpoint = obj.getNullable("avatarEndpoint") != null ? obj.getNullable("avatarEndpoint").toString() : "ava.php";
+                    instance.qrcodeEndpoint = obj.getNullable("qrcodeEndpoint") != null ? obj.getNullable("qrcodeEndpoint").toString() : "qrcode.php";
+                    instance.apiVersion = obj.getNullable("apiVersion") != null ? obj.getNullable("apiVersion").toString() : "10";
+                    instance.instancePassword = obj.getNullable("instancePassword") != null ? obj.getNullable("instancePassword").toString() : "";
 
                     instances.add(instance);
                 }
@@ -152,25 +160,25 @@ public class InstanceManager {
         wunder.apiEndpoint = "api.php";
         wunder.avatarEndpoint = "ava.php";
         wunder.qrcodeEndpoint = "qrcode.php";
-        wunder.apiVersion = "10";
+        wunder.apiVersion = "11";
         wunder.disableCertCheck = false;
         wunder.instancePassword = "";
         instances.add(wunder);
 
-        Instance nnchan = new Instance("http://mp.nnchan.ru");
+        Instance nnchan = new Instance("http://mp.nnproject.cc");
         nnchan.apiEndpoint = "api.php";
         nnchan.avatarEndpoint = "ava.php";
         nnchan.qrcodeEndpoint = "qrcode.php";
-        nnchan.apiVersion = "10";
+        nnchan.apiVersion = "11";
         nnchan.disableCertCheck = false;
         nnchan.instancePassword = "";
         instances.add(nnchan);
 
-        Instance nnchan2 = new Instance("http://mp2.nnchan.ru");
+        Instance nnchan2 = new Instance("http://10.0.2.2.");
         nnchan2.apiEndpoint = "api.php";
         nnchan2.avatarEndpoint = "ava.php";
         nnchan2.qrcodeEndpoint = "qrcode.php";
-        nnchan2.apiVersion = "10";
+        nnchan2.apiVersion = "11";
         nnchan2.disableCertCheck = false;
         nnchan2.instancePassword = "";
         instances.add(nnchan2);

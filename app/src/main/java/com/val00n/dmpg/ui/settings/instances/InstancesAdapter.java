@@ -3,6 +3,7 @@ package com.val00n.dmpg.ui.settings.instances;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,6 +20,8 @@ import com.val00n.dmpg.services.SessionManager;
 
 import java.util.ArrayList;
 
+import static android.content.ContentValues.TAG;
+
 public class InstancesAdapter extends BaseAdapter {
 
     private final ArrayList<Instance> items;
@@ -31,7 +34,6 @@ public class InstancesAdapter extends BaseAdapter {
     private final int UNKNOWN_STATUS = 0;
     private final int INACTIVE_STATUS = -1;
     private final int ERROR_STATUS = -2;
-
 
     public InstancesAdapter(Context context, ArrayList<Instance> items) {
         this.context = context;
@@ -64,12 +66,15 @@ public class InstancesAdapter extends BaseAdapter {
         notifyDataSetChanged();
     }
 
-    public void resetStatus() {
+    public void updateStatus() {
         if (sessionStatus.length != items.size()) {
             sessionStatus = new int[items.size()];
             pingResults = new long[items.size()];
         }
+    }
 
+    public void resetStatus() {
+        updateStatus();
         for (int i = 0; i < items.size(); i++) {
             pingResults[i] = 0;
             sessionStatus[i] = 0;
@@ -94,8 +99,9 @@ public class InstancesAdapter extends BaseAdapter {
             holder.editButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    int pos = (int) v.getTag();
                     Intent intent = new Intent(context, InstanceEditActivity.class);
-                    intent.putExtra("INSTANCE_INDEX", position);
+                    intent.putExtra("INSTANCE_INDEX", pos);
                     context.startActivity(intent);
                 }
             });
@@ -113,6 +119,10 @@ public class InstancesAdapter extends BaseAdapter {
 
         holder.title.setText(items.get(position).baseURL);
         holder.editButton.setTag(position);
+
+        if (position >= sessionStatus.length) {
+            updateStatus();
+        }
 
         switch (sessionStatus[position]) {
             case UNKNOWN_STATUS:
@@ -150,5 +160,4 @@ public class InstancesAdapter extends BaseAdapter {
         TextView ping;
         ImageButton editButton;
     }
-
 }

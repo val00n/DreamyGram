@@ -13,6 +13,7 @@
             android:layout_height="wrap_content"
             android:padding="2dp">
             <EditText
+                android:maxLines="1"
                 android:id="@+id/mainSearchEditText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -39,6 +40,7 @@
             android:id="@+id/mainDialogsListView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
+
     </LinearLayout>
 
     <ProgressBar

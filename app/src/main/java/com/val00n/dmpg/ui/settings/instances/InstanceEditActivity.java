@@ -86,8 +86,18 @@ public class InstanceEditActivity extends Activity {
             instance.instancePassword = passwordEditText.getText().toString();
 
             if (instanceIndex > -1) {
+                if (App.getInstanceManager().hasInstanceWithUrl(baseURL, instanceIndex)) {
+                    Toast.makeText(this, "Instance with this base URL already exists", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 App.getInstanceManager().editInstance(instance, instanceIndex);
             } else {
+                if (App.getInstanceManager().hasInstanceWithUrl(baseURL, -1)) {
+                    Toast.makeText(this, "Instance with this base URL already exists", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 App.getInstanceManager().addInstance(instance);
             }
 

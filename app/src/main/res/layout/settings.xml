@@ -3,11 +3,11 @@
               android:orientation="vertical"
               android:layout_width="match_parent"
               android:layout_height="match_parent">
+    <Button
+        android:id="@+id/settingsInstancesButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Instance settings"/>
 
-            <Button
-                android:id="@+id/settingsInstancesButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Instance settings"/>
 
 </LinearLayout>

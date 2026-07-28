@@ -46,7 +46,7 @@ public class HttpRequest {
         return this;
     }
 
-    String buildUrl() {
+    public String buildUrl() {
         StringBuilder sb = new StringBuilder(baseUrl);
         if (path != null && path.length() > 0) {
             if (!path.startsWith("/")) sb.append("/");

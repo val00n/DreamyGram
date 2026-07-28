@@ -1,7 +1,12 @@
 package com.val00n.dmpg.services;
 
 import com.val00n.dmpg.model.DialogItem;
+import com.val00n.dmpg.model.Dialogs;
+
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+
 import cc.nnproject.json.JSONArray;
 import cc.nnproject.json.JSONObject;
 
@@ -10,7 +15,7 @@ public class DialogsParser {
         ArrayList<DialogItem> result = new ArrayList<DialogItem>();
 
         if (!root.has("dialogs") || !root.has("users") || !root.has("chats")) {
-           return null;
+           return result;
         }
 
         JSONArray dialogs = root.getArray("dialogs");
@@ -21,15 +26,25 @@ public class DialogsParser {
         for (int i = 0; i < dialogs.size(); i++) {
             parsedDialogItem = new DialogItem();
             currentDialog = dialogs.getObject(i);
-            //  if (currentDialog.has("pin")) { // FOR SHOWCASE ONLY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            //      continue;
-            //  }
+
+            if (currentDialog.has("pin") && currentDialog.getBoolean("pin") == true) {
+                parsedDialogItem.isPinned = true;
+            }
+
+            if (currentDialog.has("unread")) {
+                parsedDialogItem.unreadMessages = currentDialog.getInt("unread", 0);
+            }
+
+            if (currentDialog.has("mentions")) {
+                parsedDialogItem.unreadMessages = currentDialog.getInt("mentions", 0);
+            }
 
             if (currentDialog.has("msg")) {
                 msg = currentDialog.getObject("msg");
 
                 parsedDialogItem.lastMessageText = msg.getString("text", "");
                 parsedDialogItem.lastMessageTimestamp = msg.getLong("date", 0) * 1000;
+                parsedDialogItem.lastMessageId = msg.getString("id", "");
 
                 if (msg.has("media")) {
                     JSONObject media = msg.getNullableObject("media");
@@ -59,10 +74,11 @@ public class DialogsParser {
                         String fromId = msg.getNullableString("from_id");
                         if (fromId != null && users.has(fromId)) {
                             JSONObject fromUser = users.getObject(fromId);
+
                             parsedDialogItem.lastMessageUser = fromUser.getString("fn");
 
                             if (fromUser.getNullableString("ln") != null) {
-                                parsedDialogItem.lastMessageUser += " " + fromUser.getString("ln");
+                                parsedDialogItem.lastMessageUser += ' ' + fromUser.getString("ln");
                             }
                         }
 
@@ -73,7 +89,7 @@ public class DialogsParser {
                         JSONObject currentUser = users.getObject(parsedDialogItem.id);
                         parsedDialogItem.displayName = currentUser.getString("fn");
                         if (currentUser.getNullableString("ln") != null) {
-                            parsedDialogItem.displayName += " " + currentUser.getString("ln");
+                            parsedDialogItem.displayName += ' ' + currentUser.getString("ln");
                         }
 
                         parsedDialogItem.hasAvatar = currentUser.getBoolean("p", false);
@@ -83,6 +99,13 @@ public class DialogsParser {
 
             result.add(parsedDialogItem);
         }
+
+        Collections.sort(result, new Comparator<DialogItem>() {
+            @Override
+            public int compare(DialogItem a, DialogItem b) {
+                return Boolean.valueOf(b.isPinned).compareTo(Boolean.valueOf(a.isPinned));
+            }
+        });
 
         return result;
     }

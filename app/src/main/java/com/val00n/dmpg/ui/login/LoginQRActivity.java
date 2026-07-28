@@ -60,22 +60,22 @@ public class LoginQRActivity extends Activity {
                         if (result.getResponse().equals("1")) {
                             sessionManager.saveSession(userToken);
                             navigateToMain(userToken);
+                        } else if (result.getResponse().equals("password")) {
+                            navigateTo2FA(userToken);
                         } else if (result.getText() != null && result.getText().length() > 0) {
                             if (result.getText().equals(qrLink)) {
-                                Log.d(TAG, "QR POLL: not logged, ITS THE SAME SOUND");
                                 qrPollingHandler.postDelayed(qrPollTask, 3000);
                             } else {
                                 qrLink = result.getText();
                                 getQrImage();
                                 qrPollingHandler.postDelayed(qrPollTask, 3000);
                             }
-
                         }
                     }
 
                     @Override
                     public void onError(Exception error) {
-
+                        error(error);
                     }
                 });
             }
@@ -122,15 +122,17 @@ public class LoginQRActivity extends Activity {
 
                         @Override
                         public void onError(Exception error) {
-                            Log.d(TAG, "onError: " + error.getMessage());
+                            error(error);
                         }
                     });
+                } else {
+                    error(new Exception("unexpected response: " + response.getResponse()));
                 }
             }
 
             @Override
             public void onError(final Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+                error(error);
             }
         });
     }
@@ -146,13 +148,13 @@ public class LoginQRActivity extends Activity {
                     getQrImage();
                     qrPollingHandler.postDelayed(qrPollTask, 5000);
                 } else {
-                    Log.d(TAG, "onSuccess: ERR: res is not valid: " + result.getResponse());
+                    error(new Exception("unexpected response: " + result.getResponse()));
                 }
             }
 
             @Override
             public void onError(Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+                error(error);
             }
         });
     }
@@ -165,12 +167,14 @@ public class LoginQRActivity extends Activity {
                     showQRCode(result);
                 } else {
                     Log.d(TAG, "onSuccess: ERR: qr img bytes is null");
+                    Toast.makeText(LoginQRActivity.this, "onError: null image", Toast.LENGTH_LONG).show();
+                    finish();
                 }
             }
 
             @Override
             public void onError(Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+                error(error);
             }
         });
     }
@@ -187,12 +191,10 @@ public class LoginQRActivity extends Activity {
                     if (bitmap != null) {
                         captchaImageView.setImageBitmap(bitmap);
                     } else {
-                        Toast.makeText(LoginQRActivity.this, "ERR: Failed to decode bitmap", Toast.LENGTH_LONG).show();
-                        Log.e(TAG, "ERR: Failed to decode bitmap");
+                        error(new Exception("ERR: Failed to decode bitmap"));
                     }
                 } else {
-                    Toast.makeText(LoginQRActivity.this, "ERR: Empty captcha image", Toast.LENGTH_LONG).show();
-                    Log.e(TAG, "ERR: Empty image bytes");
+                    error(new Exception("ERR: Empty captcha image"));
                 }
             }
         });
@@ -210,12 +212,10 @@ public class LoginQRActivity extends Activity {
                     if (bitmap != null) {
                         qrImageView.setImageBitmap(bitmap);
                     } else {
-                        Toast.makeText(LoginQRActivity.this, "ERR: Failed to decode bitmap", Toast.LENGTH_LONG).show();
-                        Log.e(TAG, "ERR: Failed to decode bitmap");
+                        error(new Exception("ERR: Failed to decode bitmap"));
                     }
                 } else {
-                    Toast.makeText(LoginQRActivity.this, "ERR: Empty captcha image", Toast.LENGTH_LONG).show();
-                    Log.e(TAG, "ERR: Empty image bytes");
+                    error(new Exception("ERR: empty image"));
                 }
             }
         });
@@ -228,6 +228,29 @@ public class LoginQRActivity extends Activity {
                 Intent intent = new Intent(LoginQRActivity.this, MainActivity.class);
                 intent.putExtra("USER_TOKEN", userToken);
                 startActivity(intent);
+                finish();
+            }
+        });
+    }
+
+    private void navigateTo2FA(final String userToken) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Intent intent = new Intent(LoginQRActivity.this, Login2FAActivity.class);
+                intent.putExtra("USER_TOKEN", userToken);
+                startActivity(intent);
+                finish();
+            }
+        });
+    }
+
+    private void error(final Exception error) {
+        Log.d(TAG, "onError: " + error.getMessage());
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(LoginQRActivity.this, "onError: " + error.getMessage(), Toast.LENGTH_LONG).show();
                 finish();
             }
         });

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Typeface;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -60,6 +61,7 @@ public class DialogsAdapter extends BaseAdapter {
             holder.title = (TextView) convertView.findViewById(R.id.dialogTitle);
             holder.lastTime = (TextView) convertView.findViewById(R.id.dialogLastTime);
             holder.lastMessage = (TextView) convertView.findViewById(R.id.dialogBottomText);
+            holder.unreadStatus = (TextView) convertView.findViewById(R.id.dialogUnreadText);
 
             convertView.setTag(holder);
         } else {
@@ -72,6 +74,19 @@ public class DialogsAdapter extends BaseAdapter {
         holder.title.setText(item.displayName);
         holder.lastMessage.setText(item.getSubtitle());
         holder.lastTime.setText(item.getDateTimeString());
+
+        if (item.unreadMessages > 0) {
+            holder.unreadStatus.setText("(" + item.unreadMessages + ")");
+        }
+
+        if (item.mentionsCount > 0) {
+            holder.unreadStatus.setText(holder.unreadStatus.getText().toString() + " @" + item.mentionsCount);
+        }
+
+        if (item.isPinned) {
+            holder.lastMessage.setText("(PIN) " + holder.lastMessage.getText());
+            holder.title.setTypeface(holder.title.getTypeface(), Typeface.BOLD);
+        }
 
         if (item.hasAvatar) {
             if (item.cachedAvatar != null) {
@@ -113,5 +128,6 @@ public class DialogsAdapter extends BaseAdapter {
         TextView title;
         TextView lastTime;
         TextView lastMessage;
+        TextView unreadStatus;
     }
 }

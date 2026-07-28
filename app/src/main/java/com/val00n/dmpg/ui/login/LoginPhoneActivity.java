@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -39,6 +40,7 @@ public class LoginPhoneActivity extends Activity {
     private Button phoneResendSubmitButton;
     // Others
     private MPGramService mpgService;
+    private CountDownTimer resendCountdownTimer;
     private String userToken;
     private String captchaId;
     private String phoneNumber;
@@ -76,6 +78,7 @@ public class LoginPhoneActivity extends Activity {
             public void onClick(View v) {
                 hideEverything();
                 submitCaptcha(phoneCaptchaEditText.getText().toString());
+                resendCooldown();
             }
         });
 
@@ -90,9 +93,17 @@ public class LoginPhoneActivity extends Activity {
         phoneResendSubmitButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                resendCode(); // add cooldown
+                resendCode();
             }
         });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (resendCountdownTimer != null) {
+            resendCountdownTimer.cancel();
+        }
     }
 
     private void hideEverything() {
@@ -102,16 +113,40 @@ public class LoginPhoneActivity extends Activity {
         phoneCodeLayout.setVisibility(View.GONE);
     }
 
+    private void resendCooldown() {
+        phoneResendSubmitButton.setEnabled(false);
+        resendCountdownTimer = new CountDownTimer(60000, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                long seconds = millisUntilFinished / 1000;
+                phoneResendSubmitButton.setText("Resend (" + seconds + "s)");
+            }
+
+            @Override
+            public void onFinish() {
+                phoneResendSubmitButton.setEnabled(true);
+                phoneResendSubmitButton.setText("Resend Code");
+            }
+        }.start();
+    }
+
     private void resendCode() {
-        mpgService.loginResendLoginCode(phoneNumber, userToken, phoneCodeHash, new MPGramService.ApiCallback<LoginResponse>() {
+        resendCooldown();
+
+        mpgService.loginResendLoginCode(phoneNumber, phoneCodeHash, userToken, new MPGramService.ApiCallback<LoginResponse>() {
             @Override
             public void onSuccess(LoginResponse result) {
-                Toast.makeText(LoginPhoneActivity.this, "Code sent again", Toast.LENGTH_SHORT);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(LoginPhoneActivity.this, "Code sent again", Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
 
             @Override
             public void onError(Exception error) {
-                Log.d(TAG, "onError: "+ error.getMessage());
+                error(error);
             }
         });
     }
@@ -125,12 +160,14 @@ public class LoginPhoneActivity extends Activity {
                     captchaId = response.getCaptchaID();
                     showCaptchaStep();
                     fetchCaptchaImage();
+                } else {
+                    showPhoneNumberStep("unexpected response: " + response.getResponse());
                 }
             }
 
             @Override
             public void onError(final Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+                error(error);
             }
         });
     }
@@ -148,12 +185,14 @@ public class LoginPhoneActivity extends Activity {
                     showCaptchaStep();
                 } else if ("phone_number_invalid".equals(response.getResponse())) {
                     showPhoneNumberStep("phone number invalid");
+                } else {
+                    showPhoneNumberStep("unexpected response: " + response.getResponse());
                 }
             }
 
             @Override
             public void onError(final Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+                error(error);
             }
         });
     }
@@ -165,14 +204,18 @@ public class LoginPhoneActivity extends Activity {
                 if ("1".equals(response.getResponse())) {
                     App.getSessionManager().saveSession(userToken);
                     navigateToMain(userToken);
+                } else if ("password".equals(response.getResponse())) {
+                    navigateTo2FA(userToken);
                 } else if ("phone_code_invalid".equals(response.getResponse())) {
                     showPhoneNumberStep("phone code invalid");
+                } else {
+                    showPhoneNumberStep("unexpected response: " + response.getResponse());
                 }
             }
 
             @Override
             public void onError(final Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+                error(error);
             }
         });
     }
@@ -186,7 +229,7 @@ public class LoginPhoneActivity extends Activity {
 
             @Override
             public void onError(final Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+                error(error);
             }
         });
     }
@@ -226,10 +269,12 @@ public class LoginPhoneActivity extends Activity {
                     } else {
                         Toast.makeText(LoginPhoneActivity.this, "ERR: Failed to decode bitmap", Toast.LENGTH_LONG).show();
                         Log.e(TAG, "ERR: Failed to decode bitmap");
+                        finish();
                     }
                 } else {
                     Toast.makeText(LoginPhoneActivity.this, "ERR: Empty captcha image", Toast.LENGTH_LONG).show();
-                    Log.e(TAG, "ERR: Empty image bytes");
+                    Log.e(TAG, "ERR: Empty captcha image bytes");
+                    finish();
                 }
             }
         });
@@ -252,6 +297,29 @@ public class LoginPhoneActivity extends Activity {
                 Intent intent = new Intent(LoginPhoneActivity.this, MainActivity.class);
                 intent.putExtra("USER_TOKEN", userToken);
                 startActivity(intent);
+                finish();
+            }
+        });
+    }
+
+    private void navigateTo2FA(final String userToken) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Intent intent = new Intent(LoginPhoneActivity.this, Login2FAActivity.class);
+                intent.putExtra("USER_TOKEN", userToken);
+                startActivity(intent);
+                finish();
+            }
+        });
+    }
+
+    private void error(final Exception error) {
+        Log.d(TAG, "onError: " + error.getMessage());
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(LoginPhoneActivity.this, "onError: " + error.getMessage(), Toast.LENGTH_LONG).show();
                 finish();
             }
         });

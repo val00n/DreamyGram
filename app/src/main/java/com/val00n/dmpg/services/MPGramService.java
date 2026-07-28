@@ -1,9 +1,12 @@
 package com.val00n.dmpg.services;
 
+import android.os.Build;
 import android.util.Log;
 import com.val00n.dmpg.App;
+import com.val00n.dmpg.BuildConfig;
 import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.DialogItem;
+import com.val00n.dmpg.model.Dialogs;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.LoginResponse;
 import com.val00n.dmpg.network.HttpClient;
@@ -21,7 +24,7 @@ public class MPGramService {
     private final RestClient restClient;
     private final InstanceManager instanceManager;
     private Instance instance;
-    private int getDialogLimit = 20; // TODO Pagination
+    private int getDialogLimit = 25; // TODO Pagination
 
     public interface ApiCallback<T> {
         void onSuccess(T result);
@@ -38,6 +41,27 @@ public class MPGramService {
         instance = instanceManager.getSelectedInstance();
     }
 
+    private Map<String, String> buildHeaders(String userToken, boolean includeInstancePassword, boolean includeClientInfo) {
+        Map<String, String> headers = new HashMap<>();
+        if (userToken != null && userToken.length() > 0) {
+            headers.put("X-MPGRAM-USER", userToken);
+        }
+        headers.put("X-MPGRAM-UNICODE", "1");
+
+        if (includeInstancePassword && instance.instancePassword != null
+                && instance.instancePassword.length() > 0) {
+            headers.put("X-MPGRAM-INSTANCE-PASSWORD", instance.instancePassword);
+        }
+
+        if (includeClientInfo) {
+            headers.put("X-MPGRAM-APP-VERSION", "DreamyGram " + BuildConfig.VERSION_NAME);
+            headers.put("X-MPGRAM-DEVICE", Build.MODEL);
+            headers.put("X-MPGRAM-SYSTEM", "Android " + Build.VERSION.RELEASE);
+        }
+
+        return headers;
+    }
+
     public void checkAuth(String userToken, final ApiCallback<AuthResult> callback) {
         checkAuth(instance, userToken, callback);
     }
@@ -48,14 +72,11 @@ public class MPGramService {
             return;
         }
 
-        // TODO: instance-side auto close session for inactive ones (on telegram sessions)
-
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getNotifySettings"); // i hate it. but i think this is only way to do something with telegram itself
         queryParams.put("v", pickedInstance.apiVersion);
 
-        final Map<String, String> headers = new HashMap<String, String>();
-        headers.put("X-MPGRAM-USER", userToken);
+        final Map<String, String> headers = buildHeaders(userToken, false, true);
 
         new Thread(new Runnable() {
             @Override
@@ -99,11 +120,13 @@ public class MPGramService {
         queryParams.put("v", instance.apiVersion);
         queryParams.put("phone", phoneNumber);
 
+        final Map<String, String> headers = buildHeaders(null, true, true);
+
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.getString(instance.baseURL, instance.apiEndpoint, queryParams);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -123,11 +146,13 @@ public class MPGramService {
         queryParams.put("v", instance.apiVersion);
         queryParams.put("qr", "1");
 
+        final Map<String, String> headers = buildHeaders(null, true, true);
+
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.getString(instance.baseURL, instance.apiEndpoint, queryParams);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -146,8 +171,7 @@ public class MPGramService {
         queryParams.put("method", "qrLogin");
         queryParams.put("v", instance.apiVersion);
 
-        final Map<String, String> headers = new HashMap<String, String>();
-        headers.put("X-MPGRAM-USER", userToken);
+        final Map<String, String> headers = buildHeaders(userToken, true, true);
 
         new Thread(new Runnable() {
             @Override
@@ -196,11 +220,13 @@ public class MPGramService {
         queryParams.put("captcha_id", captchaId);
         queryParams.put("captcha_key", captchaSolution);
 
+        final Map<String, String> headers = buildHeaders(null, true, true);
+
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.getString(instance.baseURL, instance.apiEndpoint, queryParams);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -222,11 +248,13 @@ public class MPGramService {
         queryParams.put("captcha_id", captchaId);
         queryParams.put("captcha_key", captchaSolution);
 
+        final Map<String, String> headers = buildHeaders(null, true, true);
+
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.getString(instance.baseURL, instance.apiEndpoint, queryParams);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -246,8 +274,7 @@ public class MPGramService {
         queryParams.put("v", instance.apiVersion);
         queryParams.put("code", code);
 
-        final Map<String, String> headers = new HashMap<String, String>();
-        headers.put("X-MPGRAM-USER", userToken);
+        final Map<String, String> headers = buildHeaders(userToken, true, true);
 
         new Thread(new Runnable() {
             @Override
@@ -274,8 +301,7 @@ public class MPGramService {
         queryParams.put("phone", phone);
         queryParams.put("hash", hash);
 
-        final Map<String, String> headers = new HashMap<String, String>();
-        headers.put("X-MPGRAM-USER", userToken);
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
 
         new Thread(new Runnable() {
             @Override
@@ -313,15 +339,13 @@ public class MPGramService {
         }).start();
     }
 
-    public void getDialogs(String userToken, final ApiCallback<ArrayList<DialogItem>> callback) {
+    public void loginComplete2FA(String password, String userToken, final ApiCallback<LoginResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
-        queryParams.put("method", "getDialogs");
+        queryParams.put("method", "complete2faLogin");
         queryParams.put("v", instance.apiVersion);
-        queryParams.put("limit", Integer.toString(getDialogLimit));
-        queryParams.put("media", "1");
+        queryParams.put("password", password);
 
-        final Map<String, String> headers = new HashMap<String, String>();
-        headers.put("X-MPGRAM-USER", userToken);
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
 
         new Thread(new Runnable() {
             @Override
@@ -332,7 +356,56 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    ArrayList<DialogItem> response = DialogsParser.parse(parsedJson);
+                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    if (callback != null) callback.onSuccess(response);
+                } catch (IOException e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        }).start();
+    }
+
+    public void getDialogs(String userToken, final ApiCallback<Dialogs> callback) {
+        getDialogs(null, null, 0, userToken, callback);
+    }
+
+    public void getDialogs(String offset_peer, String offset_id, long offset_date, String userToken, final ApiCallback<Dialogs> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "getDialogs");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("limit", Integer.toString(getDialogLimit));
+
+        if (offset_peer != null && offset_id != null && offset_date > 0) {
+            queryParams.put("offset_peer", offset_peer);
+            queryParams.put("offset_id", offset_id);
+            queryParams.put("offset_date", Long.toString(offset_date / 1000));
+        }
+
+        queryParams.put("media", "1");
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    ArrayList<DialogItem> dialogItems = DialogsParser.parse(parsedJson);
+
+                    Dialogs response = new Dialogs(dialogItems);
+                    response.count = parsedJson.getInt("count", 0);
+
+                    if (dialogItems != null && !dialogItems.isEmpty()) {
+                        DialogItem lastDialog = dialogItems.get(dialogItems.size() - 1);
+                        response.offsetPeer = lastDialog.id;
+                        response.offsetId = lastDialog.lastMessageId;
+                        response.offsetDate = lastDialog.lastMessageTimestamp;
+                    }
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -344,19 +417,46 @@ public class MPGramService {
     public void getAvatar(String peerId, String userToken, final ApiCallback<byte[]> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("c", peerId);
-        queryParams.put("p", "rp48");
+        queryParams.put("p", "rp48"); // i should unhardcode it
 
-        final Map<String, String> headers = new HashMap<String, String>();
-        headers.put("X-MPGRAM-USER", userToken);
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
 
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     byte[] imageBytes = restClient.postBytes(instance.baseURL, instance.avatarEndpoint, queryParams, headers);
-                    Log.d(TAG, "getAvatar: got bytes");
 
                     if (callback != null) callback.onSuccess(imageBytes);
+                } catch (IOException e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        }).start();
+    }
+
+    public void logout(String userToken, final ApiCallback<LoginResponse> callback) {
+        logout(instance, userToken, callback);
+    }
+
+    public void logout(final Instance pickedInstance, String userToken, final ApiCallback<LoginResponse> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "logout");
+        queryParams.put("v", pickedInstance.apiVersion);
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(pickedInstance.baseURL, pickedInstance.apiEndpoint, queryParams, headers);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
                 }
