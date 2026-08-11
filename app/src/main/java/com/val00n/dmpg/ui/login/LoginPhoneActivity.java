@@ -17,7 +17,7 @@ import android.widget.Toast;
 
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.LoginResponse;
+import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.ui.main.MainActivity;
 
@@ -133,9 +133,9 @@ public class LoginPhoneActivity extends Activity {
     private void resendCode() {
         resendCooldown();
 
-        mpgService.loginResendLoginCode(phoneNumber, phoneCodeHash, userToken, new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.loginResendLoginCode(phoneNumber, phoneCodeHash, userToken, new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(LoginResponse result) {
+            public void onSuccess(AuthResponse result) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -153,15 +153,15 @@ public class LoginPhoneActivity extends Activity {
 
     private void submitPhoneNumber(final String phoneNumber) {
         this.phoneNumber = phoneNumber;
-        mpgService.loginStartPhoneLogin(phoneNumber, new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.loginStartPhoneLogin(phoneNumber, new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(final LoginResponse response) {
-                if ("need_captcha".equals(response.getResponse())) {
-                    captchaId = response.getCaptchaID();
+            public void onSuccess(final AuthResponse response) {
+                if ("need_captcha".equals(response.response)) {
+                    captchaId = response.captchaID;
                     showCaptchaStep();
                     fetchCaptchaImage();
                 } else {
-                    showPhoneNumberStep("unexpected response: " + response.getResponse());
+                    showPhoneNumberStep("unexpected response: " + response.response);
                 }
             }
 
@@ -173,20 +173,20 @@ public class LoginPhoneActivity extends Activity {
     }
 
     private void submitCaptcha(final String captchaSolution) {
-        mpgService.loginSubmitCaptchaCode(captchaSolution, captchaId, phoneNumber, new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.loginSubmitCaptchaCode(captchaSolution, captchaId, phoneNumber, new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(final LoginResponse response) {
-                if ("code_sent".equals(response.getResponse())) {
-                    userToken = response.getUserToken();
-                    phoneCodeHash = response.getPhoneCodeHash();
+            public void onSuccess(final AuthResponse response) {
+                if ("code_sent".equals(response.response)) {
+                    userToken = response.userToken;
+                    phoneCodeHash = response.phoneCodeHash;
 
                     showLoginCodeStep();
-                } else if ("wrong_captcha".equals(response.getResponse())) {
+                } else if ("wrong_captcha".equals(response.response)) {
                     showCaptchaStep();
-                } else if ("phone_number_invalid".equals(response.getResponse())) {
+                } else if ("phone_number_invalid".equals(response.response)) {
                     showPhoneNumberStep("phone number invalid");
                 } else {
-                    showPhoneNumberStep("unexpected response: " + response.getResponse());
+                    showPhoneNumberStep("unexpected response: " + response.response);
                 }
             }
 
@@ -198,18 +198,18 @@ public class LoginPhoneActivity extends Activity {
     }
 
     private void submitLoginCode(final String loginCode) {
-        mpgService.loginSubmitLoginCode(loginCode, userToken, new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.loginSubmitLoginCode(loginCode, userToken, new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(final LoginResponse response) {
-                if ("1".equals(response.getResponse())) {
+            public void onSuccess(final AuthResponse response) {
+                if ("1".equals(response.response)) {
                     App.getSessionManager().saveSession(userToken);
                     navigateToMain(userToken);
-                } else if ("password".equals(response.getResponse())) {
+                } else if ("password".equals(response.response)) {
                     navigateTo2FA(userToken);
-                } else if ("phone_code_invalid".equals(response.getResponse())) {
+                } else if ("phone_code_invalid".equals(response.response)) {
                     showPhoneNumberStep("phone code invalid");
                 } else {
-                    showPhoneNumberStep("unexpected response: " + response.getResponse());
+                    showPhoneNumberStep("unexpected response: " + response.response);
                 }
             }
 

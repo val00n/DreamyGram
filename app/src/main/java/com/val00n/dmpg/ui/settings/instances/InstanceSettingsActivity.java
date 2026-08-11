@@ -16,11 +16,9 @@ import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.Instance;
-import com.val00n.dmpg.model.LoginResponse;
-import com.val00n.dmpg.network.RestClient;
+import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
-import com.val00n.dmpg.ui.main.MainActivity;
 import com.val00n.dmpg.ui.startup.StartupActivity;
 
 import java.util.ArrayList;
@@ -188,10 +186,10 @@ public class InstanceSettingsActivity extends Activity {
     }
 
     private void logout() {
-        mpgService.logout(App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl()), new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.logout(App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl()), new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(LoginResponse result) {
-                if (result.getResponse().equals("1")) {
+            public void onSuccess(AuthResponse result) {
+                if (result.response.equals("1")) {
                     App.getSessionManager().clearSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
 
                     runOnUiThread(new Runnable() {
@@ -202,7 +200,7 @@ public class InstanceSettingsActivity extends Activity {
                         }
                     });
                 } else {
-                    onError(new Exception("Invalid res: " + result.getResponse()));
+                    onError(new Exception("Invalid res: " + result.response));
                 }
             }
 
@@ -229,10 +227,10 @@ public class InstanceSettingsActivity extends Activity {
             String instanceUserToken = sm.loadSession(instance.baseURL);
             if (instanceUserToken != null && instanceUserToken.length() > 0) {
                 remaining[0]++;
-                mpgService.logout(instance, instanceUserToken, new MPGramService.ApiCallback<LoginResponse>() {
+                mpgService.logout(instance, instanceUserToken, new MPGramService.ApiCallback<AuthResponse>() {
                     @Override
-                    public void onSuccess(LoginResponse result) {
-                        if (result.getResponse().equals("1")) {
+                    public void onSuccess(AuthResponse result) {
+                        if (result.response.equals("1")) {
                             App.getSessionManager().clearSession(instance.baseURL);
                         }
                         done();

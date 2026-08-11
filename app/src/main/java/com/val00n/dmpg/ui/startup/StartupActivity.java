@@ -2,8 +2,6 @@ package com.val00n.dmpg.ui.startup;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -16,8 +14,6 @@ import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.Instance;
-import com.val00n.dmpg.model.LoginResponse;
-import com.val00n.dmpg.services.InstanceManager;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.ui.login.LoginPhoneActivity;
 import com.val00n.dmpg.ui.login.LoginQRActivity;

@@ -11,19 +11,16 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.DialogItem;
-import com.val00n.dmpg.model.Dialogs;
+import com.val00n.dmpg.model.Dialog;
+import com.val00n.dmpg.model.DialogResponse;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.ui.chat.ChatActivity;
 import com.val00n.dmpg.ui.settings.SettingsActivity;
 import com.val00n.dmpg.ui.startup.StartupActivity;
-
-import java.util.ArrayList;
-
+import java.util.Collections;
 import static android.content.ContentValues.TAG;
 
 public class MainActivity extends Activity {
@@ -38,7 +35,7 @@ public class MainActivity extends Activity {
     private MPGramService mpgService;
     private Instance instance;
     private String userToken;
-    private Dialogs dialogs;
+    private DialogResponse dialogs;
     private int loadedDialogs;
 
     public void onCreate(Bundle savedInstanceState) {
@@ -57,8 +54,8 @@ public class MainActivity extends Activity {
         dialogsListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Toast.makeText(MainActivity.this, "id: " + dialogs.dialogItems.get(position).id, Toast.LENGTH_SHORT).show();
-                navigateToChat(dialogs.dialogItems.get(position).id, dialogs.dialogItems.get(position).displayName);
+                Toast.makeText(MainActivity.this, "id: " + dialogs.dialogs.get(position).id, Toast.LENGTH_SHORT).show();
+                navigateToChat(dialogs.dialogs.get(position).id, dialogs.dialogs.get(position).getDisplayName());
             }
         });
 
@@ -82,11 +79,11 @@ public class MainActivity extends Activity {
 
     private void getDialogs() {
         loadedDialogs = 0;
-        mpgService.getDialogs(userToken, new MPGramService.ApiCallback<Dialogs>() {
+        mpgService.getDialogs(userToken, new MPGramService.ApiCallback<DialogResponse>() {
             @Override
-            public void onSuccess(final Dialogs result) {
+            public void onSuccess(final DialogResponse result) {
                 dialogs = result;
-                loadedDialogs += result.dialogItems.size();
+                loadedDialogs += result.dialogs.size();
                 showDialogs();
             }
 
@@ -111,10 +108,10 @@ public class MainActivity extends Activity {
         }
 
         loadMoreButton.setEnabled(false);
-        mpgService.getDialogs(dialogs.offsetPeer, dialogs.offsetId, dialogs.offsetDate, userToken, new MPGramService.ApiCallback<Dialogs>() {
+        mpgService.getDialogs(dialogs.offsetPeer, dialogs.offsetId, dialogs.offsetDate, userToken, new MPGramService.ApiCallback<DialogResponse>() {
             @Override
-            public void onSuccess(final Dialogs result) {
-                loadedDialogs += result.dialogItems.size();
+            public void onSuccess(final DialogResponse result) {
+                loadedDialogs += result.dialogs.size();
 
                 dialogs.offsetPeer = result.offsetPeer;
                 dialogs.offsetId = result.offsetId;
@@ -123,8 +120,8 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        for (DialogItem dialogItem : result.dialogItems) {
-                            dialogs.dialogItems.add(dialogItem);
+                        for (Dialog dialogItem : result.dialogs) {
+                            dialogs.dialogs.add(dialogItem);
                         }
 
                         showDialogs();
@@ -163,11 +160,13 @@ public class MainActivity extends Activity {
     }
 
     private void showDialogs() {
+        Collections.sort(dialogs.dialogs, Dialog.PINNED_FIRST);
+
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 if (dialogsAdapter == null) {
-                    dialogsAdapter = new DialogsAdapter(MainActivity.this, dialogs.dialogItems, userToken);
+                    dialogsAdapter = new DialogsAdapter(MainActivity.this, dialogs.dialogs, userToken);
                     dialogsListView.setAdapter(dialogsAdapter);
                 } else {
                     dialogsAdapter.notifyDataSetChanged();

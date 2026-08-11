@@ -14,14 +14,12 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.LoginResponse;
+import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
 import com.val00n.dmpg.ui.main.MainActivity;
-
 import static android.content.ContentValues.TAG;
 
 public class LoginQRActivity extends Activity {
@@ -54,19 +52,19 @@ public class LoginQRActivity extends Activity {
         qrPollTask = new Runnable() {
             @Override
             public void run() {
-                mpgService.loginQrPoll(userToken, new MPGramService.ApiCallback<LoginResponse>() {
+                mpgService.loginQrPoll(userToken, new MPGramService.ApiCallback<AuthResponse>() {
                     @Override
-                    public void onSuccess(LoginResponse result) {
-                        if (result.getResponse().equals("1")) {
+                    public void onSuccess(AuthResponse result) {
+                        if (result.response.equals("1")) {
                             sessionManager.saveSession(userToken);
                             navigateToMain(userToken);
-                        } else if (result.getResponse().equals("password")) {
+                        } else if (result.response.equals("password")) {
                             navigateTo2FA(userToken);
-                        } else if (result.getText() != null && result.getText().length() > 0) {
-                            if (result.getText().equals(qrLink)) {
+                        } else if (result.text != null && result.text.length() > 0) {
+                            if (result.text.equals(qrLink)) {
                                 qrPollingHandler.postDelayed(qrPollTask, 3000);
                             } else {
-                                qrLink = result.getText();
+                                qrLink = result.text;
                                 getQrImage();
                                 qrPollingHandler.postDelayed(qrPollTask, 3000);
                             }
@@ -108,11 +106,11 @@ public class LoginQRActivity extends Activity {
     }
 
     private void fetchCaptcha() {
-        mpgService.loginStartQRLogin(new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.loginStartQRLogin(new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(final LoginResponse response) {
-                if ("need_captcha".equals(response.getResponse())) {
-                    captchaId = response.getCaptchaID();
+            public void onSuccess(final AuthResponse response) {
+                if ("need_captcha".equals(response.response)) {
+                    captchaId = response.captchaID;
 
                     mpgService.loginGetCaptchaImage(captchaId, new MPGramService.ApiCallback<byte[]>() {
                         @Override
@@ -126,7 +124,7 @@ public class LoginQRActivity extends Activity {
                         }
                     });
                 } else {
-                    error(new Exception("unexpected response: " + response.getResponse()));
+                    error(new Exception("unexpected response: " + response.response));
                 }
             }
 
@@ -138,17 +136,17 @@ public class LoginQRActivity extends Activity {
     }
 
     private void submitCaptcha(final String captchaSolution) {
-        mpgService.loginGetQRData(captchaSolution, captchaId, new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.loginGetQRData(captchaSolution, captchaId, new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(LoginResponse result) {
-                if ("qr".equals(result.getResponse())) {
-                    qrLink = result.getText();
-                    userToken = result.getUserToken();
+            public void onSuccess(AuthResponse result) {
+                if ("qr".equals(result.response)) {
+                    qrLink = result.text;
+                    userToken = result.userToken;
 
                     getQrImage();
                     qrPollingHandler.postDelayed(qrPollTask, 5000);
                 } else {
-                    error(new Exception("unexpected response: " + result.getResponse()));
+                    error(new Exception("unexpected response: " + result.response));
                 }
             }
 

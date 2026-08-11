@@ -12,21 +12,19 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
-
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.DialogItem;
+import com.val00n.dmpg.model.Dialog;
 import com.val00n.dmpg.services.MPGramService;
-
 import java.util.ArrayList;
 
 public class DialogsAdapter extends BaseAdapter {
     private final Context context;
     private final MPGramService mpgService;
-    private final ArrayList<DialogItem> items;
+    private final ArrayList<Dialog> items;
     private final LayoutInflater inflater;
     private final String userToken;
 
-    public DialogsAdapter(Context context, ArrayList<DialogItem> items, String userToken) {
+    public DialogsAdapter(Context context, ArrayList<Dialog> items, String userToken) {
         this.context = context;
         this.userToken = userToken;
         this.mpgService = new MPGramService();
@@ -68,27 +66,27 @@ public class DialogsAdapter extends BaseAdapter {
             holder = (ViewHolder) convertView.getTag();
         }
 
-        final DialogItem item = items.get(position);
+        final Dialog item = items.get(position);
         final int currentPosition = position;
 
-        holder.title.setText(item.displayName);
+        holder.title.setText(item.getDisplayName());
         holder.lastMessage.setText(item.getSubtitle());
         holder.lastTime.setText(item.getDateTimeString());
 
-        if (item.unreadMessages > 0) {
-            holder.unreadStatus.setText("(" + item.unreadMessages + ")");
+        if (item.unread > 0) {
+            holder.unreadStatus.setText("(" + item.unread + ")");
         }
 
-        if (item.mentionsCount > 0) {
-            holder.unreadStatus.setText(holder.unreadStatus.getText().toString() + " @" + item.mentionsCount);
+        if (item.mentions > 0) {
+            holder.unreadStatus.setText(holder.unreadStatus.getText().toString() + " @" + item.mentions);
         }
 
-        if (item.isPinned) {
+        if (item.pin) {
             holder.lastMessage.setText("(PIN) " + holder.lastMessage.getText());
             holder.title.setTypeface(holder.title.getTypeface(), Typeface.BOLD);
         }
 
-        if (item.hasAvatar) {
+        if (item.hasAvatar()) {
             if (item.cachedAvatar != null) {
                 holder.avatar.setImageBitmap(item.cachedAvatar);
             } else {

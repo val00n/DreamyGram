@@ -8,14 +8,12 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
-
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.LoginResponse;
+import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
 import com.val00n.dmpg.ui.main.MainActivity;
-
 import static android.content.ContentValues.TAG;
 
 public class Login2FAActivity extends Activity {
@@ -48,13 +46,13 @@ public class Login2FAActivity extends Activity {
     }
 
     private void submit2FA(String password) {
-        mpgService.loginComplete2FA(password, userToken, new MPGramService.ApiCallback<LoginResponse>() {
+        mpgService.loginComplete2FA(password, userToken, new MPGramService.ApiCallback<AuthResponse>() {
             @Override
-            public void onSuccess(LoginResponse result) {
-                if (result.getResponse().equals("1")) {
+            public void onSuccess(AuthResponse result) {
+                if (result.response.equals("1")) {
                     sessionManager.saveSession(userToken);
                     navigateToMain();
-                } else if (result.getResponse().equals("password_hash_invalid")) {
+                } else if (result.response.equals("password_hash_invalid")) {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -62,7 +60,7 @@ public class Login2FAActivity extends Activity {
                         }
                     });
                 } else {
-                    onError(new Exception("Unexpected response: " + result.getResponse()));
+                    onError(new Exception("Unexpected response: " + result.response));
                 }
             }
 

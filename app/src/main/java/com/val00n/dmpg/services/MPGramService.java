@@ -5,14 +5,12 @@ import android.util.Log;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.BuildConfig;
 import com.val00n.dmpg.model.AuthResult;
-import com.val00n.dmpg.model.DialogItem;
-import com.val00n.dmpg.model.Dialogs;
+import com.val00n.dmpg.model.DialogResponse;
 import com.val00n.dmpg.model.Instance;
-import com.val00n.dmpg.model.LoginResponse;
+import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.network.HttpClient;
 import com.val00n.dmpg.network.RestClient;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import cc.nnproject.json.JSON;
@@ -112,7 +110,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginStartPhoneLogin(String phoneNumber, final ApiCallback<LoginResponse> callback) {
+    public void loginStartPhoneLogin(String phoneNumber, final ApiCallback<AuthResponse> callback) {
         phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : "+" + phoneNumber;
 
         final Map<String, String> queryParams = new HashMap<String, String>();
@@ -131,7 +129,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -140,7 +139,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginStartQRLogin(final ApiCallback<LoginResponse> callback) {
+    public void loginStartQRLogin(final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "initLogin");
         queryParams.put("v", instance.apiVersion);
@@ -157,7 +156,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -166,7 +166,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginQrPoll(String userToken, final ApiCallback<LoginResponse> callback) {
+    public void loginQrPoll(String userToken, final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "qrLogin");
         queryParams.put("v", instance.apiVersion);
@@ -182,7 +182,7 @@ public class MPGramService {
                     Log.d(TAG, "poll Raw Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
                 } catch (Exception e) {
@@ -212,7 +212,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginSubmitCaptchaCode(String captchaSolution, String captchaId, String phoneNumber, final ApiCallback<LoginResponse> callback) {
+    public void loginSubmitCaptchaCode(String captchaSolution, String captchaId, String phoneNumber, final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "phoneLogin");
         queryParams.put("v", instance.apiVersion);
@@ -231,7 +231,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -240,7 +241,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginGetQRData(String captchaSolution, String captchaId, final ApiCallback<LoginResponse> callback) {
+    public void loginGetQRData(String captchaSolution, String captchaId, final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "initLogin");
         queryParams.put("v", instance.apiVersion);
@@ -259,7 +260,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -268,7 +270,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginSubmitLoginCode(String code, String userToken, final ApiCallback<LoginResponse> callback) {
+    public void loginSubmitLoginCode(String code, String userToken, final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "completePhoneLogin");
         queryParams.put("v", instance.apiVersion);
@@ -285,7 +287,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -294,7 +297,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginResendLoginCode(String phone, String hash, String userToken, final ApiCallback<LoginResponse> callback) {
+    public void loginResendLoginCode(String phone, String hash, String userToken, final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "resendCode");
         queryParams.put("v", instance.apiVersion);
@@ -312,7 +315,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -339,7 +343,7 @@ public class MPGramService {
         }).start();
     }
 
-    public void loginComplete2FA(String password, String userToken, final ApiCallback<LoginResponse> callback) {
+    public void loginComplete2FA(String password, String userToken, final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "complete2faLogin");
         queryParams.put("v", instance.apiVersion);
@@ -356,7 +360,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
@@ -365,11 +370,11 @@ public class MPGramService {
         }).start();
     }
 
-    public void getDialogs(String userToken, final ApiCallback<Dialogs> callback) {
+    public void getDialogs(String userToken, final ApiCallback<DialogResponse> callback) {
         getDialogs(null, null, 0, userToken, callback);
     }
 
-    public void getDialogs(String offset_peer, String offset_id, long offset_date, String userToken, final ApiCallback<Dialogs> callback) {
+    public void getDialogs(String offset_peer, String offset_id, long offset_date, String userToken, final ApiCallback<DialogResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getDialogs");
         queryParams.put("v", instance.apiVersion);
@@ -378,7 +383,7 @@ public class MPGramService {
         if (offset_peer != null && offset_id != null && offset_date > 0) {
             queryParams.put("offset_peer", offset_peer);
             queryParams.put("offset_id", offset_id);
-            queryParams.put("offset_date", Long.toString(offset_date / 1000));
+            queryParams.put("offset_date", Long.toString(offset_date));
         }
 
         queryParams.put("media", "1");
@@ -394,17 +399,7 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    ArrayList<DialogItem> dialogItems = DialogsParser.parse(parsedJson);
-
-                    Dialogs response = new Dialogs(dialogItems);
-                    response.count = parsedJson.getInt("count", 0);
-
-                    if (dialogItems != null && !dialogItems.isEmpty()) {
-                        DialogItem lastDialog = dialogItems.get(dialogItems.size() - 1);
-                        response.offsetPeer = lastDialog.id;
-                        response.offsetId = lastDialog.lastMessageId;
-                        response.offsetDate = lastDialog.lastMessageTimestamp;
-                    }
+                    DialogResponse response = new DialogResponse(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
@@ -435,11 +430,11 @@ public class MPGramService {
         }).start();
     }
 
-    public void logout(String userToken, final ApiCallback<LoginResponse> callback) {
+    public void logout(String userToken, final ApiCallback<AuthResponse> callback) {
         logout(instance, userToken, callback);
     }
 
-    public void logout(final Instance pickedInstance, String userToken, final ApiCallback<LoginResponse> callback) {
+    public void logout(final Instance pickedInstance, String userToken, final ApiCallback<AuthResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "logout");
         queryParams.put("v", pickedInstance.apiVersion);
@@ -455,7 +450,8 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
-                    LoginResponse response = LoginResponse.fromJSON(parsedJson);
+                    AuthResponse response = new AuthResponse(parsedJson);
+
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {
                     if (callback != null) callback.onError(e);
