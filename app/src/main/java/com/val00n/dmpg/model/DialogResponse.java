@@ -39,14 +39,14 @@ public class DialogResponse {
                 dialog = dialogsRaw.getObject(i);
                 dialogId = dialog.getString("id");
 
-                if (dialogId.contains("-")) {
+                if (dialogId.startsWith("-")) {
                     chat = chats == null ? null : new Chat(chats.getNullableObject(dialogId));
 
                     if (dialog.has("msg")) {
                         msg = dialog.getObject("msg");
 
                         if (msg.has("from_id")) {
-                            if (msg.getString("from_id").contains("-")) {
+                            if (msg.getString("from_id").startsWith("-")) {
                                 dialogs.add(new Dialog(dialogsRaw.getObject(i), null, chat));
                             } else {
                                 user = users == null ? null : new User(users.getNullableObject(msg.getString("from_id")));

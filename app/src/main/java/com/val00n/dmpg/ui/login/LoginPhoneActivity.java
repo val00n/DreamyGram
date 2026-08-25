@@ -50,7 +50,7 @@ public class LoginPhoneActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login_phone);
 
-        mpgService = new MPGramService();
+        mpgService = App.getMPGramService();
 
         progressBar = (ProgressBar) findViewById(R.id.loginPhoneProgressBar);
         phoneNumberLayout = (LinearLayout) findViewById(R.id.loginPhoneNumberLayout);

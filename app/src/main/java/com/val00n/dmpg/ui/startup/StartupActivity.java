@@ -45,7 +45,7 @@ public class StartupActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.startup);
 
-        mpgService = new MPGramService();
+        mpgService = App.getMPGramService();
         instance = App.getInstanceManager().getSelectedInstance();
 
         startupProgressBar = (ProgressBar) findViewById(R.id.startupProgressBar);

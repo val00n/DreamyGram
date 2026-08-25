@@ -6,6 +6,7 @@ import com.val00n.dmpg.App;
 import com.val00n.dmpg.BuildConfig;
 import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.DialogResponse;
+import com.val00n.dmpg.model.HistoryResponse;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.network.HttpClient;
@@ -15,14 +16,19 @@ import java.util.HashMap;
 import java.util.Map;
 import cc.nnproject.json.JSON;
 import cc.nnproject.json.JSONObject;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import static android.content.ContentValues.TAG;
 
 public class MPGramService {
 
+    private final ExecutorService executor = Executors.newFixedThreadPool(6);
     private final RestClient restClient;
     private final InstanceManager instanceManager;
     private Instance instance;
-    private int getDialogLimit = 25; // TODO Pagination
+
+    private static final int GET_DIALOG_LIMIT = 25; // TODO change this in settings
+    private static final int GET_HISTORY_LIMIT = 30; // TODO change this in settings
 
     public interface ApiCallback<T> {
         void onSuccess(T result);
@@ -76,7 +82,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, false, true);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 long ping = 0;
@@ -107,7 +113,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginStartPhoneLogin(String phoneNumber, final ApiCallback<AuthResponse> callback) {
@@ -120,7 +126,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(null, true, true);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -136,7 +142,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginStartQRLogin(final ApiCallback<AuthResponse> callback) {
@@ -147,7 +153,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(null, true, true);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -163,7 +169,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginQrPoll(String userToken, final ApiCallback<AuthResponse> callback) {
@@ -173,7 +179,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, true, true);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -189,7 +195,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginGetCaptchaImage(String captchaId, final ApiCallback<byte[]> callback) {
@@ -198,7 +204,7 @@ public class MPGramService {
         queryParams.put("v", instance.apiVersion);
         queryParams.put("captcha_id", captchaId);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -209,7 +215,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginSubmitCaptchaCode(String captchaSolution, String captchaId, String phoneNumber, final ApiCallback<AuthResponse> callback) {
@@ -222,7 +228,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(null, true, true);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -238,7 +244,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginGetQRData(String captchaSolution, String captchaId, final ApiCallback<AuthResponse> callback) {
@@ -251,7 +257,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(null, true, true);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -267,7 +273,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginSubmitLoginCode(String code, String userToken, final ApiCallback<AuthResponse> callback) {
@@ -278,7 +284,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, true, true);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -294,7 +300,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginResendLoginCode(String phone, String hash, String userToken, final ApiCallback<AuthResponse> callback) {
@@ -306,7 +312,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -322,14 +328,14 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginGetQRImage(String encodedLink, final ApiCallback<byte[]> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("t", encodedLink);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -340,7 +346,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void loginComplete2FA(String password, String userToken, final ApiCallback<AuthResponse> callback) {
@@ -351,7 +357,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -367,18 +373,14 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
-    }
-
-    public void getDialogs(String userToken, final ApiCallback<DialogResponse> callback) {
-        getDialogs(null, null, 0, userToken, callback);
+        });
     }
 
     public void getDialogs(String offset_peer, String offset_id, long offset_date, String userToken, final ApiCallback<DialogResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getDialogs");
         queryParams.put("v", instance.apiVersion);
-        queryParams.put("limit", Integer.toString(getDialogLimit));
+        queryParams.put("limit", Integer.toString(GET_DIALOG_LIMIT));
 
         if (offset_peer != null && offset_id != null && offset_date > 0) {
             queryParams.put("offset_peer", offset_peer);
@@ -390,7 +392,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -406,7 +408,46 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
+    }
+
+    public void getHistory(String peer, String offset_id, long offset_date, String userToken, final ApiCallback<HistoryResponse> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "getHistory");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("limit", Integer.toString(GET_HISTORY_LIMIT));
+        queryParams.put("peer", peer);
+
+        if (offset_id != null) {
+            queryParams.put("offset_id", offset_id);
+        }
+
+        if (offset_date > 0) {
+            queryParams.put("offset_date", Long.toString(offset_date));
+        }
+
+        queryParams.put("media", "1");
+        queryParams.put("read", "1"); // FIXME: always read every loaded ones
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    HistoryResponse response = new HistoryResponse(parsedJson);
+
+                    if (callback != null) callback.onSuccess(response);
+                } catch (IOException e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
     }
 
     public void getAvatar(String peerId, String userToken, final ApiCallback<byte[]> callback) {
@@ -416,7 +457,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -427,7 +468,7 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 
     public void logout(String userToken, final ApiCallback<AuthResponse> callback) {
@@ -441,7 +482,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
-        new Thread(new Runnable() {
+        executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -457,6 +498,6 @@ public class MPGramService {
                     if (callback != null) callback.onError(e);
                 }
             }
-        }).start();
+        });
     }
 }

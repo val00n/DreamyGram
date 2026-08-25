@@ -1,9 +1,7 @@
 package com.val00n.dmpg.model;
 
 import android.graphics.Bitmap;
-import java.text.SimpleDateFormat;
-import java.util.Comparator;
-import java.util.Date;
+import com.val00n.dmpg.utils.DateUtils;
 import cc.nnproject.json.JSONObject;
 
 public class Dialog {
@@ -47,7 +45,7 @@ public class Dialog {
     }
 
     public String getDisplayName() {
-        if (id.contains("-") && chat != null) {
+        if (id.startsWith("-") && chat != null) {
             return chat.t;
         } else if (user != null) {
             return user.getDisplayName();
@@ -57,7 +55,7 @@ public class Dialog {
     }
 
     public boolean hasAvatar() {
-        if (id.contains("-") && chat != null) {
+        if (id.startsWith("-") && chat != null) {
             return chat.p;
         } else if (user != null) {
             return user.p;
@@ -72,7 +70,7 @@ public class Dialog {
         }
 
         if (msg.text != null && msg.text.length() > 0) {
-            if (id.contains("-") && user != null) {
+            if (id.startsWith("-") && user != null) {
                 return user.getDisplayName() + ": " + msg.text;
             } else {
                 return msg.text;
@@ -103,31 +101,10 @@ public class Dialog {
     }
 
     public String getDateTimeString() {
-        if (msg != null && msg.date > 0) {
-            Date date = new Date(msg.date * 1000);
-            Date dateNow = new Date();
-
-            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyyMMdd");
-            String dateStr = simpleDateFormat.format(date);
-            String nowStr = simpleDateFormat.format(dateNow);
-
-            if (dateStr.equals(nowStr)) {
-                simpleDateFormat = new SimpleDateFormat("HH:mm");
-            } else {
-                simpleDateFormat = new SimpleDateFormat("MM.dd HH:mm");
-            }
-
-            return simpleDateFormat.format(date);
+        if (msg != null) {
+            return DateUtils.formatChatTime(msg.date, true, System.currentTimeMillis());
         }
 
         return "XX:XX";
     }
-
-    public static final Comparator<Dialog> PINNED_FIRST = new Comparator<Dialog>() {
-        @Override
-        public int compare(Dialog a, Dialog b) {
-            if (a.pin == b.pin) return 0;
-            return a.pin ? -1 : 1;
-        }
-    };
 }

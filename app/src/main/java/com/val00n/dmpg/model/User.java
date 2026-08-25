@@ -1,5 +1,8 @@
 package com.val00n.dmpg.model;
 
+import com.val00n.dmpg.utils.DateUtils;
+
+import java.util.Date;
 import cc.nnproject.json.JSONObject;
 
 public class User {
@@ -58,5 +61,16 @@ public class User {
         }
 
         return result;
+    }
+
+    public String getStatusText() {
+        if (s) return "online";
+        if (w > 0) {
+            long now = System.currentTimeMillis();
+            return DateUtils.isToday(w, now)
+                    ? "last seen at " + DateUtils.formatTime(w)
+                    : "last seen " + DateUtils.formatDateTime(w);
+        }
+        return null;
     }
 }

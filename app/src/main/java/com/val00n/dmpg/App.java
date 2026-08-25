@@ -8,6 +8,7 @@ import android.os.Build;
 
 import com.val00n.dmpg.network.HttpClient;
 import com.val00n.dmpg.services.InstanceManager;
+import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
 
 public class App extends Application {
@@ -16,6 +17,7 @@ public class App extends Application {
     private static InstanceManager instanceManager;
     private static SessionManager sessionManager;
     private static ConnectivityManager cm;
+    private static MPGramService mpgService;
 
     public static Context get() {
         return app;
@@ -29,6 +31,13 @@ public class App extends Application {
         return sessionManager;
     }
 
+    public static MPGramService getMPGramService() {
+        if (mpgService == null) {
+            mpgService = new MPGramService();
+        }
+        return mpgService;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -36,8 +45,6 @@ public class App extends Application {
         app = this;
         instanceManager = new InstanceManager(this);
         sessionManager = new SessionManager(this);
-        //sessionManager.saveSession("GZwQDgEHrbCDpCEl4mmk6-5l5i55QFTr68kF__8zxdoO_sEesKm8-kBbs5q3Mudk", "http://mp.wunderwungiel.pl");
-        //instanceManager.selectInstance(2);
         cm = (ConnectivityManager) this.getSystemService(this.CONNECTIVITY_SERVICE);
 
         instanceManager.loadInstances();

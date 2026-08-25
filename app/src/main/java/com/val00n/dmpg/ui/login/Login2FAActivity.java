@@ -29,7 +29,7 @@ public class Login2FAActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login_2fa);
 
-        mpgService = new MPGramService();
+        mpgService = App.getMPGramService();
         sessionManager = App.getSessionManager();
 
         submitButton = (Button) findViewById(R.id.login2FASubmitButton);

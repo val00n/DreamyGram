@@ -21,81 +21,42 @@ public class Message {
     //  public Comments comments; // TODO
     //  public Reacts reacts; // TODO
 
+    public boolean dateSeparator; // ugly. THERE IS NO DATE SEPARATOR FLAG IN API
+
     public Message(JSONObject json) {
-        id = json.getString("id");
-        date = json.getLong("date", 0);
+        if (json != null) {
+            id = json.getString("id");
+            date = json.getLong("date", 0);
 
-        if (json.has("text")) {
-            text = json.getString("text");
-        }
+            if (json.has("text")) {
+                text = json.getString("text");
+            }
 
-        if (json.has("out")) {
-            out = json.getBoolean("out");
-        }
+            if (json.has("out")) {
+                out = json.getBoolean("out");
+            }
 
-        if (json.has("peer_id")) {
-            peer_id = json.getString("peer_id");
-        }
+            if (json.has("peer_id")) {
+                peer_id = json.getString("peer_id");
+            }
 
-        if (json.has("from_id")) {
-            from_id = json.getString("from_id");
-        }
+            if (json.has("from_id")) {
+                from_id = json.getString("from_id");
+            }
 
-        if (json.has("media")) {
-            media = new MessageMedia(json.getObject("media"));
-        } else if (json.has("act")) {
-            act = new Act(json.getObject("act"));
-        }
-    }
-}
-
-class MessageMedia {
-    public String type;
-    public boolean hide;
-
-    public String id;
-    public long date;
-
-    // Document
-    public String mime;
-
-    // TODO
-    // TODO type specific fields
-    // TODO
-
-    public MessageMedia(JSONObject json) {
-        if (json == null) return;
-
-        type = json.getNullableString("type");
-
-        if (json.has("hide") && json.getInt("hide") == 1) {
-            hide = true;
-        }
-
-        if (json.has("mime")) {
-            mime = json.getString("mime");
-
-            if ((mime.equals("image/webp") || mime.equals("video/webm") || mime.equals("application/x-tgsticker"))) {
-                type = "sticker"; // possible FIXME???
+            if (json.has("media")) {
+                media = new MessageMedia(json.getObject("media"));
+            } else if (json.has("act")) {
+                act = new Act(json.getObject("act"));
             }
         }
     }
-}
 
-class Act {
-    public String action;
-    public String user; // TODO
-    public String t; // TODO
-
-    public Act(JSONObject json) {
-        action = json.getString("_", "unknown action");
-
-        if (json.has("user")) {
-            user = json.getNullableString("user");
-        }
-
-        if (json.has("t")) {
-            t = json.getNullableString("t");
-        }
+    public static Message dateSeparator(long seconds) {
+        Message m = new Message(null);
+        m.date = seconds;
+        m.dateSeparator = true;
+        return m;
     }
 }
+

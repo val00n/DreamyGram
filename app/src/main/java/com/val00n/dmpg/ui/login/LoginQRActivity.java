@@ -45,9 +45,10 @@ public class LoginQRActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login_qr);
 
-        mpgService = new MPGramService();
-        qrPollingHandler = new Handler();
+        mpgService = App.getMPGramService();
         sessionManager = App.getSessionManager();
+
+        qrPollingHandler = new Handler();
 
         qrPollTask = new Runnable() {
             @Override

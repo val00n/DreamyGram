@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content">
+    <View
+        android:id="@+id/messageDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#40E0E0E0" />
+
+    <TextView
+        android:id="@+id/actMessageText"
+        android:padding="6dp"
+        android:gravity="center"
+        android:text="Action message text"
+        android:textSize="16sp"
+        android:textColor="@android:color/secondary_text_dark"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+</LinearLayout>

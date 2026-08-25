@@ -41,7 +41,7 @@ public class InstanceSettingsActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.instance_settings);
 
-        mpgService = new MPGramService();
+        mpgService = App.getMPGramService();
 
         instancesList = (ListView) findViewById(R.id.instanceSettingsInstancesList);
         addButton = (Button) findViewById(R.id.instanceSettingsAddButton);

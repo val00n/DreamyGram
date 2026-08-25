@@ -18,6 +18,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:gravity="center|top"
             android:orientation="horizontal">
             <TextView
                 android:id="@+id/dialogTitle"
@@ -29,11 +30,18 @@
                 android:textSize="20sp"
                 android:maxLines="1"
                 android:ellipsize="end"/>
+            <ImageView
+                android:visibility="visible"
+                android:id="@+id/dialogPinIcon"
+                android:src="@drawable/ic_pin"
+                android:layout_marginTop="4dp"
+                android:layout_marginRight="4dp"
+                android:layout_width="17dp"
+                android:layout_height="17dp"/>
             <TextView
                 android:id="@+id/dialogLastTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="right"
                 android:text="XX:XX"
                 android:textColor="@android:color/secondary_text_dark"
                 android:textSize="17sp"
