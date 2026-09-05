@@ -25,7 +25,6 @@ import static android.content.ContentValues.TAG;
 
 public class LoginPhoneActivity extends Activity {
 
-    // UI
     private ProgressBar progressBar;
     private LinearLayout phoneNumberLayout;
     private LinearLayout phoneCaptchaLayout;
@@ -38,7 +37,7 @@ public class LoginPhoneActivity extends Activity {
     private Button phoneCaptchaSubmitButton;
     private Button phoneCodeSubmitButton;
     private Button phoneResendSubmitButton;
-    // Others
+
     private MPGramService mpgService;
     private CountDownTimer resendCountdownTimer;
     private String userToken;

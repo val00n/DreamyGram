@@ -119,7 +119,7 @@ public class InstanceManager {
                     instance.apiEndpoint = obj.getNullable("apiEndpoint") != null ? obj.getNullable("apiEndpoint").toString() : "api.php";
                     instance.avatarEndpoint = obj.getNullable("avatarEndpoint") != null ? obj.getNullable("avatarEndpoint").toString() : "ava.php";
                     instance.qrcodeEndpoint = obj.getNullable("qrcodeEndpoint") != null ? obj.getNullable("qrcodeEndpoint").toString() : "qrcode.php";
-                    instance.apiVersion = obj.getNullable("apiVersion") != null ? obj.getNullable("apiVersion").toString() : "10";
+                    instance.apiVersion = obj.getNullable("apiVersion") != null ? obj.getNullable("apiVersion").toString() : "12";
                     instance.instancePassword = obj.getNullable("instancePassword") != null ? obj.getNullable("instancePassword").toString() : "";
 
                     instances.add(instance);
@@ -160,7 +160,7 @@ public class InstanceManager {
         wunder.apiEndpoint = "api.php";
         wunder.avatarEndpoint = "ava.php";
         wunder.qrcodeEndpoint = "qrcode.php";
-        wunder.apiVersion = "11";
+        wunder.apiVersion = "12";
         wunder.disableCertCheck = false;
         wunder.instancePassword = "";
         instances.add(wunder);
@@ -169,7 +169,7 @@ public class InstanceManager {
         nnchan.apiEndpoint = "api.php";
         nnchan.avatarEndpoint = "ava.php";
         nnchan.qrcodeEndpoint = "qrcode.php";
-        nnchan.apiVersion = "11";
+        nnchan.apiVersion = "12";
         nnchan.disableCertCheck = false;
         nnchan.instancePassword = "";
         instances.add(nnchan);
@@ -178,7 +178,7 @@ public class InstanceManager {
         nnchan2.apiEndpoint = "api.php";
         nnchan2.avatarEndpoint = "ava.php";
         nnchan2.qrcodeEndpoint = "qrcode.php";
-        nnchan2.apiVersion = "11";
+        nnchan2.apiVersion = "12";
         nnchan2.disableCertCheck = false;
         nnchan2.instancePassword = "";
         instances.add(nnchan2);

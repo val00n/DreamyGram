@@ -22,7 +22,7 @@ import static android.content.ContentValues.TAG;
 
 public class MPGramService {
 
-    private final ExecutorService executor = Executors.newFixedThreadPool(6);
+    private final ExecutorService executor;
     private final RestClient restClient;
     private final InstanceManager instanceManager;
     private Instance instance;
@@ -35,8 +35,9 @@ public class MPGramService {
         void onError(Exception error);
     }
 
-    public MPGramService() {
+    public MPGramService(int threads) {
         this.restClient = new RestClient();
+        executor = Executors.newFixedThreadPool(threads);
         instanceManager = App.getInstanceManager();
         instance = instanceManager.getSelectedInstance();
     }
@@ -100,15 +101,22 @@ public class MPGramService {
                 } catch (IOException e) {
                     String msg = e.getMessage();
 
-                    if (msg != null && (msg.contains("401") || msg.contains("authentication challenge"))) {
-                        // code 401 means that session is expired
-                        // ugly as hell, needs refactor
-                        AuthResult result = new AuthResult(false, ping);
+                    if (msg != null) {
+                        msg = msg.toLowerCase();
 
-                        if (callback != null) callback.onSuccess(result);
+                        if ((msg.contains("401") || msg.contains("authentication challenge") || msg.contains("unsupported API version"))) {
+                            // code 401 means that session is expired
+                            // ugly as hell, needs refactor
+                            AuthResult result = new AuthResult(false, ping);
+
+                            if (callback != null) callback.onSuccess(result);
+                        } else {
+                            if (callback != null) callback.onError(e);
+                        }
                     } else {
                         if (callback != null) callback.onError(e);
                     }
+
                 } catch (Exception e) {
                     if (callback != null) callback.onError(e);
                 }
@@ -441,6 +449,114 @@ public class MPGramService {
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     HistoryResponse response = new HistoryResponse(parsedJson);
+
+                    if (callback != null) callback.onSuccess(response);
+                } catch (IOException e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
+    public void sendMessage(String userToken, String peer, String text, String reply, String fwdFrom, String fwdId, String top, final ApiCallback<String> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "sendMessage");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("peer", peer);
+
+        if (text != null) {
+            queryParams.put("text", text);
+        }
+
+        if (reply != null) {
+            queryParams.put("reply", reply);
+        }
+
+        if (fwdFrom != null) {
+            queryParams.put("fwd_from", fwdFrom);
+        }
+
+        if (fwdId != null) {
+            queryParams.put("id", fwdId);
+        }
+
+        if (top != null) {
+            queryParams.put("top", top);
+        }
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    String response = parsedJson.getNullableString("res");
+
+                    if (callback != null) callback.onSuccess(response);
+                } catch (IOException e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
+    public void deleteMessage(String userToken, String peer, String id, boolean revoke, final ApiCallback<String> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "deleteMessage");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("peer", peer);
+        queryParams.put("id", id);
+
+        if (revoke) {
+            queryParams.put("revoke", "1");
+        }
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    String response = parsedJson.getNullableString("res");
+
+                    if (callback != null) callback.onSuccess(response);
+                } catch (IOException e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
+    public void editMessage(String userToken, String peer, String id, String text, final ApiCallback<String> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "editMessage");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("peer", peer);
+        queryParams.put("id", id);
+        queryParams.put("text", text);
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    String response = parsedJson.getNullableString("res");
 
                     if (callback != null) callback.onSuccess(response);
                 } catch (IOException e) {

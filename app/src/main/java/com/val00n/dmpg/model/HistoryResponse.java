@@ -7,7 +7,7 @@ import cc.nnproject.json.JSONArray;
 import cc.nnproject.json.JSONObject;
 
 public class HistoryResponse {
-    public int count; // total messages
+    public int totalCount;
     public ArrayList<Message> messages;
     public Map<String, User> users;
     public Map<String, Chat> chats;
@@ -15,7 +15,7 @@ public class HistoryResponse {
     public long offsetDate; // last msg timestamp
 
     public HistoryResponse(JSONObject json) {
-        count = json.getInt("count", 0);
+        totalCount = json.getInt("count", 0);
 
         JSONObject rawUsers = json.getNullableObject("users");
 

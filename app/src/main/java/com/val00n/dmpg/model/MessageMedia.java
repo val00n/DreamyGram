@@ -31,6 +31,8 @@ public class MessageMedia {
             if ((mime.equals("image/webp") || mime.equals("video/webm") || mime.equals("application/x-tgsticker"))) {
                 type = "sticker"; // possible FIXME???
             }
+        } else {
+            mime = null;
         }
     }
 }

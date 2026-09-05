@@ -5,14 +5,14 @@ import cc.nnproject.json.JSONArray;
 import cc.nnproject.json.JSONObject;
 
 public class DialogResponse {
-    public int count; // total dialogs
+    public int totalCount;
     public ArrayList<Dialog> dialogs;
     public String offsetPeer; // last dialog id
     public String offsetId; // last msg id (not user)
     public long offsetDate; // last msg timestamp
 
     public DialogResponse(JSONObject json) {
-        count = json.getInt("count", 0);
+        totalCount = json.getInt("count", 0);
 
         JSONObject users = null;
         if (json.has("users")) {

@@ -1,8 +1,6 @@
 package com.val00n.dmpg.model;
 
 import com.val00n.dmpg.utils.DateUtils;
-
-import java.util.Date;
 import cc.nnproject.json.JSONObject;
 
 public class User {

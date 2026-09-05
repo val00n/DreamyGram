@@ -24,7 +24,6 @@ import static android.content.ContentValues.TAG;
 
 public class StartupActivity extends Activity {
 
-    // UI
     private ProgressBar startupProgressBar;
     private LinearLayout welcomeLayout;
     private LinearLayout warningLayout;
@@ -34,7 +33,7 @@ public class StartupActivity extends Activity {
     private Button QRLoginButton;
     private Button phoneLoginButton;
     private Button instanceSettingsButton;
-    // Others
+
     private MPGramService mpgService;
     private Instance instance;
     private String userToken;
@@ -109,16 +108,16 @@ public class StartupActivity extends Activity {
         if (currentInstance == null) return;
 
         instance = currentInstance;
-        mpgService = new MPGramService();
+        mpgService = App.getMPGramService();
         userToken = App.getSessionManager().loadSession(instance.baseURL);
         hideEverything();
         startupProgressBar.setVisibility(View.VISIBLE);
 
-        isChecking = false;
-
         if (userToken == null || userToken.length() == 0) {
             userToken = "instance_check";
             Log.d(TAG, "onResume: nol");
+
+            isChecking = false;
             checkSessionStatus();
 
             startupProgressBar.setVisibility(View.GONE);
@@ -128,6 +127,8 @@ public class StartupActivity extends Activity {
                 loginTypesLayout.setVisibility(View.VISIBLE);
         } else {
             Log.d(TAG, "onResume: else");
+
+            isChecking = false;
             checkSessionStatus();
         }
     }

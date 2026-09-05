@@ -14,7 +14,7 @@ public class Instance {
         apiEndpoint = "api.php";
         avatarEndpoint = "ava.php";
         qrcodeEndpoint = "qrcode.php";
-        apiVersion = "10";
+        apiVersion = "12";
         disableCertCheck = false;
         instancePassword = "";
     }

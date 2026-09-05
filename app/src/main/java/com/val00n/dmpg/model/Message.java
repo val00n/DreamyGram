@@ -9,10 +9,10 @@ public class Message {
     public boolean out; // outbox
     public String peer_id;
     public String from_id;
-    //  public Forward fwd; // TODO
+    public MessageForward fwd;
     public MessageMedia media;
     public Act act;
-    //  public Reply reply; // TODO
+    public MessageReply reply;
     //  public Markup markup; // TODO
     public long group; // TODO
     public long edit; // TODO
@@ -42,6 +42,14 @@ public class Message {
 
             if (json.has("from_id")) {
                 from_id = json.getString("from_id");
+            }
+
+            if (json.has("fwd")) {
+                fwd = new MessageForward(json.getObject("fwd"));
+            }
+
+            if (json.has("reply")) {
+                reply = new MessageReply(json.getObject("reply"));
             }
 
             if (json.has("media")) {

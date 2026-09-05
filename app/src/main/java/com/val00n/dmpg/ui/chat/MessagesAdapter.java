@@ -14,11 +14,11 @@ import com.val00n.dmpg.model.Chat;
 import com.val00n.dmpg.model.Message;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.utils.DateUtils;
-
 import java.util.ArrayList;
 import java.util.Map;
 
 public class MessagesAdapter extends BaseAdapter {
+
     private final Context context;
     private final Map<String, User> users;
     private final Map<String, Chat> chats;
@@ -26,7 +26,6 @@ public class MessagesAdapter extends BaseAdapter {
     private final LayoutInflater inflater;
     private final int rowMarginPx;
     private final int avatarWidthPx;
-    private long nowMilis;
 
     private static final int VIEW_TYPE_IN = 0;
     private static final int VIEW_TYPE_OUT = 1;
@@ -44,7 +43,7 @@ public class MessagesAdapter extends BaseAdapter {
         this.users = users;
         this.chats = chats;
 
-        float density = context.getResources().getDisplayMetrics().density;
+        float density = this.context.getResources().getDisplayMetrics().density;
         rowMarginPx = Math.round(4 * density);
         avatarWidthPx = Math.round((AVATAR_PADDING_WIDTH + AVATAR_WIDTH) * density);
     }
@@ -69,10 +68,6 @@ public class MessagesAdapter extends BaseAdapter {
         final ViewHolder holder;
         final int viewType = getItemViewType(position);
 
-        if (position == 0) {
-            nowMilis = System.currentTimeMillis();
-        }
-
         if (viewType == VIEW_TYPE_ACT) return bindActView(items.get(position), convertView, parent);
 
         if (convertView == null) {
@@ -88,6 +83,10 @@ public class MessagesAdapter extends BaseAdapter {
             holder.text = (TextView) convertView.findViewById(R.id.messageText);
             holder.textLayout = (LinearLayout) convertView.findViewById(R.id.messageTextLayout);
             holder.titleRow = (LinearLayout) convertView.findViewById(R.id.messageTitleRow);
+            holder.captionLayout = (LinearLayout) convertView.findViewById(R.id.messageCaptionLayout);
+            holder.quoteLayout = (LinearLayout) convertView.findViewById(R.id.messageQuoteLayout);
+            holder.quoteText = (TextView) convertView.findViewById(R.id.messageQuoteText);
+            holder.captionText = (TextView) convertView.findViewById(R.id.messageCaptionText);
             holder.divider = convertView.findViewById(R.id.messageDivider);
 
             convertView.setTag(holder);
@@ -100,6 +99,7 @@ public class MessagesAdapter extends BaseAdapter {
 
         final boolean isGrouped = prev != null
                 && !prev.dateSeparator
+                && item.fwd == null
                 && prev.act == null
                 && item.date - prev.date < GROUP_INTERVAL_SECONDS
                 && isSameSender(item, prev);
@@ -113,12 +113,12 @@ public class MessagesAdapter extends BaseAdapter {
 
             if (isGrouped) {
                 if (viewType == VIEW_TYPE_OUT) {
-                    holder.text.setPadding(0, 0, avatarWidthPx, 0);
+                    holder.textLayout.setPadding(0, 0, avatarWidthPx, 0);
                 } else {
-                    holder.text.setPadding(avatarWidthPx, 0, 0, 0);
+                    holder.textLayout.setPadding(avatarWidthPx, 0, 0, 0);
                 }
             } else {
-                holder.text.setPadding(0, 0, 0, 0);
+                holder.textLayout.setPadding(0, 0, 0, 0);
             }
 
             LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) holder.textLayout.getLayoutParams();
@@ -126,35 +126,71 @@ public class MessagesAdapter extends BaseAdapter {
             holder.textLayout.setLayoutParams(lp);
         }
 
-        if (item.text != null && item.text.length() > 0) {
-            holder.text.setText(item.text);
-        } else if (item.media != null && item.media.type != null) {
-            holder.text.setText("MEDIA: " + item.media.type + "MIME:" + item.media.mime);
-        } else {
-            holder.text.setText("NO MESSAGE");
-        }
+        holder.text.setText(getContentString(item));
 
         if (!item.out) {
-            if (item.from_id != null && item.from_id.length() > 0) {
-                if (item.from_id.startsWith("-")) {
-                    holder.title.setText(getChatTitle(chats, item.from_id));
-                } else {
-                    holder.title.setText(getUserTitle(users, item.from_id));
-                }
-            } else if (item.peer_id != null && item.peer_id.length() > 0) {
-                if (item.peer_id.startsWith("-")) {
-                    holder.title.setText(getChatTitle(chats, item.peer_id));
-                } else {
-                    holder.title.setText(getUserTitle(users, item.peer_id));
-                }
-            } else {
-                holder.title.setText("UNKNOWN USER");
-            }
+            holder.title.setText(getNameString(item));
         }
 
-        holder.date.setText(DateUtils.formatChatTime(item.date, false, nowMilis));
+        if (item.reply != null && item.reply.msg != null) {
+            holder.quoteLayout.setVisibility(View.VISIBLE);
+            holder.quoteText.setText(getNameString(item.reply.msg) + ":\n" + getContentString(item.reply.msg));
+        } else {
+            holder.quoteLayout.setVisibility(View.GONE);
+        }
+
+        if (item.fwd != null && (item.fwd.fromId != null || item.fwd.fromName != null)) {
+            holder.captionLayout.setVisibility(View.VISIBLE);
+
+            String senderName;
+            if (item.fwd.fromName != null) {
+                senderName = item.fwd.fromName;
+            } else if (item.fwd.fromId != null && item.fwd.fromId.length() > 0) {
+                if (item.fwd.fromId.startsWith("-")) {
+                    senderName = getChatTitle(chats, item.fwd.fromId);
+                } else {
+                    senderName = getUserTitle(users, item.fwd.fromId);
+                }
+            } else {
+                senderName = "unknown";
+            }
+
+            holder.captionText.setText("Forwarded from: " + senderName);
+        } else {
+            holder.captionLayout.setVisibility(View.GONE);
+        }
+
+        holder.date.setText(DateUtils.formatChatTime(item.date, false, 0));
 
         return convertView;
+    }
+
+    private String getNameString(Message item) {
+        if (item.from_id != null && item.from_id.length() > 0) {
+            if (item.from_id.startsWith("-")) {
+                return getChatTitle(chats, item.from_id);
+            } else {
+                return getUserTitle(users, item.from_id);
+            }
+        } else if (item.peer_id != null && item.peer_id.length() > 0) {
+            if (item.peer_id.startsWith("-")) {
+                return getChatTitle(chats, item.peer_id);
+            } else {
+                return getUserTitle(users, item.peer_id);
+            }
+        } else {
+            return "unknown";
+        }
+    }
+
+    private String getContentString(Message item) {
+        if (item.text != null && item.text.length() > 0) {
+            return item.text;
+        } else if (item.media != null && item.media.type != null) {
+            return "MEDIA: " + item.media.type + "\nMIME:" + item.media.mime;
+        } else {
+            return "NO MESSAGE";
+        }
     }
 
     private View bindActView(Message item, View convertView, ViewGroup parent) {
@@ -240,7 +276,7 @@ public class MessagesAdapter extends BaseAdapter {
     }
 
     private static boolean isSameSender(Message item, Message prev) {
-        if (item == null || prev == null) return false;
+        if (prev == null) return false;
         String id = item.from_id != null && item.from_id.length() > 0 ? item.from_id : item.peer_id;
         String prevId = prev.from_id != null && prev.from_id.length() > 0 ? prev.from_id : prev.peer_id;
         return id != null && id.equals(prevId);
@@ -251,8 +287,12 @@ public class MessagesAdapter extends BaseAdapter {
         TextView title;
         TextView date;
         TextView text;
+        TextView captionText;
+        TextView quoteText;
         LinearLayout titleRow;
         LinearLayout textLayout;
+        LinearLayout captionLayout;
+        LinearLayout quoteLayout;
         View divider;
 
         boolean isGrouped;

@@ -17,10 +17,10 @@ import com.val00n.dmpg.ui.main.MainActivity;
 import static android.content.ContentValues.TAG;
 
 public class Login2FAActivity extends Activity {
-    // UI
+
     public Button submitButton;
     public EditText passwordEditText;
-    // Others
+
     private MPGramService mpgService;
     private String userToken;
     private SessionManager sessionManager;

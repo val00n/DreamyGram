@@ -1,14 +1,19 @@
 package com.val00n.dmpg.ui.chat;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.AbsListView;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -21,9 +26,9 @@ import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.Message;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.services.MPGramService;
+import com.val00n.dmpg.ui.main.MainActivity;
 import com.val00n.dmpg.ui.startup.StartupActivity;
 import com.val00n.dmpg.utils.DateUtils;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import static android.content.ContentValues.TAG;
@@ -43,29 +48,49 @@ public class ChatActivity extends Activity {
     private ProgressBar headerProgressBar;
     private Button headerButton;
     private View headerView;
+    private LinearLayout tooltipLayout;
+    private TextView tooltipText;
+    private ImageButton tooltipClose;
 
-    private HistoryResponse historyResponse;
-    private String peerId;
-    private String displayName;
     private MPGramService mpgService;
+    private HistoryResponse historyResponse;
     private Instance instance;
     private String userToken;
+    private String peerId;
+    private String displayName;
+    private String draftMessage;
     private int loadedHistory;
     private boolean isLoading;
     private boolean endReached;
     private boolean initialLoaded;
     private boolean fetchError;
 
+    private MessageAction messageAction = MessageAction.NONE;
+    private String fwdPeerId;
+    private String fwdMessageId;
+    private String targetMessageId;
+
+    private static final int REQUEST_FORWARD = 1;
+
+    private enum MessageAction {
+        NONE, EDIT, REPLY
+    }
+
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.chat);
 
-        mpgService = App.getMPGramService();
+        mpgService = App.getMPGramService(); // TODO prioritize
         instance = App.getInstanceManager().getSelectedInstance();
         userToken = App.getSessionManager().loadSession(instance.baseURL);
 
         peerId = getIntent().getStringExtra("ID");
         displayName = getIntent().getStringExtra("NAME");
+
+        if (savedInstanceState != null) {
+            fwdPeerId = savedInstanceState.getString("fwdPeerId");
+            fwdMessageId = savedInstanceState.getString("fwdMessageId");
+        }
 
         if (peerId == null) {
             Toast.makeText(ChatActivity.this, "Invalid peer ID", Toast.LENGTH_SHORT).show();
@@ -81,11 +106,31 @@ public class ChatActivity extends Activity {
         chatInputEditText = (EditText) findViewById(R.id.chatInputEditText);
         chatAttachButton = (ImageButton) findViewById(R.id.chatAttachButton);
         chatSendButton = (ImageButton) findViewById(R.id.chatSendButton);
+        tooltipLayout = (LinearLayout) findViewById(R.id.chatTooltip);
+        tooltipClose = (ImageButton) findViewById(R.id.chatTooltipCloseButton);
+        tooltipText = (TextView) findViewById(R.id.chatTooltipText);
 
         chatTitleText.setText(displayName);
 
         addHeader();
         loadHistory(true, null, 0);
+
+        chatMessages.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                int adapterPos = position - 1;
+                if (adapterPos < 0 || adapterPos >= historyResponse.messages.size()) {
+                    return false;
+                }
+
+                if (historyResponse.messages.get(adapterPos).dateSeparator || historyResponse.messages.get(adapterPos).act != null) {
+                    return false;
+                }
+
+                showMessageActionMenu(adapterPos);
+                return false;
+            }
+        });
 
         chatMessages.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
@@ -101,6 +146,36 @@ public class ChatActivity extends Activity {
                 }
             }
         });
+
+        chatSendButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String text = chatInputEditText.getText().toString();
+                
+                switch (messageAction) {
+                    case EDIT:
+                        if (text != null && text.length() > 0) {
+                            applyEditedMessage(targetMessageId, text);
+                        }
+                        break;
+                    default:
+                        if (text != null && text.length() > 0) {
+                            sendMessage(text);
+                        }
+                        break;
+                }
+
+                restoreActionMode();
+                chatInputEditText.setText("");
+            }
+        });
+
+        tooltipClose.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                restoreActionMode();
+            }
+        });
     }
 
     protected void onResume() {
@@ -108,6 +183,300 @@ public class ChatActivity extends Activity {
         if (!instance.equals(App.getInstanceManager().getSelectedInstance())) {
             navigateToStartup();
         }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (fwdMessageId != null) {
+            outState.putString("fwdPeerId", fwdPeerId);
+            outState.putString("fwdMessageId", fwdMessageId);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_FORWARD && resultCode == RESULT_OK && data != null
+                && fwdMessageId != null && fwdPeerId != null) {
+            String targetPeer = data.getStringExtra("ID");
+            String targetName = data.getStringExtra("NAME");
+
+            if (targetPeer != null) {
+                sendForward(targetPeer, targetName);
+                fwdPeerId = null;
+                fwdMessageId = null;
+            }
+        }
+    }
+
+    private void sendForward(String targetPeer, final String targetName) {
+        mpgService.sendMessage(userToken, targetPeer, null, null, fwdPeerId, fwdMessageId, null, new MPGramService.ApiCallback<String>() {
+            @Override
+            public void onSuccess(final String result) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (result != null && result.equals("1")) {
+                            Toast.makeText(ChatActivity.this, "Forwarded to " + targetName, Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(ChatActivity.this, "Failed to forward", Toast.LENGTH_SHORT).show();
+                        }
+
+                    }
+                });
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(ChatActivity.this, "Failed to forward: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void sendMessage(String text) {
+        String replyId = messageAction == MessageAction.REPLY && targetMessageId != null ? targetMessageId : null;
+
+        mpgService.sendMessage(userToken, peerId, text, replyId, null, null, null, new MPGramService.ApiCallback<String>() {
+            @Override
+            public void onSuccess(String result) {
+                if ("1".equals(result)) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            showMessages(0);
+                            chatMessages.setSelection(chatMessages.getCount() - 1);
+                        }
+                    });
+                } else {
+                    onError(new Exception("res: " + result));
+                }
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(ChatActivity.this, "Failed to send message: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void forwardMessage(Message msg) {
+        fwdPeerId = msg.peer_id;
+        fwdMessageId = msg.id;
+
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("FORWARD_MODE", true);
+        startActivityForResult(intent, REQUEST_FORWARD);
+    }
+
+    private void deleteMessage(String id, boolean revoke) {
+        mpgService.deleteMessage(userToken, peerId, id, revoke, new MPGramService.ApiCallback<String>() {
+            @Override
+            public void onSuccess(String result) {
+                if ("1".equals(result)) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            showMessages(0);
+                            Toast.makeText(ChatActivity.this, "Successfully deleted", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } else {
+                    onError(new Exception("res: " + result));
+                }
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(ChatActivity.this, "Unable to delete: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void restoreActionMode() {
+        tooltipLayout.setVisibility(View.GONE);
+        if (messageAction == MessageAction.EDIT) {
+            chatInputEditText.setText(draftMessage);
+        }
+        messageAction = MessageAction.NONE;
+    }
+
+    private void showMessageActionMenu(final int position) {
+        final String[] options = {"Delete", "Copy", "Edit", "Forward", "Reply", "Share", "Info"};
+        final Message msg = historyResponse.messages.get(position);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Choose action");
+
+        builder.setItems(options, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                switch (which) {
+                    case 0:
+                        new AlertDialog.Builder(ChatActivity.this)
+                                .setTitle("Delete")
+                                .setMessage("Are you sure?")
+                                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        deleteMessage(msg.id, false);
+                                    }
+                                })
+                                .setNegativeButton("Delete for everyone", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        deleteMessage(msg.id, true);
+                                    }
+                                })
+                                .setNeutralButton("Cancel", null)
+                                .show();
+                        break;
+                    case 1:
+                        copy(msg.text);
+                        break;
+                    case 2:
+                        editMessage(msg);
+                        break;
+                    case 3:
+                        forwardMessage(msg);
+                        break;
+                    case 4:
+                        setReply(msg);
+                        break;
+                    case 5:
+                        if (msg.text != null) {
+                            shareMessage(msg.text);
+                        } else {
+                            Toast.makeText(ChatActivity.this, "Message is empty", Toast.LENGTH_SHORT).show();
+                        }
+                        break;
+                    case 6:
+                        showMessageInfo(position);
+                        break;
+                }
+            }
+        });
+
+        builder.create().show();
+    }
+
+    private void editMessage(Message message) {
+        if (message.text != null && message.text.length() > 0) {
+            messageAction = MessageAction.EDIT;
+            draftMessage = chatInputEditText.getText().toString();
+
+            targetMessageId = message.id;
+            chatInputEditText.setText(message.text);
+
+            tooltipLayout.setVisibility(View.VISIBLE);
+            tooltipText.setText("Editing message:");
+        } else {
+            Toast.makeText(ChatActivity.this, "Message is empty", Toast.LENGTH_SHORT).show();
+            return;
+        }
+    }
+
+    private void setReply(Message message) {
+        String tooltipReplyText;
+        tooltipReplyText = "Reply: ";
+
+        if (message.text != null) {
+            tooltipReplyText += message.text;
+        }
+
+        messageAction = MessageAction.REPLY;
+        targetMessageId = message.id;
+
+        tooltipLayout.setVisibility(View.VISIBLE);
+        tooltipText.setText(tooltipReplyText);
+    }
+
+    private void applyEditedMessage(String id, String text) {
+        mpgService.editMessage(userToken, peerId, id, text, new MPGramService.ApiCallback<String>() {
+            @Override
+            public void onSuccess(String result) {
+                if ("1".equals(result)) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            showMessages(0);
+                        }
+                    });
+                } else {
+                    onError(new Exception("res: " + result));
+                }
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(ChatActivity.this, "Unable to edit: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void shareMessage(String text) {
+        Intent sendIntent = new Intent();
+        sendIntent.setAction(Intent.ACTION_SEND);
+        sendIntent.setType("text/plain");
+        sendIntent.putExtra(Intent.EXTRA_TEXT, text);
+        startActivity(Intent.createChooser(sendIntent, "Send message"));
+    }
+
+    private void copy(String text) {
+        if (text == null || text.length() <= 0) {
+            Toast.makeText(ChatActivity.this, "Message is empty", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        @SuppressWarnings("deprecation")
+        android.text.ClipboardManager clipboard =
+                (android.text.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setText(text);
+        }
+    }
+
+    private void showMessageInfo(int position) {
+        Message msg = historyResponse.messages.get(position);
+        StringBuilder stringBuilder = new StringBuilder();
+
+        stringBuilder.append("ID: ").append(msg.id);
+        stringBuilder.append("\nDATE: ").append(msg.date);
+        stringBuilder.append("\nPEER_ID: ").append(msg.peer_id);
+        stringBuilder.append("\nFROM_ID: ").append(msg.from_id);
+
+        if (msg.media != null) { // FIXME
+            stringBuilder.append("\n\nMEDIA_TYPE: ").append(msg.media.type);
+            stringBuilder.append("\nMEDIA_MIME: ").append(msg.media.mime);
+        }
+
+        stringBuilder.append("\n\nTEXT: ").append(msg.text);
+
+        new AlertDialog.Builder(ChatActivity.this)
+                .setTitle("Message info")
+                .setMessage(stringBuilder.toString())
+                .setNeutralButton("Ok", null)
+                .show();
     }
 
     private void showMessages(final int inserted) {
@@ -147,6 +516,7 @@ public class ChatActivity extends Activity {
         }
 
         if (status != null) {
+            chatStatusText.setVisibility(View.VISIBLE);
             chatStatusText.setText(status);
         } else {
             chatStatusText.setVisibility(View.GONE);
@@ -173,7 +543,7 @@ public class ChatActivity extends Activity {
                    public void run() {
                        loadedHistory += result.messages.size();
                        Collections.reverse(result.messages);
-                       insertDateSeparators(result.messages);
+                       result.messages = insertDateSeparators(result.messages);
 
                        isLoading = false;
 
@@ -186,7 +556,7 @@ public class ChatActivity extends Activity {
                            historyResponse.add(result);
                            final int inserted = historyResponse.messages.size() - sizeBefore;
 
-                           if (loadedHistory >= result.count || result.messages.isEmpty()) {
+                           if (loadedHistory >= result.totalCount || result.messages.isEmpty()) {
                                endReached = true;
 
                                headerText.setVisibility(View.GONE);
@@ -244,7 +614,7 @@ public class ChatActivity extends Activity {
         });
     }
 
-    private void insertDateSeparators(ArrayList<Message> messages) {
+    private ArrayList<Message> insertDateSeparators(ArrayList<Message> messages) {
         ArrayList<Message> result = new ArrayList<>(messages.size() * 2);
         String prevDay = null;
 
@@ -264,8 +634,7 @@ public class ChatActivity extends Activity {
             result.add(m);
         }
 
-        messages.clear();
-        messages.addAll(result);
+        return result;
     }
 
     private void navigateToStartup() {

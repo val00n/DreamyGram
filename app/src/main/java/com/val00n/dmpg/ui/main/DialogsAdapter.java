@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Typeface;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,7 +11,6 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
-
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.Dialog;
@@ -20,6 +18,7 @@ import com.val00n.dmpg.services.MPGramService;
 import java.util.ArrayList;
 
 public class DialogsAdapter extends BaseAdapter {
+
     private final Context context;
     private final MPGramService mpgService;
     private final ArrayList<Dialog> items;

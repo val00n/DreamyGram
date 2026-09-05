@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private String userToken;
     private DialogResponse dialogs;
     private int loadedDialogs;
+    private boolean forwardMode;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,11 +54,24 @@ public class MainActivity extends Activity {
         searchButton = (ImageButton) findViewById(R.id.mainSearchButton);
         settingsButton = (ImageButton) findViewById(R.id.mainSettingsButton);
 
+        forwardMode = getIntent().getBooleanExtra("FORWARD_MODE", false);
+        if (forwardMode) {
+            searchButton.setVisibility(View.GONE);
+            settingsButton.setVisibility(View.GONE);
+        }
+
         dialogsListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Toast.makeText(MainActivity.this, "id: " + dialogs.dialogs.get(position).id, Toast.LENGTH_SHORT).show();
-                navigateToChat(dialogs.dialogs.get(position).id, dialogs.dialogs.get(position).getDisplayName());
+                if (forwardMode) {
+                    Intent intent = new Intent();
+                    intent.putExtra("ID", dialogs.dialogs.get(position).id);
+                    intent.putExtra("NAME", dialogs.dialogs.get(position).getDisplayName());
+                    setResult(RESULT_OK, intent);
+                    finish();
+                } else {
+                    navigateToChat(dialogs.dialogs.get(position).id, dialogs.dialogs.get(position).getDisplayName());
+                }
             }
         });
 
@@ -84,7 +98,7 @@ public class MainActivity extends Activity {
         if (initial) {
             loadedDialogs = 0;
         } else {
-            if (loadedDialogs >= dialogs.count) {
+            if (loadedDialogs >= dialogs.totalCount) {
                 Toast.makeText(MainActivity.this, "it all was loaded", Toast.LENGTH_SHORT).show();
                 return; // FIXME
             }

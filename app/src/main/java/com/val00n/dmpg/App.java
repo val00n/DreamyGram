@@ -33,7 +33,7 @@ public class App extends Application {
 
     public static MPGramService getMPGramService() {
         if (mpgService == null) {
-            mpgService = new MPGramService();
+            mpgService = new MPGramService(3);
         }
         return mpgService;
     }

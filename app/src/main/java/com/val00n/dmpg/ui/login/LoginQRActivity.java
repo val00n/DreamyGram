@@ -24,7 +24,6 @@ import static android.content.ContentValues.TAG;
 
 public class LoginQRActivity extends Activity {
 
-    // UI
     private ProgressBar progressBar;
     private LinearLayout captchaLayout;
     private LinearLayout qrLayout;
@@ -32,7 +31,7 @@ public class LoginQRActivity extends Activity {
     private ImageView qrImageView;
     private EditText captchaSolutionEditText;
     private Button captchaSubmitButton;
-    // Others
+
     private MPGramService mpgService;
     private SessionManager sessionManager;
     private Handler qrPollingHandler;
