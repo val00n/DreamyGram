@@ -1,9 +1,9 @@
-package com.val00n.dmpg.model;
+package com.val00n.dmpg.model.message;
 
 import cc.nnproject.json.JSONObject;
 
 public class Message {
-    public String id;
+    public int id;
     public long date;
     public String text;
     public boolean out; // outbox
@@ -22,10 +22,25 @@ public class Message {
     //  public Reacts reacts; // TODO
 
     public boolean dateSeparator; // ugly. THERE IS NO DATE SEPARATOR FLAG IN API
+    public MessageState messageState; // same shit
+
+    public enum MessageState {
+        MESSAGE_SENDING,
+        MESSAGE_SENT,
+        MESSAGE_WAS_READ,
+        MESSAGE_ERROR
+    }
+
+    public Message(String text, int id, String peer_id) {
+        this.text = text;
+        this.id = id;
+        this.peer_id = peer_id;
+        messageState = MessageState.MESSAGE_SENDING;
+    }
 
     public Message(JSONObject json) {
         if (json != null) {
-            id = json.getString("id");
+            id = json.getInt("id");
             date = json.getLong("date", 0);
 
             if (json.has("text")) {
@@ -57,6 +72,8 @@ public class Message {
             } else if (json.has("act")) {
                 act = new Act(json.getObject("act"));
             }
+
+            messageState = MessageState.MESSAGE_SENT;
         }
     }
 

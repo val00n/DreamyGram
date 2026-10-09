@@ -3,16 +3,15 @@ package com.val00n.dmpg.ui.startup;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.ui.login.LoginPhoneActivity;
@@ -35,10 +34,12 @@ public class StartupActivity extends Activity {
     private Button instanceSettingsButton;
 
     private MPGramService mpgService;
+    private CountDownTimer continueCountdownTimer;
     private Instance instance;
     private String userToken;
     private boolean isMessagesSeen = false;
     private boolean isChecking = false;
+    private volatile boolean isActivityDied = false;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -62,6 +63,7 @@ public class StartupActivity extends Activity {
             public void onClick(View v) {
                 hideEverything();
                 warningLayout.setVisibility(View.VISIBLE);
+                continueCooldown();
             }
         });
 
@@ -99,7 +101,9 @@ public class StartupActivity extends Activity {
             isMessagesSeen = true;
         }
 
-        init();
+        if (!App.isNetworkAvailable()) {
+            Toast.makeText(this, "Network unavailable", Toast.LENGTH_SHORT).show();
+        }
     }
 
     protected void onResume() {
@@ -110,14 +114,13 @@ public class StartupActivity extends Activity {
         instance = currentInstance;
         mpgService = App.getMPGramService();
         userToken = App.getSessionManager().loadSession(instance.baseURL);
-        hideEverything();
-        startupProgressBar.setVisibility(View.VISIBLE);
+
+        if (App.sessionDead) {
+            App.sessionDead = false;
+        }
 
         if (userToken == null || userToken.length() == 0) {
             userToken = "instance_check";
-            Log.d(TAG, "onResume: nol");
-
-            isChecking = false;
             checkSessionStatus();
 
             startupProgressBar.setVisibility(View.GONE);
@@ -126,50 +129,41 @@ public class StartupActivity extends Activity {
             else
                 loginTypesLayout.setVisibility(View.VISIBLE);
         } else {
-            Log.d(TAG, "onResume: else");
-
-            isChecking = false;
             checkSessionStatus();
         }
     }
 
-    private void init() {
-        if (!App.isNetworkAvailable()) {
-            Toast.makeText(this, "Network unavailable", Toast.LENGTH_SHORT).show();
-        }
-
-        if (userToken == null || userToken.length() == 0) {
-            hideEverything();
-            welcomeLayout.setVisibility(View.VISIBLE);
+    protected void onDestroy() {
+        super.onDestroy();
+        isActivityDied = true;
+        if (continueCountdownTimer != null) {
+            continueCountdownTimer.cancel();
+            continueCountdownTimer = null;
         }
     }
 
     private void checkSessionStatus() {
-        if (isChecking) return;
+        if (isChecking || isActivityDied) return;
         isChecking = true;
-        mpgService.checkAuth(userToken, new MPGramService.ApiCallback<AuthResult>() {
+        mpgService.checkAuth(userToken, new MPGramService.ApiCallback<Boolean>() {
             @Override
-            public void onSuccess(final AuthResult response) {
+            public void onSuccess(final Boolean response) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        if (isActivityDied) return;
                         isChecking = false;
 
                         if (!instance.equals(App.getInstanceManager().getSelectedInstance())) {
                             return;
                         }
 
-                        Log.d(TAG, "run: ping " + response.ping);
-
-                        if (response.ping < 1) {
-                            Toast.makeText(StartupActivity.this, "Instance unavailable", Toast.LENGTH_SHORT).show();
-                        }
-
-                        if (response.isLogged) {
+                        if (response) {
                             Log.d(TAG, "checkAuth: User has valid session");
                             navigateToMain();
                         } else {
                             Log.d(TAG, "checkAuth: User has invalid/no session");
+                            App.getSessionManager().clearSession(instance.baseURL);
                             hideEverything();
                             if (!isMessagesSeen)
                                 welcomeLayout.setVisibility(View.VISIBLE);
@@ -182,15 +176,22 @@ public class StartupActivity extends Activity {
 
             @Override
             public void onError(final Exception error) {
+                error.printStackTrace();
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        isChecking = false;
-                        
                         Log.d(TAG, "AUTH onError: " + error.getMessage());
-                        Toast.makeText(StartupActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
-                        
+                        if (isActivityDied) return;
+
+                        if (error.getMessage() != null) {
+                            Toast.makeText(StartupActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(StartupActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                        }
+
+                        isChecking = false;
                         hideEverything();
+
                         if (!isMessagesSeen)
                             welcomeLayout.setVisibility(View.VISIBLE);
                         else
@@ -199,6 +200,24 @@ public class StartupActivity extends Activity {
                 });
             }
         });
+    }
+
+    private void continueCooldown() {
+        if (continueCountdownTimer != null) continueCountdownTimer.cancel();
+        warningNextButton.setEnabled(false);
+        continueCountdownTimer = new CountDownTimer(11000, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                long seconds = millisUntilFinished / 1000;
+                warningNextButton.setText("Continue (" + seconds + " s)");
+            }
+
+            @Override
+            public void onFinish() {
+                warningNextButton.setEnabled(true);
+                warningNextButton.setText("Continue");
+            }
+        }.start();
     }
 
     private void navigateToMain() {
@@ -213,7 +232,6 @@ public class StartupActivity extends Activity {
         warningLayout.setVisibility(View.GONE);
         loginTypesLayout.setVisibility(View.GONE);
     }
-
 
     private void navigateToLoginQR() {
         Intent intent = new Intent(this, LoginQRActivity.class);

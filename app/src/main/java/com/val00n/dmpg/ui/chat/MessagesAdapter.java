@@ -9,9 +9,9 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.Act;
+import com.val00n.dmpg.model.message.Act;
 import com.val00n.dmpg.model.Chat;
-import com.val00n.dmpg.model.Message;
+import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.utils.DateUtils;
 import java.util.ArrayList;
@@ -89,6 +89,10 @@ public class MessagesAdapter extends BaseAdapter {
             holder.captionText = (TextView) convertView.findViewById(R.id.messageCaptionText);
             holder.divider = convertView.findViewById(R.id.messageDivider);
 
+            if (viewType == VIEW_TYPE_OUT) {
+                holder.status = (ImageView) convertView.findViewById(R.id.messageStatus);
+            }
+
             convertView.setTag(holder);
         } else {
             holder = (ViewHolder) convertView.getTag();
@@ -130,11 +134,31 @@ public class MessagesAdapter extends BaseAdapter {
 
         if (!item.out) {
             holder.title.setText(getNameString(item));
+        } else {
+            switch (item.messageState) {
+                case MESSAGE_SENDING:
+                    holder.status.setImageResource(R.drawable.ic_wait);
+                    break;
+                case MESSAGE_SENT:
+                    holder.status.setImageResource(R.drawable.ic_checkmark);
+                    break;
+                case MESSAGE_WAS_READ:
+                    holder.status.setImageResource(R.drawable.ic_double_checkmark);
+                    break;
+                case MESSAGE_ERROR:
+                    holder.status.setImageResource(R.drawable.ic_cross);
+                    break;
+            }
         }
 
-        if (item.reply != null && item.reply.msg != null) {
+        if (item.reply != null) {
             holder.quoteLayout.setVisibility(View.VISIBLE);
-            holder.quoteText.setText(getNameString(item.reply.msg) + ":\n" + getContentString(item.reply.msg));
+
+            if (item.reply.msg != null) {
+                holder.quoteText.setText(getNameString(item.reply.msg) + ":\n" + getContentString(item.reply.msg));
+            } else {
+                holder.quoteText.setText(item.reply.quote);
+            }
         } else {
             holder.quoteLayout.setVisibility(View.GONE);
         }
@@ -293,6 +317,7 @@ public class MessagesAdapter extends BaseAdapter {
         LinearLayout textLayout;
         LinearLayout captionLayout;
         LinearLayout quoteLayout;
+        ImageView status;
         View divider;
 
         boolean isGrouped;

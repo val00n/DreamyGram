@@ -72,7 +72,7 @@ public class DialogResponse {
                 offsetPeer = latestDialog.id;
                 if (latestDialog.msg != null) {
                     offsetDate = latestDialog.msg.date;
-                    offsetId = latestDialog.msg.id;
+                    offsetId = String.valueOf(latestDialog.msg.id);
                 }
             }
         }

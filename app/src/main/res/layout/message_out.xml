@@ -66,7 +66,15 @@
                     android:text="XX:XX"
                     android:textColor="@android:color/secondary_text_dark"
                     android:textSize="17sp"
-                    android:paddingTop="2dp"/>
+                    android:paddingTop="2dp"
+                    android:paddingRight="4dp"/>
+                <ImageView
+                    android:id="@+id/messageStatus"
+                    android:src="@drawable/ic_wait"
+                    android:layout_gravity="center"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"/>
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_weight="1"

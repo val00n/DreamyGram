@@ -1,4 +1,4 @@
-package com.val00n.dmpg.model;
+package com.val00n.dmpg.model.message;
 
 import cc.nnproject.json.JSONObject;
 
@@ -9,6 +9,10 @@ public class MessageReply {
     public String quote;
     public Message msg;
     public int top;
+
+    public MessageReply(String placeholder) {
+        quote = placeholder;
+    }
 
     public MessageReply(JSONObject json) {
         if (json != null) {

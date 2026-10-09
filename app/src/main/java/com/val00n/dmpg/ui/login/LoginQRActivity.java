@@ -55,10 +55,10 @@ public class LoginQRActivity extends Activity {
                 mpgService.loginQrPoll(userToken, new MPGramService.ApiCallback<AuthResponse>() {
                     @Override
                     public void onSuccess(AuthResponse result) {
-                        if (result.response.equals("1")) {
+                        if ("1".equals(result.response)) {
                             sessionManager.saveSession(userToken);
                             navigateToMain(userToken);
-                        } else if (result.response.equals("password")) {
+                        } else if ("password".equals(result.response)) {
                             navigateTo2FA(userToken);
                         } else if (result.text != null && result.text.length() > 0) {
                             if (result.text.equals(qrLink)) {
@@ -68,6 +68,8 @@ public class LoginQRActivity extends Activity {
                                 getQrImage();
                                 qrPollingHandler.postDelayed(qrPollTask, 3000);
                             }
+                        } else {
+                            error(new Exception("Poll has died unexpectedly :("));
                         }
                     }
 
@@ -145,6 +147,10 @@ public class LoginQRActivity extends Activity {
 
                     getQrImage();
                     qrPollingHandler.postDelayed(qrPollTask, 5000);
+                } else if ("wrong_captcha".equals(result.response) || "captcha_expired".equals(result.response)) {
+                    progressBar.setVisibility(View.GONE);
+                    captchaLayout.setVisibility(View.VISIBLE);
+                    fetchCaptcha();
                 } else {
                     error(new Exception("unexpected response: " + result.response));
                 }
@@ -244,11 +250,16 @@ public class LoginQRActivity extends Activity {
     }
 
     private void error(final Exception error) {
-        Log.d(TAG, "onError: " + error.getMessage());
+        Log.d(TAG, "Error: " + error.getMessage());
+        error.printStackTrace();
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Toast.makeText(LoginQRActivity.this, "onError: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                if (error.getMessage() != null) {
+                    Toast.makeText(LoginQRActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(LoginQRActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                }
                 finish();
             }
         });

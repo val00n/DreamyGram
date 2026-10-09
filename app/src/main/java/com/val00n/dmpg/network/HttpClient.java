@@ -12,6 +12,7 @@ import java.util.Map;
 public class HttpClient {
     private static final int DEFAULT_TIMEOUT = 25000;
     private static final int DEFAULT_READ_TIMEOUT = 35000;
+    private static final int PING_TIMEOUT = 5000;
     private static String userAgent;
 
     public static void setUserAgent(String customUserAgent) {
@@ -82,17 +83,17 @@ public class HttpClient {
         return buffer.toByteArray();
     }
 
-    public static long ping(String baseURL) throws IOException {
+    public static int ping(String baseURL) throws IOException {
         URL url = new URL(baseURL);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setConnectTimeout(DEFAULT_TIMEOUT);
-        connection.setReadTimeout(DEFAULT_TIMEOUT);
+        connection.setConnectTimeout(PING_TIMEOUT);
+        connection.setReadTimeout(PING_TIMEOUT);
 
         long start = System.currentTimeMillis();
         connection.connect();
         long elapsed = System.currentTimeMillis() - start;
 
         connection.disconnect();
-        return elapsed;
+        return (int) elapsed;
     }
 }

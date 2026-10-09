@@ -39,17 +39,27 @@ public class RestClient {
     }
 
     public String postString(String baseURL, String endpoint, Map<String, String> queryParams, Map<String, String> headers) throws IOException {
-        return postString(baseURL, endpoint, queryParams, headers, null, null);
+        return postString(baseURL, endpoint, 0, queryParams, headers, null, null);
     }
 
-    public String postString(String baseURL, String endpoint, Map<String, String> queryParams, Map<String, String> headers, String body, String contentType) throws IOException {
+    public String postString(String baseURL, String endpoint, int timeout, Map<String, String> queryParams, Map<String, String> headers) throws IOException {
+        return postString(baseURL, endpoint, timeout, queryParams, headers, null, null);
+    }
+
+    public String postString(String baseURL, String endpoint, int timeout, Map<String, String> queryParams, Map<String, String> headers, String body, String contentType) throws IOException {
         HttpRequest request = new HttpRequest(baseURL, endpoint, "POST");
         request = addQueryParams(queryParams, request);
         request = addHeaders(headers, request);
         if (body != null && body.length() > 0 && contentType != null && contentType.length() > 0)
             request.setBody(body, contentType);
 
-        HttpResponse response = HttpClient.send(request, CONNECT_TIMEOUT, READ_TIMEOUT);
+        HttpResponse response;
+        if (timeout > 0) {
+            response = HttpClient.send(request, CONNECT_TIMEOUT, (timeout + 10) * 1000) ;
+        } else {
+            response = HttpClient.send(request, CONNECT_TIMEOUT, READ_TIMEOUT);
+        }
+
         if (response.isSuccessfulCode()) {
             return response.readAsString();
         }

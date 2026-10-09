@@ -1,5 +1,7 @@
 package com.val00n.dmpg.model;
 
+import com.val00n.dmpg.model.message.Message;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -53,8 +55,8 @@ public class HistoryResponse {
 
         if (messages != null && !messages.isEmpty()) {
             Message lastMsg = messages.get(messages.size() - 1);
-            if (lastMsg.id != null) {
-                offsetId = lastMsg.id;
+            if (lastMsg.id != 0) {
+                offsetId = String.valueOf(lastMsg.id);
             }
 
             if (lastMsg.date > 0) {

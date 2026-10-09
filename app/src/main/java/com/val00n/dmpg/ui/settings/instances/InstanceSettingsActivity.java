@@ -11,18 +11,14 @@ import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.Toast;
-
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.AuthResult;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
 import com.val00n.dmpg.ui.startup.StartupActivity;
-
 import java.util.ArrayList;
-
 import static android.content.ContentValues.TAG;
 
 public class InstanceSettingsActivity extends Activity {
@@ -144,7 +140,7 @@ public class InstanceSettingsActivity extends Activity {
         instancesAdapter.resetStatus();
 
         for (int i = 0; i < instances.size(); i++) {
-            Instance instance = instances.get(i);
+            final Instance instance = instances.get(i);
             final int index = i;
             final String token;
 
@@ -155,25 +151,47 @@ public class InstanceSettingsActivity extends Activity {
                 token = "session_test"; // it is stupid lol
             }
 
-            mpgService.checkAuth(instance, token, new MPGramService.ApiCallback<AuthResult>() {
+            mpgService.checkAuth(instance, token, new MPGramService.ApiCallback<Boolean>() {
                 @Override
-                public void onSuccess(final AuthResult response) {
+                public void onSuccess(final Boolean response) {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            if (response.isLogged) {
-                                instancesAdapter.updateItem(index, response.ping, 1);
-                            } else if (token.equals("session_test")) {
-                                instancesAdapter.updateItem(index, response.ping, 2);
-                            } else {
-                                instancesAdapter.updateItem(index, response.ping, -1);
-                            }
+                            mpgService.pingInstance(instance, new MPGramService.ApiCallback<Integer>() {
+                                @Override
+                                public void onSuccess(final Integer result) {
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            if (response) {
+                                                instancesAdapter.updateItem(index, result, 1);
+                                            } else if (token.equals("session_test")) {
+                                                instancesAdapter.updateItem(index, result, 2);
+                                            } else {
+                                                instancesAdapter.updateItem(index, result, -1);
+                                            }
+                                        }
+                                    });
+                                }
+
+                                @Override
+                                public void onError(Exception error) {
+                                    error.printStackTrace();
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            instancesAdapter.updateItem(index, -1, -1);
+                                        }
+                                    });
+                                }
+                            });
                         }
                     });
                 }
 
                 @Override
                 public void onError(final Exception error) {
+                    error.printStackTrace();
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {

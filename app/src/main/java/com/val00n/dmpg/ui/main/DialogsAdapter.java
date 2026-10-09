@@ -1,9 +1,10 @@
 package com.val00n.dmpg.ui.main;
 
-import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -22,7 +23,6 @@ public class DialogsAdapter extends BaseAdapter {
     private final Context context;
     private final MPGramService mpgService;
     private final ArrayList<Dialog> items;
-    private final LayoutInflater inflater;
     private final String userToken;
 
     public DialogsAdapter(Context context, ArrayList<Dialog> items, String userToken) {
@@ -30,7 +30,6 @@ public class DialogsAdapter extends BaseAdapter {
         this.userToken = userToken;
         this.mpgService = App.getMPGramService();
         this.items = items;
-        this.inflater = LayoutInflater.from(context);
     }
 
     @Override
@@ -97,12 +96,14 @@ public class DialogsAdapter extends BaseAdapter {
                 mpgService.getAvatar(item.id, userToken, new MPGramService.ApiCallback<byte[]>() {
                     @Override
                     public void onSuccess(final byte[] imageBytes) {
+
                         if (currentPosition < items.size() && items.get(currentPosition) == item) {
                             final Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+
                             if (bitmap != null) {
                                 item.cachedAvatar = bitmap;
 
-                                ((Activity) context).runOnUiThread(new Runnable() {
+                                new Handler(Looper.getMainLooper()).post(new Runnable() {
                                     @Override
                                     public void run() {
                                         if (currentPosition < items.size() && items.get(currentPosition) == item) {

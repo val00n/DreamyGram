@@ -62,8 +62,11 @@
             android:textStyle="bold"
             android:textSize="28sp"/>
         <TextView
+            android:gravity="center"
             android:layout_width="300dp"
             android:layout_height="wrap_content"
+            android:textSize="17sp"
+            android:textColor="@android:color/primary_text_dark"
             android:text="Using this app, may lead to some risk about your telegram account.\n1) If your account is younger than 6 months, and you never used third party clients, your account may very likely be banned. If it's not, anyway account safety cannot be guaranteed. \n2) Using this client, instance owner may have access to your data (phone number, chats, media, etc). So if you really care about this, you can use your own instance, or delete this app.\n3) The developers are not responsible for your account anyhow. It is just MPGram Client. Pressing the button below, means, that you accepted all of above listed.\nEnjoy :)"
             android:layout_marginTop="6dp"/>
         <Button
@@ -73,7 +76,7 @@
             android:layout_height="wrap_content"
             android:text="Agree"
             android:layout_alignParentBottom="true"
-            android:layout_marginTop="36dp"/>
+            android:layout_marginTop="18dp"/>
     </LinearLayout>
 
     <LinearLayout

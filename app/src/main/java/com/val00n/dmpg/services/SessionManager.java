@@ -29,8 +29,6 @@ public class SessionManager {
     }
 
     public String loadSession(String baseUrl) {
-        Log.d(TAG, "SESSION load: trying to fetch: " + baseUrl);
-        Log.d(TAG, "loadSession: " + prefs.getString(baseUrl, null));
         return prefs.getString(baseUrl, null);
     }
 

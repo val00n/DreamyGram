@@ -118,7 +118,7 @@ public class LoginPhoneActivity extends Activity {
             @Override
             public void onTick(long millisUntilFinished) {
                 long seconds = millisUntilFinished / 1000;
-                phoneResendSubmitButton.setText("Resend (" + seconds + "s)");
+                phoneResendSubmitButton.setText("Resend (" + seconds + " s)");
             }
 
             @Override
@@ -315,10 +315,15 @@ public class LoginPhoneActivity extends Activity {
 
     private void error(final Exception error) {
         Log.d(TAG, "onError: " + error.getMessage());
+        error.printStackTrace();
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Toast.makeText(LoginPhoneActivity.this, "onError: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                if (error.getMessage() != null) {
+                    Toast.makeText(LoginPhoneActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(LoginPhoneActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                }
                 finish();
             }
         });

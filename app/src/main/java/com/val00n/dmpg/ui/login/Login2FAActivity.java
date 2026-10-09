@@ -67,10 +67,15 @@ public class Login2FAActivity extends Activity {
             @Override
             public void onError(final Exception error) {
                 Log.d(TAG, "onError: " + error.getMessage());
+                error.printStackTrace();
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(Login2FAActivity.this, "onError: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                        if (error.getMessage() != null) {
+                            Toast.makeText(Login2FAActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(Login2FAActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                        }
                         finish();
                     }
                 });

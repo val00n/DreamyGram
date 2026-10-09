@@ -1,6 +1,8 @@
 package com.val00n.dmpg.model;
 
 import android.graphics.Bitmap;
+
+import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.utils.DateUtils;
 import cc.nnproject.json.JSONObject;
 
@@ -34,6 +36,10 @@ public class Dialog {
 
         if (json.has("mentions")) {
             mentions = json.getInt("mentions");
+        }
+
+        if (json.has("read_out")) {
+            readOut = json.getInt("read_out");
         }
 
         if (json.has("msg")) {
