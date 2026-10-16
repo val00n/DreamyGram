@@ -8,6 +8,8 @@ import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.message.Act;
 import com.val00n.dmpg.model.Chat;
@@ -34,6 +36,8 @@ public class MessagesAdapter extends BaseAdapter {
     private static final int AVATAR_WIDTH = 48;
     private static final int AVATAR_PADDING_WIDTH = 8;
     private static final int GROUP_INTERVAL_SECONDS = 6 * 60;
+
+    private String peerId;
 
     public MessagesAdapter(Context context, ArrayList<Message> items, Map<String, User> users, Map<String, Chat> chats) {
         this.context = context;
@@ -62,6 +66,9 @@ public class MessagesAdapter extends BaseAdapter {
     public long getItemId(int position) {
         return position;
     }
+
+    public void setPeerId(String v) { peerId = v; }
+    private boolean isSelf() { return peerId != null && peerId.equals(App.selfId); }
 
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
@@ -132,9 +139,12 @@ public class MessagesAdapter extends BaseAdapter {
 
         holder.text.setText(getContentString(item));
 
-        if (!item.out) {
+        if (!item.out && !isSelf()) {
             holder.title.setText(getNameString(item));
+        } else if (isSelf()) {
+            holder.status.setVisibility(View.GONE);
         } else {
+            holder.status.setVisibility(View.VISIBLE);
             switch (item.messageState) {
                 case MESSAGE_SENDING:
                     holder.status.setImageResource(R.drawable.ic_wait);
@@ -271,7 +281,7 @@ public class MessagesAdapter extends BaseAdapter {
         Message item = items.get(position);
         if (item.dateSeparator) return VIEW_TYPE_ACT;
         if (item.act != null) return VIEW_TYPE_ACT;
-        return item.out ? VIEW_TYPE_OUT : VIEW_TYPE_IN;
+        return (item.out || isSelf()) ? VIEW_TYPE_OUT : VIEW_TYPE_IN;
     }
 
     @Override

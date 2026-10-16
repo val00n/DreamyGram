@@ -15,6 +15,7 @@ import android.widget.TextView;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.Dialog;
+import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.services.MPGramService;
 import java.util.ArrayList;
 
@@ -60,6 +61,7 @@ public class DialogsAdapter extends BaseAdapter {
             holder.lastTime = (TextView) convertView.findViewById(R.id.dialogLastTime);
             holder.lastMessage = (TextView) convertView.findViewById(R.id.dialogBottomText);
             holder.unreadStatus = (TextView) convertView.findViewById(R.id.dialogUnreadText);
+            holder.readIcon = (ImageView) convertView.findViewById(R.id.dialogReadStatus);
             holder.pinIcon = convertView.findViewById(R.id.dialogPinIcon);
 
             convertView.setTag(holder);
@@ -70,9 +72,14 @@ public class DialogsAdapter extends BaseAdapter {
         final Dialog item = items.get(position);
         final int currentPosition = position;
 
-        holder.title.setText(item.getDisplayName());
-        holder.lastMessage.setText(item.getSubtitle());
+        holder.title.setText(item.getDisplayName(App.selfId));
         holder.lastTime.setText(item.getDateTimeString());
+
+        if (item.isTyping) {
+            holder.lastMessage.setText("Typing...");
+        } else {
+            holder.lastMessage.setText(item.getSubtitle());
+        }
 
         StringBuilder badge = new StringBuilder();
         if (item.unread > 0) {
@@ -87,6 +94,29 @@ public class DialogsAdapter extends BaseAdapter {
             holder.pinIcon.setVisibility(View.VISIBLE);
         } else {
             holder.pinIcon.setVisibility(View.GONE);
+        }
+
+        if (item.msg == null || !item.msg.out) {
+            holder.readIcon.setVisibility(View.GONE);
+        } else {
+            holder.readIcon.setVisibility(View.VISIBLE);
+            Message.MessageState state = item.msg.messageState != null
+                    ? item.msg.messageState
+                    : Message.MessageState.MESSAGE_SENT;
+            switch (state) {
+                case MESSAGE_SENDING:
+                    holder.readIcon.setImageResource(R.drawable.ic_wait);
+                    break;
+                case MESSAGE_SENT:
+                    holder.readIcon.setImageResource(R.drawable.ic_checkmark);
+                    break;
+                case MESSAGE_WAS_READ:
+                    holder.readIcon.setImageResource(R.drawable.ic_double_checkmark);
+                    break;
+                case MESSAGE_ERROR:
+                    holder.readIcon.setImageResource(R.drawable.ic_cross);
+                    break;
+            }
         }
 
         if (item.hasAvatar()) {
@@ -129,6 +159,7 @@ public class DialogsAdapter extends BaseAdapter {
     static class ViewHolder {
         ImageView avatar;
         View pinIcon;
+        ImageView readIcon;
         TextView title;
         TextView lastTime;
         TextView lastMessage;

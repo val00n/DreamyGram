@@ -1,7 +1,6 @@
 package com.val00n.dmpg.model;
 
 import android.graphics.Bitmap;
-
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.utils.DateUtils;
 import cc.nnproject.json.JSONObject;
@@ -19,6 +18,7 @@ public class Dialog {
     public User user; // if chat != null, user is last messaged user
     public Chat chat;
 
+    public boolean isTyping = false; // not in API, ew
     public Bitmap cachedAvatar; // FIXME
 
     public Dialog(JSONObject json, User user, Chat chat) {
@@ -50,7 +50,9 @@ public class Dialog {
         this.chat = chat;
     }
 
-    public String getDisplayName() {
+    public String getDisplayName(String selfId) {
+        if (selfId != null && selfId.equals(id)) return "Saved Messages";
+
         if (id.startsWith("-") && chat != null) {
             return chat.t;
         } else if (user != null) {

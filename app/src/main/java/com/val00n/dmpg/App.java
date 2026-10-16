@@ -22,6 +22,7 @@ public class App extends Application {
     private static ConnectivityManager cm;
     private static MPGramService mpgService;
     private static String[] sessionDeathMarkers;
+    public static volatile String selfId;
     public static volatile boolean sessionDead;
 
     public static Context get() {

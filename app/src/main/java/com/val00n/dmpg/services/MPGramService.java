@@ -137,6 +137,32 @@ public class MPGramService {
         });
     }
 
+    public void getSelf(String userToken, final ApiCallback<User> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "me");
+        queryParams.put("v", instance.apiVersion);
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    User response = new User(parsedJson);
+
+                    if (callback != null) callback.onSuccess(response);
+                } catch (Exception e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
     public void loginStartPhoneLogin(String phoneNumber, final ApiCallback<AuthResponse> callback) {
         phoneNumber = phoneNumber.startsWith("+") ? phoneNumber : "+" + phoneNumber;
 
@@ -579,19 +605,33 @@ public class MPGramService {
         });
     }
 
-    public void getUpdates(String peer, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, String userToken, final ApiCallback<ArrayList<Update>> callback) {
+    public void getUpdates(String[] filter, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, String userToken, final ApiCallback<ArrayList<Update>> callback) {
+        getUpdates(null, filter, limit, offset, messageId, read, timeoutSeconds, userToken, callback);
+    }
+
+    public void getUpdates(String peer, String[] filter, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, String userToken, final ApiCallback<ArrayList<Update>> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "updates");
         queryParams.put("v", instance.apiVersion);
-        queryParams.put("peer", peer);
+        if (peer != null) queryParams.put("peer", peer);
         queryParams.put("limit", limit);
         queryParams.put("offset", offset);
-        queryParams.put("message", messageId);
+        if (messageId != null) queryParams.put("message", messageId);
         queryParams.put("timeout", Integer.toString(timeoutSeconds));
 
         queryParams.put("media", "1");
         if (read) {
             queryParams.put("read", "1");
+        }
+
+        if (filter != null && filter.length > 0) {
+            StringBuilder s = new StringBuilder();
+            for (int i = 0; i < filter.length; i++) {
+                if (i != 0) s.append(",");
+                s.append(filter[i]);
+            }
+
+            queryParams.put("types", s.toString());
         }
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
@@ -606,6 +646,10 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    if (parsedJson.has("cancel")) {
+                        if (callback != null) callback.onSuccess(new ArrayList<Update>());
+                        return;
+                    }
 
                     if (parsedJson.has("error")) {
                         if (callback != null) callback.onError(new Exception(parsedJson.getObject("error").getString("message", "(no message)")));
@@ -628,11 +672,15 @@ public class MPGramService {
         });
     }
 
+    public void getLastUpdate(String userToken, final int timeoutSeconds, final ApiCallback<Update> callback) {
+        getLastUpdate(null, userToken, timeoutSeconds, callback);
+    }
+
     public void getLastUpdate(String peer, String userToken, final int timeoutSeconds, final ApiCallback<Update> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getLastUpdate");
         queryParams.put("v", instance.apiVersion);
-        queryParams.put("peer", peer);
+        if (peer != null) queryParams.put("peer", peer);
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 

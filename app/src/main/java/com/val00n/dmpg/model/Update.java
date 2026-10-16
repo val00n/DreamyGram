@@ -11,9 +11,10 @@ public class Update {
     public String from_id;
     public String user_id;
     public String channel_id;
+    public String chat_id;
     public String peer;
-    public JSONObject action; // fucking kostyl
-    public JSONObject status; // same shit =(
+    public JSONObject action; // lame
+    public JSONObject status; // lame
     public String type; // a.k.a "_"
     public Message msg;
     public ArrayList<String> messages;
@@ -43,6 +44,10 @@ public class Update {
             channel_id = u.getString("channel_id");
         }
 
+        if (u.has("chat_id")) {
+            chat_id = u.getString("chat_id");
+        }
+
         if (u.has("peer")) {
             peer = u.getString("peer");
         }
@@ -63,5 +68,14 @@ public class Update {
                 messages.add(a.getString(i));
             }
         }
+    }
+
+    public String getPeerId() {
+        if (peer != null) return peer;
+        if (channel_id != null) return channel_id;
+        if (chat_id != null) return chat_id;
+        if (user_id != null) return user_id;
+        if (msg != null) return msg.peer_id;
+        return null;
     }
 }

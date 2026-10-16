@@ -34,5 +34,6 @@ public class SessionManager {
 
     public void clearSession(String baseUrl) {
         prefs.edit().remove(baseUrl).commit();
+        App.selfId = null;
     }
 }

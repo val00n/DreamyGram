@@ -71,9 +71,9 @@ public class ChatActivity extends Activity {
     private String displayName;
     private String draftMessage;
     private String firstMessageId = "0";
+    private int readOut;
     private int loadedHistory;
     private boolean isLoading;
-    volatile private boolean isActivityDied;
     private boolean endReached;
     private boolean initialLoaded;
     private boolean fetchError;
@@ -82,8 +82,8 @@ public class ChatActivity extends Activity {
     private Message pendingMessage;
     private boolean isTyping;
     volatile private boolean isPolling;
-    private int readOut;
     volatile private boolean isPaused;
+    volatile private boolean isActivityDied;
 
     private MessageAction messageAction = MessageAction.NONE;
     private String fwdPeerId;
@@ -96,8 +96,8 @@ public class ChatActivity extends Activity {
     private int updateFails = 0;
 
     private static final int UPDATE_TIMEOUT_SECS = 30;
-    private static final int UPDATE_POLL_MILIS = 3000;
-    private static final int STATUS_UPDATE_MILIS = 5000;
+    private static final int UPDATE_POLL_MILLIS = 3000;
+    private static final int STATUS_UPDATE_MILLIS = 5000;
     private static final int REQUEST_FORWARD = 1;
 
     private enum MessageAction {
@@ -115,6 +115,30 @@ public class ChatActivity extends Activity {
         peerId = getIntent().getStringExtra("ID");
         displayName = getIntent().getStringExtra("NAME");
         readOut = getIntent().getIntExtra("READ_OUT", 0);
+
+        if (App.selfId == null && userToken != null && instance != null) {
+            final String reqBase = instance.baseURL;
+            mpgService.getSelf(userToken, new MPGramService.ApiCallback<User>() {
+                @Override
+                public void onSuccess(User result) {
+                    if (isActivityDied) return;
+                    if (result != null && reqBase.equals(App.getInstanceManager().getSelectedInstanceBaseUrl())) {
+                        App.selfId = result.id;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+                            }
+                        });
+                    }
+                }
+
+                @Override
+                public void onError(Exception error) {
+                    error.printStackTrace();
+                }
+            });
+        }
 
         progressBar = (ProgressBar) findViewById(R.id.chatProgressBar);
         chatTitleText = (TextView) findViewById(R.id.chatTitle);
@@ -137,7 +161,7 @@ public class ChatActivity extends Activity {
             @Override
             public void run() {
                 isPolling = true;
-                mpgService.getUpdates(peerId, updateLimit, updateOffset, firstMessageId, true, UPDATE_TIMEOUT_SECS, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
+                mpgService.getUpdates(peerId, null, updateLimit, updateOffset, firstMessageId, true, UPDATE_TIMEOUT_SECS, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
                     @Override
                     public void onSuccess(ArrayList<Update> result) {
                         if (isActivityDied) return;
@@ -156,7 +180,7 @@ public class ChatActivity extends Activity {
 
                         updateFails = 0;
                         isPolling = false;
-                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILIS);
+                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
                     }
 
                     @Override
@@ -176,14 +200,14 @@ public class ChatActivity extends Activity {
                                             updateOffset = "-1";
                                         }
 
-                                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILIS);
+                                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
                                     }
 
                                     @Override
                                     public void onError(Exception error) {
                                         error.printStackTrace();
                                         if (!App.isSessionDead(error.getMessage(), ChatActivity.this)) {
-                                            if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILIS);
+                                            if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
                                         }
                                     }
                                 });
@@ -191,7 +215,7 @@ public class ChatActivity extends Activity {
                                 updateFails = 0;
                             } else {
                                 updateFails++;
-                                if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILIS * updateFails);
+                                if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS * updateFails);
                             }
                         }
                     }
@@ -383,15 +407,13 @@ public class ChatActivity extends Activity {
         isPaused = false;
         if (!isPolling) {
             if (historyResponse != null) {
-                chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILIS);
-                statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILIS);
+                chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILLIS);
             } else {
                 if (!isLoading) {
                     loadHistory(true, null, 0);
                 }
             }
-
-            isPaused = false;
         }
     }
 
@@ -515,11 +537,15 @@ public class ChatActivity extends Activity {
                     break;
                 case "updateDeleteChannelMessages":
                 case "updateDeleteMessages":
+                    // deletions in DMs is not implemented on the server
                     if (upd.messages != null && peerId.equals(upd.channel_id)) {
                         clearDeleted(upd.messages);
                     }
                     break;
                 case "updateUserTyping":
+                    String typingAuthor = upd.user_id != null ? upd.user_id : upd.from_id;
+                    if (typingAuthor != null && typingAuthor.equals(App.selfId)) break;
+
                     if (upd.action != null && upd.action.has("_") && "sendMessageCancelAction".equals(upd.action.getString("_"))) {
                         statusUpdateHandler.removeCallbacks(statusUpdateTask);
                         statusUpdateTask.run();
@@ -527,11 +553,14 @@ public class ChatActivity extends Activity {
                         isTyping = true;
                         chatStatusText.setText("Typing...");
                         statusUpdateHandler.removeCallbacks(statusUpdateTask);
-                        statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILIS);
+                        statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILLIS);
                     }
                     break;
                 case "updateChatUserTyping":
                 case "updateChannelUserTyping":
+                    String typingUser = upd.user_id != null ? upd.user_id : upd.from_id;
+                    if (typingUser != null && typingUser.equals(App.selfId)) break;
+
                     if (upd.action != null && upd.action.has("_") && "sendMessageCancelAction".equals(upd.action.getString("_"))) {
                         statusUpdateHandler.removeCallbacks(statusUpdateTask);
                         statusUpdateTask.run();
@@ -548,7 +577,7 @@ public class ChatActivity extends Activity {
                             chatStatusText.setText("Typing...");
                         }
                         statusUpdateHandler.removeCallbacks(statusUpdateTask);
-                        statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILIS);
+                        statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILLIS);
                     }
                     break;
                 case "updateUserStatus":
@@ -901,6 +930,7 @@ public class ChatActivity extends Activity {
     private void showMessages(final int inserted) {
         if (messagesAdapter == null) {
             messagesAdapter = new MessagesAdapter(ChatActivity.this, historyResponse.messages, historyResponse.users, historyResponse.chats);
+            messagesAdapter.setPeerId(peerId);
             chatMessages.setAdapter(messagesAdapter);
         } else {
             int pos = chatMessages.getFirstVisiblePosition();
@@ -1009,13 +1039,13 @@ public class ChatActivity extends Activity {
                                    }
                                    updates = new ArrayList<Update>();
 
-                                   if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILIS);
+                                   if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
                                }
 
                                @Override
                                public void onError(Exception error) {
                                    error.printStackTrace();
-                                   if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILIS);
+                                   if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
                                }
                            });
                        } else {
