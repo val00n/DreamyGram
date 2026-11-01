@@ -1,7 +1,6 @@
 package com.val00n.dmpg.model;
 
 import com.val00n.dmpg.model.message.Message;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;

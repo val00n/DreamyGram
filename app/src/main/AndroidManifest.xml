@@ -14,7 +14,7 @@
 
         <activity
         android:label="@string/app_name"
-        android:name="com.val00n.dmpg.ui.startup.StartupActivity">
+        android:name="com.val00n.dmpg.ui.StartupActivity">
         <intent-filter >
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
@@ -28,6 +28,7 @@
         <activity android:name=".ui.login.Login2FAActivity" android:label="2FA login"/>
         <activity android:name="com.val00n.dmpg.ui.settings.instances.InstanceSettingsActivity" android:label="Instances"/>
         <activity android:name="com.val00n.dmpg.ui.settings.instances.InstanceEditActivity" android:label="Edit instance"/>
+        <activity android:name=".ui.settings.CacheSettingsActivity" android:label="Cache management"/>
         <activity android:name=".ui.settings.SettingsActivity" android:label="Settings"/>
 
     </application>

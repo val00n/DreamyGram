@@ -33,6 +33,8 @@ public class MPGramService {
     private static final int GET_HISTORY_LIMIT = 30; // TODO change this in settings
     private static final int CHECK_AUTH_TIMEOUT = 2;
 
+    public static final int AVATAR_SIZE = 48; // TODO change this in settings
+
     public interface ApiCallback<T> {
         void onSuccess(T result);
         void onError(Exception error);
@@ -771,7 +773,7 @@ public class MPGramService {
     public void getAvatar(String peerId, String userToken, final ApiCallback<byte[]> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("c", peerId);
-        queryParams.put("p", "rp48"); // i should unhardcode it
+        queryParams.put("p", "rp" + AVATAR_SIZE);
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 

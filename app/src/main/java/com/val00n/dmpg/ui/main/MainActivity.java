@@ -16,6 +16,7 @@ import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.Dialog;
 import com.val00n.dmpg.model.DialogResponse;
+import com.val00n.dmpg.model.DialogRow;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.User;
@@ -23,7 +24,8 @@ import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.ui.chat.ChatActivity;
 import com.val00n.dmpg.ui.settings.SettingsActivity;
-import com.val00n.dmpg.ui.startup.StartupActivity;
+import com.val00n.dmpg.ui.StartupActivity;
+import com.val00n.dmpg.ui.AvatarViewBinder;
 import com.val00n.dmpg.utils.SortUtils;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -81,8 +83,18 @@ public class MainActivity extends Activity {
                     public void onSuccess(User result) {
                         if (result != null && reqBase.equals(App.getInstanceManager().getSelectedInstanceBaseUrl())) {
                             App.selfId = result.id;
-                        }
 
+                            final String selfId = result.id;
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (dialogsAdapter != null) {
+                                        dialogsAdapter.setSelfId(selfId);
+                                        dialogsAdapter.notifyDataSetChanged();
+                                    }
+                                }
+                            });
+                        }
                     }
 
                     @Override
@@ -117,15 +129,15 @@ public class MainActivity extends Activity {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 Object item = parent.getItemAtPosition(position);
 
-                if (!(item instanceof Dialog)) {
+                if (!(item instanceof DialogRow)) {
                     return;
                 }
 
-                Dialog dialog = (Dialog) item;
+                Dialog dialog = ((DialogRow) item).dialog;
 
                 if (forwardMode) {
                     Intent intent = new Intent();
-                    intent.putExtra("ID", dialog.id);
+                    intent.putExtra("ID", dialog.peerId);
                     intent.putExtra("NAME", dialog.getDisplayName(App.selfId));
                     setResult(RESULT_OK, intent);
                     finish();
@@ -135,7 +147,7 @@ public class MainActivity extends Activity {
                         dialog.mentions = 0;
                         dialogsAdapter.notifyDataSetChanged();
                     }
-                    navigateToChat(dialog.id, dialog.getDisplayName(App.selfId), dialog.readOut);
+                    navigateToChat(dialog.peerId, dialog.getDisplayName(App.selfId), dialog.readOut);
                 }
             }
         });
@@ -315,7 +327,7 @@ public class MainActivity extends Activity {
                         boolean isEdit = upd.type.contains("Edit");
                         for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                             Dialog d = dialogResponse.dialogs.get(i);
-                            if (d != null && peerId.equals(d.id)) {
+                            if (d != null && peerId.equals(d.peerId)) {
                                 if (d.msg != null && d.msg.id == upd.msg.id) {
                                     d.isTyping = false;
                                     found = true;
@@ -344,7 +356,7 @@ public class MainActivity extends Activity {
                     if (dialogResponse == null || dialogResponse.dialogs == null) break;
                     for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                         Dialog d = dialogResponse.dialogs.get(i);
-                        if (d != null && delPeer.equals(d.id)) {
+                        if (d != null && delPeer.equals(d.peerId)) {
                             if (d.msg != null && upd.messages != null
                                     && upd.messages.contains(String.valueOf(d.msg.id))) {
                                 needRefresh = true;
@@ -370,7 +382,7 @@ public class MainActivity extends Activity {
                     if (isCancel) {
                         for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                             Dialog d = dialogResponse.dialogs.get(i);
-                            if (d != null && typingPeer.equals(d.id) && d.isTyping) {
+                            if (d != null && typingPeer.equals(d.peerId) && d.isTyping) {
                                 d.isTyping = false;
                                 break;
                             }
@@ -379,7 +391,7 @@ public class MainActivity extends Activity {
                     } else {
                         for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                             Dialog d = dialogResponse.dialogs.get(i);
-                            if (d != null && typingPeer.equals(d.id)) {
+                            if (d != null && typingPeer.equals(d.peerId)) {
                                 d.isTyping = true;
                                 break;
                             }
@@ -396,7 +408,7 @@ public class MainActivity extends Activity {
                     if (dialogResponse == null || dialogResponse.dialogs == null || dialogsAdapter == null) break;
                     for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                         Dialog d = dialogResponse.dialogs.get(i);
-                        if (d != null && readPeer.equals(d.id)) {
+                        if (d != null && readPeer.equals(d.peerId)) {
                             d.readOut = Math.max(d.readOut, upd.max_id);
                             if (d.msg != null && d.msg.out && (upd.max_id == 0 || d.msg.id <= upd.max_id))
                                 d.msg.messageState = Message.MessageState.MESSAGE_WAS_READ;
@@ -583,7 +595,7 @@ public class MainActivity extends Activity {
         applyReadStates();
 
         if (dialogsAdapter == null) {
-            dialogsAdapter = new DialogsAdapter(getApplicationContext(), dialogResponse.dialogs, userToken);
+            dialogsAdapter = new DialogsAdapter(dialogResponse.dialogs, App.selfId, new AvatarViewBinder(App.getCacheManager()));
             dialogsListView.setAdapter(dialogsAdapter);
         }
 

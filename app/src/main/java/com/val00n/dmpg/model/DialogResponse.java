@@ -69,7 +69,7 @@ public class DialogResponse {
             if (dialogs.size() > 0) {
                 Dialog latestDialog = dialogs.get(dialogs.size() - 1);
 
-                offsetPeer = latestDialog.id;
+                offsetPeer = latestDialog.peerId;
                 if (latestDialog.msg != null) {
                     offsetDate = latestDialog.msg.date;
                     offsetId = String.valueOf(latestDialog.msg.id);

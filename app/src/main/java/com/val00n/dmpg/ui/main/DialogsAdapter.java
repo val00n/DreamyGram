@@ -1,46 +1,43 @@
 package com.val00n.dmpg.ui.main;
 
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
-import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.Dialog;
+import com.val00n.dmpg.model.DialogRow;
 import com.val00n.dmpg.model.message.Message;
-import com.val00n.dmpg.services.MPGramService;
+import com.val00n.dmpg.ui.AvatarViewBinder;
 import java.util.ArrayList;
 
 public class DialogsAdapter extends BaseAdapter {
 
-    private final Context context;
-    private final MPGramService mpgService;
     private final ArrayList<Dialog> items;
-    private final String userToken;
+    private final ArrayList<DialogRow> rows;
+    private final AvatarViewBinder avatarViewBinder;
 
-    public DialogsAdapter(Context context, ArrayList<Dialog> items, String userToken) {
-        this.context = context;
-        this.userToken = userToken;
-        this.mpgService = App.getMPGramService();
+    private String selfId;
+
+    public DialogsAdapter(ArrayList<Dialog> items, String selfId, AvatarViewBinder avatarViewBinder) {
+        this.selfId = selfId;
         this.items = items;
+        this.avatarViewBinder = avatarViewBinder;
+
+        rows = new ArrayList<DialogRow>();
+        buildRows();
     }
 
     @Override
     public int getCount() {
-        return items.size();
+        return rows.size();
     }
 
     @Override
     public Object getItem(int position) {
-        return items.get(position);
+        return rows.get(position);
     }
 
     @Override
@@ -49,19 +46,26 @@ public class DialogsAdapter extends BaseAdapter {
     }
 
     @Override
+    public void notifyDataSetChanged() {
+        buildRows();
+        super.notifyDataSetChanged();
+    }
+
+    @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         final ViewHolder holder;
+        final DialogRow row = rows.get(position);
 
         if (convertView == null) {
-            convertView = LayoutInflater.from(context).inflate(R.layout.dialog_item, parent, false);
+            convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.dialog_item, parent, false);
 
             holder = new ViewHolder();
             holder.avatar = (ImageView) convertView.findViewById(R.id.dialogAvatar);
             holder.title = (TextView) convertView.findViewById(R.id.dialogTitle);
-            holder.lastTime = (TextView) convertView.findViewById(R.id.dialogLastTime);
-            holder.lastMessage = (TextView) convertView.findViewById(R.id.dialogBottomText);
-            holder.unreadStatus = (TextView) convertView.findViewById(R.id.dialogUnreadText);
-            holder.readIcon = (ImageView) convertView.findViewById(R.id.dialogReadStatus);
+            holder.date = (TextView) convertView.findViewById(R.id.dialogLastTime);
+            holder.subtitle = (TextView) convertView.findViewById(R.id.dialogBottomText);
+            holder.unreadBadge = (TextView) convertView.findViewById(R.id.dialogUnreadText);
+            holder.statusIcon = (ImageView) convertView.findViewById(R.id.dialogReadStatus);
             holder.pinIcon = convertView.findViewById(R.id.dialogPinIcon);
 
             convertView.setTag(holder);
@@ -69,100 +73,93 @@ public class DialogsAdapter extends BaseAdapter {
             holder = (ViewHolder) convertView.getTag();
         }
 
-        final Dialog item = items.get(position);
-        final int currentPosition = position;
+        holder.title.setText(row.title);
+        holder.date.setText(row.dialog.getDateTimeString());
+        holder.subtitle.setText(row.subTitle);
+        holder.unreadBadge.setText(row.unreadBadge);
 
-        holder.title.setText(item.getDisplayName(App.selfId));
-        holder.lastTime.setText(item.getDateTimeString());
-
-        if (item.isTyping) {
-            holder.lastMessage.setText("Typing...");
-        } else {
-            holder.lastMessage.setText(item.getSubtitle());
-        }
-
-        StringBuilder badge = new StringBuilder();
-        if (item.unread > 0) {
-            badge.append("(").append(item.unread).append(")");
-        }
-        if (item.mentions > 0) {
-            badge.append(" @").append(item.mentions);
-        }
-        holder.unreadStatus.setText(badge.toString());
-
-        if (item.pin) {
+        if (row.pinned) {
             holder.pinIcon.setVisibility(View.VISIBLE);
         } else {
             holder.pinIcon.setVisibility(View.GONE);
         }
 
-        if (item.msg == null || !item.msg.out) {
-            holder.readIcon.setVisibility(View.GONE);
-        } else {
-            holder.readIcon.setVisibility(View.VISIBLE);
-            Message.MessageState state = item.msg.messageState != null
-                    ? item.msg.messageState
-                    : Message.MessageState.MESSAGE_SENT;
-            switch (state) {
-                case MESSAGE_SENDING:
-                    holder.readIcon.setImageResource(R.drawable.ic_wait);
-                    break;
-                case MESSAGE_SENT:
-                    holder.readIcon.setImageResource(R.drawable.ic_checkmark);
-                    break;
-                case MESSAGE_WAS_READ:
-                    holder.readIcon.setImageResource(R.drawable.ic_double_checkmark);
-                    break;
-                case MESSAGE_ERROR:
-                    holder.readIcon.setImageResource(R.drawable.ic_cross);
-                    break;
-            }
+        holder.statusIcon.setVisibility(row.out ? View.VISIBLE : View.GONE);
+        if (row.out) {
+            holder.statusIcon.setImageResource(row.statusRes);
         }
 
-        if (item.hasAvatar()) {
-            if (item.cachedAvatar != null) {
-                holder.avatar.setImageBitmap(item.cachedAvatar);
-            } else {
-                mpgService.getAvatar(item.id, userToken, new MPGramService.ApiCallback<byte[]>() {
-                    @Override
-                    public void onSuccess(final byte[] imageBytes) {
-
-                        if (currentPosition < items.size() && items.get(currentPosition) == item) {
-                            final Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-
-                            if (bitmap != null) {
-                                item.cachedAvatar = bitmap;
-
-                                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        if (currentPosition < items.size() && items.get(currentPosition) == item) {
-                                            holder.avatar.setImageBitmap(bitmap);
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onError(Exception error) {
-                        Log.d("DialogsAdapter", "Failed to load avatar: " + error.getMessage());
-                    }
-                });
-            }
-        }
+        avatarViewBinder.bind(holder.avatar, row.avatarPeer, row.hasAvatar);
 
         return convertView;
+    }
+
+    private void buildRows() {
+        rows.clear();
+        for (Dialog item : items) {
+            DialogRow newRow = new DialogRow();
+
+            newRow.dialog = item;
+            newRow.title = item.getDisplayName(selfId);
+
+            if (item.isTyping) {
+                newRow.subTitle = "Typing...";
+            } else {
+                newRow.subTitle = item.getSubtitle();
+            }
+
+            StringBuilder badge = new StringBuilder();
+            if (item.unread > 0) {
+                badge.append("(").append(item.unread).append(")");
+            }
+            if (item.mentions > 0) {
+                badge.append(" @").append(item.mentions);
+            }
+
+            newRow.unreadBadge = badge.toString();
+            newRow.pinned = item.pin;
+
+            if (item.msg == null || !item.msg.out) {
+                newRow.out = false;
+            } else {
+                newRow.out = true;
+                Message.MessageState state = item.msg.messageState != null
+                        ? item.msg.messageState
+                        : Message.MessageState.MESSAGE_SENT;
+                switch (state) {
+                    case MESSAGE_SENDING:
+                        newRow.statusRes = R.drawable.ic_wait;
+                        break;
+                    case MESSAGE_SENT:
+                        newRow.statusRes = R.drawable.ic_checkmark;
+                        break;
+                    case MESSAGE_WAS_READ:
+                        newRow.statusRes = R.drawable.ic_double_checkmark;
+                        break;
+                    case MESSAGE_ERROR:
+                        newRow.statusRes = R.drawable.ic_cross;
+                        break;
+                }
+            }
+
+            newRow.avatarPeer = item.peerId;
+            newRow.hasAvatar = item.hasAvatar();
+
+            rows.add(newRow);
+        }
+    }
+
+    public void setSelfId(String selfId) {
+        this.selfId = selfId;
     }
 
     static class ViewHolder {
         ImageView avatar;
         View pinIcon;
-        ImageView readIcon;
+        ImageView statusIcon;
         TextView title;
-        TextView lastTime;
-        TextView lastMessage;
-        TextView unreadStatus;
+        TextView date;
+        TextView subtitle;
+        TextView unreadBadge;
     }
 }

@@ -8,20 +8,24 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.widget.Toast;
+
+import com.val00n.dmpg.cache.CacheManager;
 import com.val00n.dmpg.network.HttpClient;
 import com.val00n.dmpg.services.InstanceManager;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
-import com.val00n.dmpg.ui.startup.StartupActivity;
+import com.val00n.dmpg.ui.StartupActivity;
 
 public class App extends Application {
 
     private static App app;
     private static InstanceManager instanceManager;
     private static SessionManager sessionManager;
-    private static ConnectivityManager cm;
+    private static CacheManager cacheManager;
     private static MPGramService mpgService;
+    private static ConnectivityManager cm;
     private static String[] sessionDeathMarkers;
+
     public static volatile String selfId;
     public static volatile boolean sessionDead;
 
@@ -35,6 +39,11 @@ public class App extends Application {
 
     public static SessionManager getSessionManager() {
         return sessionManager;
+    }
+
+    public static CacheManager getCacheManager() {
+        if (cacheManager == null) cacheManager = new CacheManager(app);
+        return cacheManager;
     }
 
     public static MPGramService getMPGramService() {
@@ -51,6 +60,7 @@ public class App extends Application {
         app = this;
         instanceManager = new InstanceManager(this);
         sessionManager = new SessionManager(this);
+
         cm = (ConnectivityManager) this.getSystemService(this.CONNECTIVITY_SERVICE);
 
         instanceManager.loadInstances();

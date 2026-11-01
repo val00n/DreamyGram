@@ -3,92 +3,158 @@ package com.val00n.dmpg.services;
 import android.net.Uri;
 import android.os.Environment;
 import com.val00n.dmpg.App;
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 
 public class FileHelper {
 
-    private final String MEDIA_DIRECTORY_NAME = "/dmpg/";
-    private final String APPDATA_DIRECTORY_NAME = "/dmpgAppData/";
+    private static final String CHARSET_NAME = "UTF-8";
+    private static final int BUFFER_SIZE = 2048;
+    private static final String MEDIA_DIRECTORY_NAME = "/dmpg/";
+    private static final String APPDATA_DIRECTORY_NAME = "/dmpgAppData/";
 
-    public boolean saveFile(String fileName, String content, boolean isAppData) {
-        if (isAppData) {
-            return saveFile(fileName, content, getAppDataDirectoryPath());
-        } else {
-            return saveFile(fileName, content, getMediaDirectoryPath());
+    public boolean saveFileText(String fileName, String content, boolean isAppData) {
+        if (content == null) return false;
+
+        try {
+            return saveFileBytes(fileName, content.getBytes(CHARSET_NAME), isAppData);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
         }
     }
 
-    public boolean saveFile(String fileName, String content, String directory) {
-        File folder = new File(directory);
-        File file = new File(folder, fileName);
-        String fullFileText = content;
+    public String getFullAppdataPath(String fileName) {
+        return new File(getAppDataDirectoryPath(), fileName).getAbsolutePath();
+    }
 
-        File parent = file.getParentFile();
-        if (parent != null && !parent.exists()) {
-            parent.mkdirs();
-        }
+    public boolean saveFileText(String fileName, String content, String directory) {
+        if (content == null) return false;
 
-        OutputStreamWriter outputStreamWriter = null;
         try {
-            outputStreamWriter = new OutputStreamWriter(new FileOutputStream(file), "UTF-8");
-            outputStreamWriter.write(fullFileText);
-            outputStreamWriter.flush();
-        } catch (IOException e) {
+            return saveFileBytes(fileName, content.getBytes(CHARSET_NAME), directory);
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
-        } finally {
-            if (outputStreamWriter != null) {
-                try { outputStreamWriter.close(); } catch (IOException e) { e.printStackTrace(); }
+        }
+    }
+
+    public String loadFileText(String fileName, boolean isAppData) {
+        byte[] data = loadFileBytes(fileName, isAppData);
+        try {
+            return data == null ? null : new String(data, CHARSET_NAME);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public String loadFileText(String fileName, String directory) {
+        try {
+            byte[] data = loadFileBytes(fileName, directory);
+            return data == null ? null : new String(data, CHARSET_NAME);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public boolean saveFileBytes(String fileName, byte[] content, boolean isAppData) {
+        if (content == null) return false;
+
+        try {
+            if (isAppData) {
+                return saveFileBytes(fileName, content, getAppDataDirectoryPath());
+            } else {
+                return saveFileBytes(fileName, content, getMediaDirectoryPath());
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean saveFileBytes(String fileName, byte[] content, String directory) {
+        if (content == null || fileName == null || directory == null) return false;
+
+        File folder = new File(directory);
+        File finalFile = new File(folder, fileName);
+        File parent = finalFile.getParentFile();
+
+        if (parent != null && !parent.exists() && !parent.mkdirs()) return false;
+
+        File tempFile = new File(parent, finalFile.getName() + "." + System.nanoTime() + ".tmp");
+        FileOutputStream stream = null;
+
+        try {
+            stream = new FileOutputStream(tempFile);
+            stream.write(content);
+            stream.flush();
+            stream.getFD().sync();
+        } catch (IOException e) {
+            e.printStackTrace();
+            if (tempFile.exists()) tempFile.delete();
+            return false;
+        } finally {
+            if (stream != null) {
+                try { stream.close(); } catch (IOException e) { e.printStackTrace(); }
+            }
+        }
+
+        if (!tempFile.renameTo(finalFile)) {
+            tempFile.delete();
+            return false;
         }
 
         return true;
     }
 
-    public String loadFile(String fileName, boolean isAppData) {
+
+    public byte[] loadFileBytes(String fileName, boolean isAppData) {
         if (isAppData) {
-            return loadFile(fileName, getAppDataDirectoryPath());
+            return loadFileBytes(fileName, getAppDataDirectoryPath());
         } else {
-            return loadFile(fileName, getMediaDirectoryPath());
+            return loadFileBytes(fileName, getMediaDirectoryPath());
         }
     }
 
-    public String loadFile(String fileName, String directory) {
+    public byte[] loadFileBytes(String fileName, String directory) {
         File file = new File(directory, fileName);
-        String fullFileText = null;
 
-        FileInputStream input = null;
-        BufferedReader reader = null;
-        InputStreamReader inputStreamReader = null;
+        FileInputStream fis = null;
+        ByteArrayOutputStream bos = null;
         try {
-            input = new FileInputStream(file);
-            inputStreamReader = new InputStreamReader(input, "UTF-8");
+            fis = new FileInputStream(file);
+            bos = new ByteArrayOutputStream();
 
-            reader = new BufferedReader(inputStreamReader);
-            StringBuilder stringBuilder = new StringBuilder();
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                stringBuilder.append(line).append("\n");
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int read;
+            while ((read = fis.read(buffer)) != -1) {
+                bos.write(buffer, 0, read);
             }
-
-            fullFileText = stringBuilder.toString();
+            return bos.toByteArray();
         } catch (IOException e) {
             e.printStackTrace();
             return null;
         } finally {
-            if (reader != null) {
-                try { reader.close(); } catch (IOException e) { e.printStackTrace(); }
+            if (fis != null) {
+                try {
+                    fis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (bos != null) {
+                try {
+                    bos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
-
-        return fullFileText;
     }
 
     public boolean deleteFile(String fileName, boolean isAppData) {

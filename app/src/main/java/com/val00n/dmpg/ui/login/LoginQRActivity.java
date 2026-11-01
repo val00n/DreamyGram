@@ -148,9 +148,14 @@ public class LoginQRActivity extends Activity {
                     getQrImage();
                     qrPollingHandler.postDelayed(qrPollTask, 5000);
                 } else if ("wrong_captcha".equals(result.response) || "captcha_expired".equals(result.response)) {
-                    progressBar.setVisibility(View.GONE);
-                    captchaLayout.setVisibility(View.VISIBLE);
-                    fetchCaptcha();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressBar.setVisibility(View.GONE);
+                            captchaLayout.setVisibility(View.VISIBLE);
+                            fetchCaptcha();
+                        }
+                    });
                 } else {
                     error(new Exception("unexpected response: " + result.response));
                 }

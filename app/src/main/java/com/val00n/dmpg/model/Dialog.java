@@ -1,12 +1,11 @@
 package com.val00n.dmpg.model;
 
-import android.graphics.Bitmap;
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.utils.DateUtils;
 import cc.nnproject.json.JSONObject;
 
 public class Dialog {
-    public String id;
+    public String peerId;
     public boolean pin;
     public int unread;
     public int mentions;
@@ -19,12 +18,11 @@ public class Dialog {
     public Chat chat;
 
     public boolean isTyping = false; // not in API, ew
-    public Bitmap cachedAvatar; // FIXME
 
     public Dialog(JSONObject json, User user, Chat chat) {
         if (json == null) return;
 
-        id = json.getString("id");
+        peerId = json.getString("id");
 
         if (json.has("pin")) {
             pin = json.getBoolean("pin");
@@ -51,9 +49,9 @@ public class Dialog {
     }
 
     public String getDisplayName(String selfId) {
-        if (selfId != null && selfId.equals(id)) return "Saved Messages";
+        if (selfId != null && selfId.equals(peerId)) return "Saved Messages";
 
-        if (id.startsWith("-") && chat != null) {
+        if (peerId.startsWith("-") && chat != null) {
             return chat.t;
         } else if (user != null) {
             return user.getDisplayName();
@@ -63,7 +61,7 @@ public class Dialog {
     }
 
     public boolean hasAvatar() {
-        if (id.startsWith("-") && chat != null) {
+        if (peerId.startsWith("-") && chat != null) {
             return chat.p;
         } else if (user != null) {
             return user.p;
@@ -78,7 +76,7 @@ public class Dialog {
         }
 
         if (msg.text != null && msg.text.length() > 0) {
-            if (id.startsWith("-") && user != null) {
+            if (peerId.startsWith("-") && user != null) {
                 return user.getDisplayName() + ": " + msg.text;
             } else {
                 return msg.text;

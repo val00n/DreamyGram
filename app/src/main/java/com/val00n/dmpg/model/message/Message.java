@@ -21,8 +21,7 @@ public class Message {
     //  public Comments comments; // TODO
     //  public Reacts reacts; // TODO
 
-    public boolean dateSeparator; // ugly. THERE IS NO DATE SEPARATOR FLAG IN API
-    public MessageState messageState; // same shit
+    public MessageState messageState; // local state, not from API
 
     public enum MessageState {
         MESSAGE_SENDING,
@@ -75,13 +74,6 @@ public class Message {
 
             messageState = MessageState.MESSAGE_SENT;
         }
-    }
-
-    public static Message dateSeparator(long seconds) {
-        Message m = new Message(null);
-        m.date = seconds;
-        m.dateSeparator = true;
-        return m;
     }
 }
 

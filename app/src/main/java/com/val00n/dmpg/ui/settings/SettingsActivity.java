@@ -11,23 +11,32 @@ import com.val00n.dmpg.ui.settings.instances.InstanceSettingsActivity;
 public class SettingsActivity extends Activity {
 
     private Button instancesButton;
+    private Button cacheButton;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings);
 
         instancesButton = (Button) findViewById(R.id.settingsInstancesButton);
+        cacheButton = (Button) findViewById(R.id.settingsCacheButton);
 
         instancesButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                navigateToInstanceSettings();
+                navigateTo(InstanceSettingsActivity.class);
+            }
+        });
+
+        cacheButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                navigateTo(CacheSettingsActivity.class);
             }
         });
     }
 
-    private void navigateToInstanceSettings() {
-        Intent intent = new Intent(this, InstanceSettingsActivity.class);
+    private void navigateTo(Class<?> cls) {
+        Intent intent = new Intent(this, cls);
         startActivity(intent);
     }
 }

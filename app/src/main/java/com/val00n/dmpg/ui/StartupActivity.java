@@ -1,4 +1,4 @@
-package com.val00n.dmpg.ui.startup;
+package com.val00n.dmpg.ui;
 
 import android.app.Activity;
 import android.content.Intent;

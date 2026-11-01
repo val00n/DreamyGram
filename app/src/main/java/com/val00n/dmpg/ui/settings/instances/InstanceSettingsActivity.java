@@ -17,7 +17,7 @@ import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
-import com.val00n.dmpg.ui.startup.StartupActivity;
+import com.val00n.dmpg.ui.StartupActivity;
 import java.util.ArrayList;
 import static android.content.ContentValues.TAG;
 

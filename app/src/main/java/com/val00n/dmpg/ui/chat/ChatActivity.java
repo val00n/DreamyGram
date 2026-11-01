@@ -28,14 +28,14 @@ import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.model.message.MessageReply;
+import com.val00n.dmpg.model.message.PendingMessage;
 import com.val00n.dmpg.services.MPGramService;
+import com.val00n.dmpg.ui.AvatarViewBinder;
 import com.val00n.dmpg.ui.main.MainActivity;
-import com.val00n.dmpg.ui.startup.StartupActivity;
-import com.val00n.dmpg.utils.DateUtils;
+import com.val00n.dmpg.ui.StartupActivity;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-
 import static android.content.ContentValues.TAG;
 
 public class ChatActivity extends Activity {
@@ -79,8 +79,9 @@ public class ChatActivity extends Activity {
     private boolean fetchError;
     private boolean atBottom = true;
     private boolean canType;
-    private Message pendingMessage;
     private boolean isTyping;
+    private boolean isSavedMessages;
+
     volatile private boolean isPolling;
     volatile private boolean isPaused;
     volatile private boolean isActivityDied;
@@ -95,6 +96,10 @@ public class ChatActivity extends Activity {
     private String updateOffset = "-1";
     private int updateFails = 0;
 
+    private final ArrayList<PendingMessage> pendingMessages = new ArrayList<PendingMessage>();
+    private int nextLocalMessageId = -1;
+
+    private static final long PENDING_MATCH_WINDOW_SECS = 300;
     private static final int UPDATE_TIMEOUT_SECS = 30;
     private static final int UPDATE_POLL_MILLIS = 3000;
     private static final int STATUS_UPDATE_MILLIS = 5000;
@@ -120,14 +125,14 @@ public class ChatActivity extends Activity {
             final String reqBase = instance.baseURL;
             mpgService.getSelf(userToken, new MPGramService.ApiCallback<User>() {
                 @Override
-                public void onSuccess(User result) {
+                public void onSuccess(final User result) {
                     if (isActivityDied) return;
                     if (result != null && reqBase.equals(App.getInstanceManager().getSelectedInstanceBaseUrl())) {
                         App.selfId = result.id;
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                if (messagesAdapter != null) messagesAdapter.notifyDataSetChanged();
+                                if (messagesAdapter != null) messagesAdapter.setSavedMessages(peerId.equals(result.id));
                             }
                         });
                     }
@@ -139,6 +144,8 @@ public class ChatActivity extends Activity {
                 }
             });
         }
+
+        isSavedMessages = App.selfId != null && App.selfId.equals(peerId);
 
         progressBar = (ProgressBar) findViewById(R.id.chatProgressBar);
         chatTitleText = (TextView) findViewById(R.id.chatTitle);
@@ -167,7 +174,7 @@ public class ChatActivity extends Activity {
                         if (isActivityDied) return;
 
                         updates = result;
-                        if (updates.size() > 0) {
+                        if (result != null && result.size() > 0) {
                             updateOffset = Integer.toString(updates.get(updates.size() - 1).update_id);
 
                             runOnUiThread(new Runnable() {
@@ -253,40 +260,46 @@ public class ChatActivity extends Activity {
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
                 int adapterPos = position - 1;
-                if (adapterPos < 0 || adapterPos >= historyResponse.messages.size()) {
+                if (messagesAdapter == null || !messagesAdapter.isMessage(adapterPos)) {
+                    return false;
+                }
+                Message msg = (Message) messagesAdapter.getItem(adapterPos);
+                if (msg == null) {
                     return false;
                 }
 
-                if (historyResponse.messages.get(adapterPos).dateSeparator || historyResponse.messages.get(adapterPos).act != null) {
-                    return false;
-                }
+                showMessageActionMenu(msg);
 
-                if (historyResponse.messages.get(adapterPos).messageState == Message.MessageState.MESSAGE_ERROR) {
-                    return false;
-                }
-
-                showMessageActionMenu(adapterPos);
-                return false;
+                return true;
             }
         });
 
         chatMessages.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                if (!chatSendButton.isEnabled()) {
-                    return;
-                }
+                if (!chatSendButton.isEnabled()) return;
 
                 int adapterPos = position - 1;
-                if (adapterPos < 0 || adapterPos >= historyResponse.messages.size()) {
-                    return;
-                }
+                if (messagesAdapter == null || !messagesAdapter.isMessage(adapterPos)) return;
 
-                if (historyResponse.messages.get(adapterPos).messageState == Message.MessageState.MESSAGE_ERROR) {
-                    String pendingText = historyResponse.messages.get(adapterPos).text;
-                    pendingMessage = null;
-                    historyResponse.messages.remove(adapterPos);
-                    sendMessage(pendingText);
+                Message msg = (Message) messagesAdapter.getItem(adapterPos);
+                if (msg == null || msg.messageState != Message.MessageState.MESSAGE_ERROR) return;
+
+                PendingMessage entry = findPendingByMessage(msg);
+
+                if (entry != null) {
+                    historyResponse.messages.remove(entry.message);
+                    historyResponse.messages.add(entry.message);
+
+                    pendingMessages.remove(entry);
+                    pendingMessages.add(entry);
+
+                    chatSendButton.setEnabled(false);
+                    sendPending(entry);
+                    chatMessages.setSelection(chatMessages.getCount() - 1);
+                } else {
+                    historyResponse.messages.remove(msg);
+                    sendMessage(msg.text);
                 }
             }
         });
@@ -317,7 +330,7 @@ public class ChatActivity extends Activity {
         chatSendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String text = chatInputEditText.getText().toString();
+                String text = chatInputEditText.getText().toString().trim();
                 
                 switch (messageAction) {
                     case EDIT:
@@ -355,7 +368,8 @@ public class ChatActivity extends Activity {
 
     protected void onResume() {
         super.onResume();
-        if (!instance.equals(App.getInstanceManager().getSelectedInstance())) {
+        Instance selected = App.getInstanceManager().getSelectedInstance();
+        if (instance == null || !instance.equals(selected)) {
             navigateToStartup();
         }
     }
@@ -418,69 +432,86 @@ public class ChatActivity extends Activity {
     }
 
     private void sendMessage(String text) {
+        if (historyResponse == null || messagesAdapter == null) return;
+
         chatSendButton.setEnabled(false);
-        String replyId = messageAction == MessageAction.REPLY && targetMessageId != null ? targetMessageId : null;
 
-        pendingMessage = new Message(text, 0, peerId);
-        pendingMessage.out = true;
-        pendingMessage.date = System.currentTimeMillis() / 1000;
+        final String replyId = messageAction == MessageAction.REPLY && targetMessageId != null ? targetMessageId : null;
+
+        Message pending = new Message(text, nextLocalMessageId--, peerId);
+        pending.out = true;
+        pending.date = System.currentTimeMillis() / 1000;
+
         if (replyId != null) {
-            pendingMessage.reply = new MessageReply("Loading...");
+            pending.reply = buildPendingReply(replyId);
         }
-        historyResponse.messages.add(pendingMessage);
-        messagesAdapter.notifyDataSetChanged();
+
+        PendingMessage entry = new PendingMessage(pending, replyId);
+        pendingMessages.add(entry);
+        historyResponse.messages.add(pending);
+
+        sendPending(entry);
         chatMessages.setSelection(chatMessages.getCount() - 1);
+    }
 
-        mpgService.sendMessage(userToken, peerId, text, replyId, null, null, null, new MPGramService.ApiCallback<String>() {
-            @Override
-            public void onSuccess(String result) {
-                if (pendingMessage != null) {
-                    if ("1".equals(result)) {
-                        pendingMessage.messageState = Message.MessageState.MESSAGE_SENT;
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                messagesAdapter.notifyDataSetChanged();
-                            }
-                        });
-                    } else {
-                        pendingMessage.messageState = Message.MessageState.MESSAGE_ERROR;
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                messagesAdapter.notifyDataSetChanged();
-                            }
-                        });
-                        onError(new Exception("res: " + result));
-                    }
-                }
+    private void sendPending(final PendingMessage entry) {
+        final Message pending = entry.message;
 
-                runOnUiThread(new Runnable() {
+        pending.messageState = Message.MessageState.MESSAGE_SENDING;
+        pending.date = System.currentTimeMillis() / 1000;
+        messagesAdapter.notifyDataSetChanged();
+
+        mpgService.sendMessage(userToken, peerId, pending.text, entry.replyId, null, null, null,
+                new MPGramService.ApiCallback<String>() {
                     @Override
-                    public void run() {
-                        chatSendButton.setEnabled(true);
+                    public void onSuccess(final String result) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (isActivityDied) return;
+
+                                if (pending.id <= 0) {
+                                    if ("1".equals(result)) {
+                                        pending.messageState = Message.MessageState.MESSAGE_SENT;
+                                    } else {
+                                        pending.messageState = Message.MessageState.MESSAGE_ERROR;
+                                        Toast.makeText(ChatActivity.this,
+                                                "Failed to send message: res: " + result,
+                                                Toast.LENGTH_SHORT).show();
+                                    }
+                                    messagesAdapter.notifyDataSetChanged();
+                                }
+
+                                chatSendButton.setEnabled(true);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(final Exception error) {
+                        error.printStackTrace();
+
+                        if (isActivityDied) return;
+                        if (App.isSessionDead(error.getMessage(), ChatActivity.this)) return;
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (isActivityDied) return;
+
+                                if (pending.id <= 0) {
+                                    pending.messageState = Message.MessageState.MESSAGE_ERROR;
+                                    messagesAdapter.notifyDataSetChanged();
+                                    Toast.makeText(ChatActivity.this,
+                                            "Failed to send message: " + error.getMessage(),
+                                            Toast.LENGTH_SHORT).show();
+                                }
+
+                                chatSendButton.setEnabled(true);
+                            }
+                        });
                     }
                 });
-            }
-
-            @Override
-            public void onError(final Exception error) {
-                error.printStackTrace();
-                if (!App.isSessionDead(error.getMessage(), ChatActivity.this)) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (pendingMessage != null) {
-                                pendingMessage.messageState = Message.MessageState.MESSAGE_ERROR;
-                                messagesAdapter.notifyDataSetChanged();
-                            }
-                            chatSendButton.setEnabled(true);
-                            Toast.makeText(ChatActivity.this, "Failed to send message: " + error.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                }
-            }
-        });
     }
 
     private void update(ArrayList<Update> u) {
@@ -489,28 +520,29 @@ public class ChatActivity extends Activity {
                 case "updateNewChannelMessage":
                 case "updateNewMessage":
                     if (upd.msg != null) {
+                        Message serverMsg = upd.msg;
                         boolean isDupe = false;
-                        for (int i = 0; i < historyResponse.messages.size(); i++) {
-                            if (upd.msg.id == historyResponse.messages.get(i).id) {
-                                isDupe = true;
-                                break;
+
+                        if (serverMsg.id > 0) {
+                            for (int i = 0; i < historyResponse.messages.size(); i++) {
+                                if (serverMsg.id == historyResponse.messages.get(i).id) {
+                                    isDupe = true;
+                                    break;
+                                }
                             }
                         }
                         if (isDupe) continue;
 
-                        if (upd.msg.out == true && pendingMessage != null) {
-                            pendingMessage.id = upd.msg.id;
-                            pendingMessage.date = upd.msg.date;
-                            pendingMessage.reply = upd.msg.reply;
-                            pendingMessage.from_id = upd.msg.from_id;
-                            pendingMessage.media = upd.msg.media; // is this will work? i dunno =/
-                            pendingMessage.messageState = Message.MessageState.MESSAGE_SENT;
+                        PendingMessage match = serverMsg.out ? findPendingMatch(serverMsg) : null;
 
+                        if (match != null) {
+                            applyServerMessage(match.message, serverMsg);
+                            pendingMessages.remove(match);
                             messagesAdapter.notifyDataSetChanged();
-                            pendingMessage = null;
                         } else {
-                            historyResponse.messages.add(upd.msg);
+                            historyResponse.messages.add(serverMsg);
                             messagesAdapter.notifyDataSetChanged();
+
                             if (atBottom) {
                                 chatMessages.setSelection(chatMessages.getCount() - 1);
                             }
@@ -731,26 +763,6 @@ public class ChatActivity extends Activity {
         }
 
         if (isChanged) {
-            if (historyResponse.messages.isEmpty()) {
-                messagesAdapter.notifyDataSetChanged();
-                return;
-            }
-
-            if (historyResponse.messages.get(historyResponse.messages.size() - 1).dateSeparator) {
-                historyResponse.messages.remove(historyResponse.messages.size() - 1);
-            }
-
-            if (historyResponse.messages.isEmpty()) {
-                messagesAdapter.notifyDataSetChanged();
-                return;
-            }
-
-            for (int i = historyResponse.messages.size() - 2; i >= 0; i--) {
-                if (historyResponse.messages.get(i).dateSeparator && (historyResponse.messages.get(i+1).dateSeparator)) {
-                    historyResponse.messages.remove(i);
-                }
-            }
-
             messagesAdapter.notifyDataSetChanged();
         }
     }
@@ -763,47 +775,67 @@ public class ChatActivity extends Activity {
         messageAction = MessageAction.NONE;
     }
 
-    private void showMessageActionMenu(final int position) {
+    private void showMessageActionMenu(final Message msg) {
         final String[] options = {"Delete", "Copy", "Edit", "Forward", "Reply", "Share", "Info"};
-        final Message msg = historyResponse.messages.get(position);
-
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Choose action");
-
         builder.setItems(options, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 switch (which) {
                     case 0:
-                        new AlertDialog.Builder(ChatActivity.this)
-                                .setTitle("Delete")
-                                .setMessage("Are you sure?")
-                                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        deleteMessage(String.valueOf(msg.id), false);
-                                    }
-                                })
-                                .setNegativeButton("Delete for everyone", new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        deleteMessage(String.valueOf(msg.id), true);
-                                    }
-                                })
-                                .setNeutralButton("Cancel", null)
-                                .show();
+                        if (isMessagePending(msg)) {
+                            PendingMessage entry = findPendingByMessage(msg);
+                            if (entry != null) {
+                                pendingMessages.remove(entry);
+                            }
+                            historyResponse.messages.remove(msg);
+                            messagesAdapter.notifyDataSetChanged();
+                        } else {
+                            new AlertDialog.Builder(ChatActivity.this)
+                                    .setTitle("Delete")
+                                    .setMessage("Are you sure?")
+                                    .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            deleteMessage(String.valueOf(msg.id), false);
+                                        }
+                                    })
+                                    .setNegativeButton("Delete for everyone", new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            deleteMessage(String.valueOf(msg.id), true);
+                                        }
+                                    })
+                                    .setNeutralButton("Cancel", null)
+                                    .show();
+                        }
                         break;
                     case 1:
                         copy(msg.text);
                         break;
                     case 2:
-                        editMessage(msg);
+                        if (isMessagePending(msg)) {
+                            Toast.makeText(ChatActivity.this, "Cannot edit pending message", Toast.LENGTH_SHORT).show();
+                        } else if (msg.id <= 0) {
+                            Toast.makeText(ChatActivity.this, "Cannot edit message without server ID", Toast.LENGTH_SHORT).show();
+                        } else {
+                            editMessage(msg);
+                        }
                         break;
                     case 3:
-                        forwardMessage(msg);
+                        if (isMessagePending(msg)) {
+                            Toast.makeText(ChatActivity.this, "Cannot forward pending message", Toast.LENGTH_SHORT).show();
+                        } else {
+                            forwardMessage(msg);
+                        }
                         break;
                     case 4:
-                        setReply(msg);
+                        if (isMessagePending(msg)) {
+                            Toast.makeText(ChatActivity.this, "Cannot reply to pending message", Toast.LENGTH_SHORT).show();
+                        } else {
+                            setReply(msg);
+                        }
                         break;
                     case 5:
                         if (msg.text != null) {
@@ -813,12 +845,11 @@ public class ChatActivity extends Activity {
                         }
                         break;
                     case 6:
-                        showMessageInfo(position);
+                        showMessageInfo(msg);
                         break;
                 }
             }
         });
-
         builder.create().show();
     }
 
@@ -861,7 +892,7 @@ public class ChatActivity extends Activity {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            showMessages(0);
+                            showMessages();
                         }
                     });
                 } else {
@@ -904,8 +935,7 @@ public class ChatActivity extends Activity {
         }
     }
 
-    private void showMessageInfo(int position) {
-        Message msg = historyResponse.messages.get(position);
+    private void showMessageInfo(Message msg) {
         StringBuilder stringBuilder = new StringBuilder();
 
         stringBuilder.append("ID: ").append(msg.id);
@@ -927,17 +957,18 @@ public class ChatActivity extends Activity {
                 .show();
     }
 
-    private void showMessages(final int inserted) {
+    private void showMessages() {
         if (messagesAdapter == null) {
-            messagesAdapter = new MessagesAdapter(ChatActivity.this, historyResponse.messages, historyResponse.users, historyResponse.chats);
-            messagesAdapter.setPeerId(peerId);
+            messagesAdapter = new MessagesAdapter(historyResponse.messages, historyResponse.users, historyResponse.chats, isSavedMessages, new AvatarViewBinder(App.getCacheManager()));
             chatMessages.setAdapter(messagesAdapter);
         } else {
             int pos = chatMessages.getFirstVisiblePosition();
             View v = chatMessages.getChildAt(0);
             int top = (v == null) ? 0 : v.getTop();
 
+            int oldCount = messagesAdapter.getCount();
             messagesAdapter.notifyDataSetChanged();
+            int inserted = messagesAdapter.getCount() - oldCount;
 
             chatMessages.setSelectionFromTop(pos + inserted, top);
         }
@@ -970,7 +1001,7 @@ public class ChatActivity extends Activity {
     private void markRead(int limit) {
         for (int i = historyResponse.messages.size() - 1; i >= 0; i--) {
             Message m = historyResponse.messages.get(i);
-            if (m.out && m.id <= limit
+            if (m.out && (m.id > 0 || isMessageSent(m)) && m.id <= limit
                     && m.messageState != Message.MessageState.MESSAGE_ERROR
                     && m.messageState != Message.MessageState.MESSAGE_SENDING) {
                 historyResponse.messages.get(i).messageState = Message.MessageState.MESSAGE_WAS_READ;
@@ -998,7 +1029,6 @@ public class ChatActivity extends Activity {
                    public void run() {
                        loadedHistory += result.messages.size();
                        Collections.reverse(result.messages);
-                       result.messages = insertDateSeparators(result.messages);
 
                        isLoading = false;
 
@@ -1008,10 +1038,12 @@ public class ChatActivity extends Activity {
                            markRead(readOut);
 
                            initialLoaded = true;
-                           showMessages(0);
+                           showMessages();
 
-                           if (historyResponse.messages.size() > 0 && !historyResponse.messages.isEmpty()) {
-                                firstMessageId = String.valueOf(historyResponse.messages.get(historyResponse.messages.size() - 1).id); // date separator shouldn't be last
+                           if (!historyResponse.messages.isEmpty()) {
+                               firstMessageId = String.valueOf(
+                                       historyResponse.messages.get(historyResponse.messages.size() - 1).id
+                               );
                            }
 
                            canType = true;
@@ -1049,9 +1081,8 @@ public class ChatActivity extends Activity {
                                }
                            });
                        } else {
-                           int sizeBefore = historyResponse.messages.size();
                            historyResponse.add(result);
-                           final int inserted = historyResponse.messages.size() - sizeBefore;
+                           markRead(readOut);
 
                            if (loadedHistory >= result.totalCount || result.messages.isEmpty()) {
                                endReached = true;
@@ -1061,7 +1092,7 @@ public class ChatActivity extends Activity {
                                headerButton.setVisibility(View.GONE);
                            }
 
-                           showMessages(inserted);
+                           showMessages();
                        }
                    }
                });
@@ -1095,6 +1126,100 @@ public class ChatActivity extends Activity {
         });
     }
 
+    private MessageReply buildPendingReply(String replyId) {
+        Message target = findMessageById(replyId);
+
+        if (target != null) {
+            MessageReply reply = new MessageReply(target.text);
+            reply.replyId = replyId;
+            reply.peer = target.from_id != null ? target.from_id : target.peer_id;
+            reply.msg = target;
+            return reply;
+        }
+
+        MessageReply reply = new MessageReply("Loading...");
+        reply.replyId = replyId;
+        return reply;
+    }
+
+    private PendingMessage findPendingMatch(Message serverMsg) {
+        PendingMessage errorFallback = null;
+
+        for (int i = 0; i < pendingMessages.size(); i++) {
+            PendingMessage entry = pendingMessages.get(i);
+            Message local = entry.message;
+
+            if (local.id > 0) continue;
+            if (local.text == null || !local.text.equals(serverMsg.text)) continue;
+
+            if (local.peer_id != null && serverMsg.peer_id != null
+                    && !local.peer_id.equals(serverMsg.peer_id)) continue;
+
+            long delta = serverMsg.date - local.date;
+            if (delta < -PENDING_MATCH_WINDOW_SECS || delta > PENDING_MATCH_WINDOW_SECS) {
+                continue;
+            }
+
+            if (local.messageState == Message.MessageState.MESSAGE_ERROR) {
+                if (errorFallback == null) errorFallback = entry;
+                continue;
+            }
+
+            return entry;
+        }
+
+        return errorFallback;
+    }
+
+    private void applyServerMessage(Message local, Message server) {
+        local.id = server.id;
+        local.date = server.date;
+        local.out = server.out;
+
+        if (server.text != null) local.text = server.text;
+        if (server.peer_id != null) local.peer_id = server.peer_id;
+
+        local.from_id = server.from_id;
+        local.reply = server.reply != null ? server.reply : local.reply;
+        local.media = server.media;
+        local.fwd = server.fwd;
+        local.act = server.act;
+        local.group = server.group;
+        local.edit = server.edit;
+        local.silent = server.silent;
+        local.mention = server.mention;
+
+        local.messageState = Message.MessageState.MESSAGE_SENT;
+    }
+
+    private boolean isMessagePending(Message msg) {
+        return msg.messageState == Message.MessageState.MESSAGE_SENDING
+                || msg.messageState == Message.MessageState.MESSAGE_ERROR;
+    }
+
+    private boolean isMessageSent(Message msg) {
+        return msg.messageState == Message.MessageState.MESSAGE_SENT
+                || msg.messageState == Message.MessageState.MESSAGE_WAS_READ;
+    }
+
+    private Message findMessageById(String id) {
+        if (id == null || historyResponse == null) return null;
+
+        for (int i = 0; i < historyResponse.messages.size(); i++) {
+            Message m = historyResponse.messages.get(i);
+            if (String.valueOf(m.id).equals(id)) return m;
+        }
+        return null;
+    }
+
+    private PendingMessage findPendingByMessage(Message message) {
+        for (int i = 0; i < pendingMessages.size(); i++) {
+            PendingMessage entry = pendingMessages.get(i);
+            if (entry.message == message) return entry;
+        }
+        return null;
+    }
+
     private void addHeader() {
         headerView = getLayoutInflater().inflate(R.layout.chat_header, chatMessages, false);
         chatMessages.addHeaderView(headerView);
@@ -1113,29 +1238,6 @@ public class ChatActivity extends Activity {
                 loadHistory(false, historyResponse.offsetId, historyResponse.offsetDate);
             }
         });
-    }
-
-    private ArrayList<Message> insertDateSeparators(ArrayList<Message> messages) {
-        ArrayList<Message> result = new ArrayList<>(messages.size() * 2);
-        String prevDay = null;
-
-        for (int i = 0; i < messages.size(); i++) {
-            Message m = messages.get(i);
-
-            if (m.act == null) {
-                String day = DateUtils.dayKey(m.date);
-
-                if (!day.equals(prevDay)) {
-                    result.add(Message.dateSeparator(m.date));
-                }
-
-                prevDay = day;
-            }
-
-            result.add(m);
-        }
-
-        return result;
     }
 
     private void navigateToStartup() {

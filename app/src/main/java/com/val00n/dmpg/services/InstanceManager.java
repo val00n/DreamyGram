@@ -4,11 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
-import com.val00n.dmpg.App;
 import com.val00n.dmpg.model.Instance;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import cc.nnproject.json.JSONArray;
 import cc.nnproject.json.JSONObject;
@@ -99,7 +96,7 @@ public class InstanceManager {
 
     public void loadInstances() {
         if (fileHelper.isFileExist(INSTANCES_FILENAME, true)) {
-            String json = fileHelper.loadFile(INSTANCES_FILENAME, true);
+            String json = fileHelper.loadFileText(INSTANCES_FILENAME, true);
             if (json == null || json.length() == 0) {
                 addDefaultInstances();
                 return;
@@ -144,7 +141,7 @@ public class InstanceManager {
             arr.add(obj);
         }
 
-        fileHelper.saveFile(INSTANCES_FILENAME, arr.toString(), true);
+        fileHelper.saveFileText(INSTANCES_FILENAME, arr.toString(), true);
     }
 
     private void saveSelectedIndex() {
