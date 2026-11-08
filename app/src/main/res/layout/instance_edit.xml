@@ -66,6 +66,32 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:text="File endpoint"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditFileEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="file.php"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Voice endpoint"
+                android:textSize="18sp"
+                android:layout_marginBottom="2dp"/>
+            <EditText
+                android:id="@+id/instanceEditVoiceEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:hint="voice.php"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:text="QR endpoint"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>

@@ -115,6 +115,8 @@ public class InstanceManager {
 
                     instance.apiEndpoint = obj.getNullable("apiEndpoint") != null ? obj.getNullable("apiEndpoint").toString() : "api.php";
                     instance.avatarEndpoint = obj.getNullable("avatarEndpoint") != null ? obj.getNullable("avatarEndpoint").toString() : "ava.php";
+                    instance.fileEndpoint = obj.getNullable("fileEndpoint") != null ? obj.getNullable("fileEndpoint").toString() : "file.php";
+                    instance.voiceEndpoint = obj.getNullable("voiceEndpoint") != null ? obj.getNullable("voiceEndpoint").toString() : "voice.php";
                     instance.qrcodeEndpoint = obj.getNullable("qrcodeEndpoint") != null ? obj.getNullable("qrcodeEndpoint").toString() : "qrcode.php";
                     instance.apiVersion = obj.getNullable("apiVersion") != null ? obj.getNullable("apiVersion").toString() : "12";
                     instance.instancePassword = obj.getNullable("instancePassword") != null ? obj.getNullable("instancePassword").toString() : "";
@@ -134,6 +136,8 @@ public class InstanceManager {
             obj.put("baseURL", inst.baseURL);
             obj.put("apiEndpoint", inst.apiEndpoint);
             obj.put("avatarEndpoint", inst.avatarEndpoint);
+            obj.put("fileEndpoint", inst.fileEndpoint);
+            obj.put("voiceEndpoint", inst.voiceEndpoint);
             obj.put("qrcodeEndpoint", inst.qrcodeEndpoint);
             obj.put("apiVersion", inst.apiVersion);
             obj.put("instancePassword", inst.instancePassword);
@@ -149,13 +153,15 @@ public class InstanceManager {
     }
 
     public void addDefaultInstances() {
-        // TODO FIXME: Ugly as fuck, should think about it more later
+        // TODO: i don't like it, should think about it more later
         // should be called once on first startup
         instances = new ArrayList<Instance>();
 
         Instance wunder = new Instance("http://mp.wunderwungiel.pl");
         wunder.apiEndpoint = "api.php";
         wunder.avatarEndpoint = "ava.php";
+        wunder.fileEndpoint = "file.php";
+        wunder.voiceEndpoint = "voice.php";
         wunder.qrcodeEndpoint = "qrcode.php";
         wunder.apiVersion = "12";
         wunder.disableCertCheck = false;
@@ -165,6 +171,8 @@ public class InstanceManager {
         Instance nnchan = new Instance("http://mp.nnproject.cc");
         nnchan.apiEndpoint = "api.php";
         nnchan.avatarEndpoint = "ava.php";
+        nnchan.fileEndpoint = "file.php";
+        nnchan.voiceEndpoint = "voice.php";
         nnchan.qrcodeEndpoint = "qrcode.php";
         nnchan.apiVersion = "12";
         nnchan.disableCertCheck = false;
@@ -174,6 +182,8 @@ public class InstanceManager {
         Instance nnchan2 = new Instance("http://10.0.2.2.");
         nnchan2.apiEndpoint = "api.php";
         nnchan2.avatarEndpoint = "ava.php";
+        nnchan2.fileEndpoint = "file.php";
+        nnchan2.voiceEndpoint = "voice.php";
         nnchan2.qrcodeEndpoint = "qrcode.php";
         nnchan2.apiVersion = "12";
         nnchan2.disableCertCheck = false;

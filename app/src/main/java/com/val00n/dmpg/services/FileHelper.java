@@ -2,18 +2,24 @@ package com.val00n.dmpg.services;
 
 import android.net.Uri;
 import android.os.Environment;
+import android.util.Log;
+
 import com.val00n.dmpg.App;
+import com.val00n.dmpg.model.CacheFile;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import static android.content.ContentValues.TAG;
+
 public class FileHelper {
 
     private static final String CHARSET_NAME = "UTF-8";
     private static final int BUFFER_SIZE = 2048;
-    private static final String MEDIA_DIRECTORY_NAME = "/dmpg/";
+    private static final String MEDIA_DIRECTORY_NAME = "/DreamyGram/";
     private static final String APPDATA_DIRECTORY_NAME = "/dmpgAppData/";
 
     public boolean saveFileText(String fileName, String content, boolean isAppData) {
@@ -174,7 +180,7 @@ public class FileHelper {
         return false;
     }
 
-    public Uri getFileUri(String fileName, boolean isAppData) {
+    public static Uri getFileUri(String fileName, boolean isAppData) {
         if (isAppData) {
             return getFileUri(fileName, getAppDataDirectoryPath());
         } else {
@@ -182,13 +188,13 @@ public class FileHelper {
         }
     }
 
-    public Uri getFileUri(String fineName, String directory) {
+    public static Uri getFileUri(String fineName, String directory) {
         File folder = new File(directory);
         File file = new File(folder, fineName);
         return Uri.fromFile(file);
     }
 
-    public boolean isFileExist(String fileName, boolean isAppData) {
+    public static boolean isFileExist(String fileName, boolean isAppData) {
         if (isAppData) {
             return isFileExist(fileName, getAppDataDirectoryPath());
         } else {
@@ -196,19 +202,163 @@ public class FileHelper {
         }
     }
 
-    public boolean isFileExist(String fileName, String directory) {
+    public static boolean isFileExist(String fileName, String directory) {
         File file = new File(directory, fileName);
         if (file.exists()) {
+            Log.d(TAG, "isFileExist: SEARCH FOR (FOUND): " + file.getAbsolutePath());
             return true;
         }
+        Log.d(TAG, "isFileExist: SEARCH FOR (NOT FOUND): " + file.getAbsolutePath());
         return false;
     }
 
-    private String getAppDataDirectoryPath() { // hello gohoski :3
+    public static File getCachedFile(String filename, boolean isAppData) {
+        if (isAppData) {
+            return getCachedFile(filename, getAppDataDirectoryPath());
+        } else {
+            return getCachedFile(filename, getMediaDirectoryPath());
+        }
+    }
+
+    public static File getCachedFile(String filename, String directory) {
+        File file = new File(directory, filename);
+        if (file.exists()) {
+            return file;
+        }
+        return null;
+    }
+
+    public static String sanitizeFileName(String name) {
+        if (name == null) {
+            return null;
+        }
+
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0 && slash + 1 < name.length()) {
+            name = name.substring(slash + 1);
+        }
+
+        slash = name.lastIndexOf('\\');
+        if (slash >= 0 && slash + 1 < name.length()) {
+            name = name.substring(slash + 1);
+        }
+
+        name = name.trim();
+
+        if (name.length() == 0) {
+            return null;
+        }
+
+        return name;
+    }
+
+    public File createTempFileFor(String finalName, boolean isAppData) throws IOException {
+        String safeName = sanitizeFileName(finalName);
+        if (safeName == null) {
+            safeName = "file";
+        }
+
+        String dirPath = isAppData ? getAppDataDirectoryPath() : getMediaDirectoryPath();
+        File dir = new File(dirPath);
+
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("Cannot create directory");
+        }
+
+        return new File(dir, safeName + "." + System.nanoTime() + ".tmp");
+    }
+
+    public File finishDownload(File tempFile, String finalName, boolean isAppData) throws IOException {
+        if (tempFile == null || !tempFile.exists()) {
+            throw new IOException("Temp file does not exist");
+        }
+
+        String safeName = sanitizeFileName(finalName);
+        if (safeName == null) {
+            safeName = "file";
+        }
+
+        String dirPath = isAppData ? getAppDataDirectoryPath() : getMediaDirectoryPath();
+        File dir = new File(dirPath);
+
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("Cannot create directory");
+        }
+
+        File finalFile = new File(dir, safeName);
+
+        if (finalFile.exists() && !finalFile.delete()) {
+            throw new IOException("Cannot delete old file");
+        }
+
+        if (!tempFile.renameTo(finalFile)) {
+            if (!copyFile(tempFile, finalFile)) {
+                tempFile.delete();
+                throw new IOException("Cannot move temp file");
+            }
+
+            tempFile.delete();
+        }
+
+        Log.d(TAG, "finishDownload: SAVED: " + finalFile.getAbsolutePath());
+
+        return finalFile;
+    }
+
+    public boolean copyFile(File src, File dst) throws IOException {
+        if (src == null || !src.exists()) {
+            return false;
+        }
+
+        File parent = dst.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            return false;
+        }
+
+        FileInputStream in = null;
+        FileOutputStream out = null;
+
+        try {
+            in = new FileInputStream(src);
+            out = new FileOutputStream(dst);
+
+            byte[] buffer = new byte[8192];
+            int read;
+
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+
+            out.flush();
+            out.getFD().sync();
+
+            return true;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) { }
+            }
+
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException ignored) { }
+            }
+        }
+    }
+
+    public static String formatSize(long size) {
+        if (size < 1024) return size + " B";
+        if (size < 1024 * 1024) return String.format("%.1f KB", size / 1024.0);
+        return String.format("%.1f MB", size / (1024.0 * 1024));
+    }
+
+    public static String getAppDataDirectoryPath() { // hello gohoski :3
         return App.get().getFilesDir().getPath() + APPDATA_DIRECTORY_NAME;
     }
 
-    private String getMediaDirectoryPath() {
+    public static String getMediaDirectoryPath() {
         String baseDir;
 
         if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {

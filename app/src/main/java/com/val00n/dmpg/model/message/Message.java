@@ -14,7 +14,7 @@ public class Message {
     public Act act;
     public MessageReply reply;
     //  public Markup markup; // TODO
-    public long group; // TODO
+    public long group;
     public long edit; // TODO
     public boolean silent; // TODO
     public boolean mention; // TODO
@@ -43,7 +43,9 @@ public class Message {
             date = json.getLong("date", 0);
 
             if (json.has("text")) {
-                text = json.getString("text");
+                text = json.getString("text", "");
+            } else {
+                text = "";
             }
 
             if (json.has("out")) {
@@ -70,6 +72,10 @@ public class Message {
                 media = new MessageMedia(json.getObject("media"));
             } else if (json.has("act")) {
                 act = new Act(json.getObject("act"));
+            }
+
+            if (json.has("group")) {
+                group = json.getLong("group");
             }
 
             messageState = MessageState.MESSAGE_SENT;

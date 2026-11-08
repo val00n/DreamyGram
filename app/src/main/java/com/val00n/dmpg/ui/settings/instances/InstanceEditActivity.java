@@ -17,6 +17,8 @@ public class InstanceEditActivity extends Activity {
     private EditText baseURLEditText;
     private EditText APIEditText;
     private EditText avatarEditText;
+    private EditText fileEditText;
+    private EditText voiceEditText;
     private EditText QREditText;
     private EditText APIVersionEditText;
     private EditText passwordEditText;
@@ -33,6 +35,8 @@ public class InstanceEditActivity extends Activity {
         APIEditText = (EditText) findViewById(R.id.instanceEditAPIEditText);
         avatarEditText = (EditText) findViewById(R.id.instanceEditAvatarEditText);
         QREditText = (EditText) findViewById(R.id.instanceEditQREditText);
+        fileEditText = (EditText) findViewById(R.id.instanceEditFileEditText);
+        voiceEditText = (EditText) findViewById(R.id.instanceEditVoiceEditText);
         APIVersionEditText = (EditText) findViewById(R.id.instanceEditAPIVersionEditText);
         passwordEditText = (EditText) findViewById(R.id.instanceEditPasswordEditText);
         checkCertsCheckBox = (CheckBox) findViewById(R.id.instanceEditCheckCertsCheckBox);
@@ -55,6 +59,8 @@ public class InstanceEditActivity extends Activity {
         baseURLEditText.setText(instance.baseURL);
         APIEditText.setText(instance.apiEndpoint);
         avatarEditText.setText(instance.avatarEndpoint);
+        fileEditText.setText(instance.fileEndpoint);
+        voiceEditText.setText(instance.voiceEndpoint);
         QREditText.setText(instance.qrcodeEndpoint);
         APIVersionEditText.setText(instance.apiVersion);
         passwordEditText.setText(instance.instancePassword);
@@ -73,6 +79,8 @@ public class InstanceEditActivity extends Activity {
         }
 
         if (APIEditText.getText().toString().length() > 0 &&
+                fileEditText.getText().toString().length() > 0 &&
+                voiceEditText.getText().toString().length() > 0 &&
                 QREditText.getText().toString().length() > 0 &&
                 avatarEditText.getText().toString().length() > 0 &&
                 APIVersionEditText.getText().toString().length() > 0) {
@@ -80,6 +88,8 @@ public class InstanceEditActivity extends Activity {
             Instance instance = new Instance(baseURL);
             instance.apiEndpoint = APIEditText.getText().toString();
             instance.avatarEndpoint = avatarEditText.getText().toString();
+            instance.fileEndpoint = fileEditText.getText().toString();
+            instance.voiceEndpoint = voiceEditText.getText().toString();
             instance.qrcodeEndpoint = QREditText.getText().toString();
             instance.apiVersion = APIVersionEditText.getText().toString();
             instance.disableCertCheck = !checkCertsCheckBox.isChecked();

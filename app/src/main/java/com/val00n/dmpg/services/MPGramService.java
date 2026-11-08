@@ -1,10 +1,13 @@
 package com.val00n.dmpg.services;
 
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.BuildConfig;
 import com.val00n.dmpg.model.DialogResponse;
+import com.val00n.dmpg.model.FileParams;
 import com.val00n.dmpg.model.HistoryResponse;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.AuthResponse;
@@ -12,6 +15,7 @@ import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.network.HttpClient;
 import com.val00n.dmpg.network.RestClient;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,16 +32,29 @@ public class MPGramService {
     private final ExecutorService executor;
     private final RestClient restClient;
     private final InstanceManager instanceManager;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Instance instance;
+
+    private final ExecutorService updatesExecutor = Executors.newSingleThreadExecutor();
+    private final Object updatesLock = new Object();
+    private volatile boolean updatesInFlight = false;
 
     private static final int GET_HISTORY_LIMIT = 30; // TODO change this in settings
     private static final int CHECK_AUTH_TIMEOUT = 2;
 
     public static final int AVATAR_SIZE = 48; // TODO change this in settings
+    public static final String FILE_PREVIEW_SIZE = "256"; // TODO change this in settings
 
     public interface ApiCallback<T> {
         void onSuccess(T result);
         void onError(Exception error);
+    }
+
+    public interface DownloadCallback {
+        void onProgress(long downloaded, long total);
+        void onSuccess(File file);
+        void onError(Exception error);
+        void onCancelled();
     }
 
     public MPGramService(int threads) {
@@ -612,6 +629,15 @@ public class MPGramService {
     }
 
     public void getUpdates(String peer, String[] filter, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, String userToken, final ApiCallback<ArrayList<Update>> callback) {
+        synchronized (updatesLock) {
+            if (updatesInFlight) {
+                if (callback != null) callback.onError(
+                        new IllegalStateException("Updates polling already in progress"));
+                return;
+            }
+            updatesInFlight = true;
+        }
+
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "updates");
         queryParams.put("v", instance.apiVersion);
@@ -638,7 +664,7 @@ public class MPGramService {
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
-        executor.execute(new Runnable() {
+        updatesExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -669,6 +695,8 @@ public class MPGramService {
                     }
                 } catch (Exception e) {
                     if (callback != null) callback.onError(e);
+                } finally {
+                    synchronized (updatesLock) { updatesInFlight = false; }
                 }
             }
         });
@@ -791,6 +819,83 @@ public class MPGramService {
         });
     }
 
+    public void getFile(String peerId, String messageId, FileParams fileParams, String userToken, final ApiCallback<byte[]> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("c", peerId);
+        queryParams.put("m", messageId);
+
+        if (fileParams != null) {
+            fileParams.applyTo(queryParams);
+        }
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    byte[] fileBytes = restClient.postBytes(instance.baseURL, instance.fileEndpoint, queryParams, headers);
+
+                    if (callback != null) callback.onSuccess(fileBytes);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    if (callback != null) {
+                        if (t instanceof Exception) {
+                            callback.onError((Exception) t);
+                        } else {
+                            callback.onError(new Exception(t));
+                    }
+                }
+            }
+            }
+        });
+    }
+
+    public DownloadTask downloadFile(String peerId,
+                                     String messageId,
+                                     FileParams fileParams,
+                                     String userToken,
+                                     final File targetFile,
+                                     final DownloadCallback callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("c", peerId);
+        queryParams.put("m", messageId);
+
+        if (fileParams != null) {
+            fileParams.applyTo(queryParams);
+        }
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+        final DownloadTask task = new DownloadTask(callback, mainHandler);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    restClient.downloadFile(instance.baseURL, instance.fileEndpoint, queryParams, headers, targetFile, task);
+
+                    if (task.isCancelled()) {
+                        deleteQuietly(targetFile);
+                        postCancelled(callback);
+                    } else {
+                        postSuccess(callback, targetFile);
+                    }
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                    deleteQuietly(targetFile);
+
+                    if (task.isCancelled()) {
+                        postCancelled(callback);
+                    } else {
+                        postError(callback, toException(t));
+                    }
+                }
+            }
+        });
+
+        return task;
+    }
+
     public void logout(String userToken, final ApiCallback<AuthResponse> callback) {
         logout(instance, userToken, callback);
     }
@@ -819,5 +924,51 @@ public class MPGramService {
                 }
             }
         });
+    }
+
+    private void postSuccess(final DownloadCallback callback, final File file) {
+        if (callback == null) return;
+
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callback.onSuccess(file);
+            }
+        });
+    }
+
+    private void postError(final DownloadCallback callback, final Exception error) {
+        if (callback == null) return;
+
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callback.onError(error);
+            }
+        });
+    }
+
+    private void postCancelled(final DownloadCallback callback) {
+        if (callback == null) return;
+
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callback.onCancelled();
+            }
+        });
+    }
+
+    private static void deleteQuietly(File file) {
+        if (file != null && file.exists()) {
+            file.delete();
+        }
+    }
+
+    private static Exception toException(Throwable t) {
+        if (t instanceof Exception) {
+            return (Exception) t;
+        }
+        return new Exception(t);
     }
 }

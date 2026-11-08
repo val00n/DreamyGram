@@ -171,7 +171,62 @@
                 android:layout_height="wrap_content"
                 android:text="Store chats cache"
                 android:checked="true"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Avatar cache TTL (days)"
+                    android:textSize="16dp"/>
+                <EditText
+                    android:id="@+id/cacheSettingsAvatarTTLEditText"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:text="XX"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Media cache TTL (days)"
+                    android:textSize="16dp"/>
+                <EditText
+                    android:id="@+id/cacheSettingsMediaTTLEditText"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:text="XX"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Chats cache TTL (days)"
+                    android:textSize="16dp"/>
+                <EditText
+                    android:id="@+id/cacheSettingsChatsTTLEditText"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:text="XX"/>
+            </LinearLayout>
         </LinearLayout>
+
     </ScrollView>
 
 </LinearLayout>

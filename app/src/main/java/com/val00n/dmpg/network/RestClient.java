@@ -1,11 +1,13 @@
 package com.val00n.dmpg.network;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 
 public class RestClient {
     private final int CONNECT_TIMEOUT = 20000;
     private final int READ_TIMEOUT = 30000;
+    private final int FILE_READ_TIMEOUT = 120000;
 
     public String getString(String baseURL, String endpoint) throws IOException {
         return getString(baseURL, endpoint, null);
@@ -36,6 +38,14 @@ public class RestClient {
             return response.readAsBytes();
         }
         throw new IOException("HTTP " + response.getStatusCode() + ": " + response.readAsString());
+    }
+
+    public void downloadFile(String baseURL, String endpoint, Map<String, String> queryParams, Map<String, String> headers, File targetFile, HttpClient.FileDownloadListener listener) throws IOException {
+        HttpRequest request = new HttpRequest(baseURL, endpoint, "POST");
+        request = addQueryParams(queryParams, request);
+        request = addHeaders(headers, request);
+
+        HttpClient.sendToFile(request, targetFile, CONNECT_TIMEOUT, FILE_READ_TIMEOUT, listener);
     }
 
     public String postString(String baseURL, String endpoint, Map<String, String> queryParams, Map<String, String> headers) throws IOException {

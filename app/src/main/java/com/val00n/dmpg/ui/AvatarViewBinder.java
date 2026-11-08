@@ -21,7 +21,7 @@ public class AvatarViewBinder {
         }
         view.setTag(peer);
 
-        cacheManager.loadAvatar(peer, new CacheManager.AvatarCallback() {
+        cacheManager.loadAvatar(peer, new CacheManager.ImageCallback() {
             @Override
             public void onLoaded(Bitmap bitmap) {
                 if (!peer.equals(view.getTag())) return;

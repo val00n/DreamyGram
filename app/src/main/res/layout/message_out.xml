@@ -4,7 +4,7 @@
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
               android:minHeight="1dp"
-              android:descendantFocusability="blocksDescendants">
+              android:descendantFocusability="blocksDescendants" android:layout_marginBottom="2dp">
 
     <View
         android:id="@+id/messageDivider"
@@ -39,6 +39,7 @@
     </LinearLayout>
 
     <LinearLayout
+        android:orientation="horizontal"
         android:id="@+id/messageRoot"
         android:padding="2dp"
         android:layout_width="match_parent"
@@ -50,7 +51,8 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:gravity="right">
 
             <LinearLayout
                 android:id="@+id/messageTitleRow"
@@ -115,6 +117,41 @@
                     android:layout_marginLeft="4dp"
                     android:background="#75E0E0E0"/>
             </LinearLayout>
+
+            <com.val00n.dmpg.ui.chat.AlbumView
+                android:id="@+id/messageAlbum"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right">
+
+                <com.val00n.dmpg.ui.AspectImageView
+                    android:id="@+id/messageImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#000000"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/messagePlayOverlay"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:src="@android:drawable/ic_media_play"
+                    android:background="#80000000"
+                    android:padding="8dp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <com.val00n.dmpg.ui.chat.FileMessageView
+                android:id="@+id/messageFile"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/messageText"

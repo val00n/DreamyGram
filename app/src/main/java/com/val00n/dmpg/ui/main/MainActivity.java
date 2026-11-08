@@ -45,10 +45,10 @@ public class MainActivity extends Activity {
     private DialogResponse dialogResponse;
     private Instance instance;
     private String userToken;
-    private Handler chatUpdatesHandler;
+    private Handler dialogsUpdatesHandler;
     private Handler statusUpdateHandler;
     private Runnable statusUpdateTask;
-    private Runnable chatUpdateTask;
+    private Runnable dialogsUpdateTask;
     private String[] updatesFilter;
     private int loadedDialogs;
     private boolean forwardMode;
@@ -56,6 +56,7 @@ public class MainActivity extends Activity {
     volatile private boolean isPaused;
     volatile private boolean isPolling;
     volatile private boolean isActivityDied;
+    private volatile boolean cancelInProgress = false;
 
     private ArrayList<Update> updates;
     private String updateLimit = "200";
@@ -116,7 +117,7 @@ public class MainActivity extends Activity {
             settingsButton.setVisibility(View.GONE);
         }
 
-        chatUpdatesHandler = new Handler();
+        dialogsUpdatesHandler = new Handler();
         statusUpdateHandler = new Handler();
 
         updatesFilter = new String[] { "updateNewChannelMessage",  "updateNewMessage", "updateEditChannelMessage",
@@ -159,7 +160,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        chatUpdateTask = new Runnable() {
+        dialogsUpdateTask = new Runnable() {
             @Override
             public void run() {
                 isPolling = true;
@@ -182,7 +183,7 @@ public class MainActivity extends Activity {
 
                         updateFails = 0;
                         isPolling = false;
-                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                        if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
                     }
 
                     @Override
@@ -202,14 +203,14 @@ public class MainActivity extends Activity {
                                             updateOffset = "-1";
                                         }
 
-                                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                        if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
                                     }
 
                                     @Override
                                     public void onError(Exception error) {
                                         error.printStackTrace();
                                         if (!App.isSessionDead(error.getMessage(), MainActivity.this)) {
-                                            if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                            if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
                                         }
                                     }
                                 });
@@ -217,7 +218,7 @@ public class MainActivity extends Activity {
                                 updateFails = 0;
                             } else {
                                 updateFails++;
-                                if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS * updateFails);
+                                if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS * updateFails);
                             }
                         }
                     }
@@ -256,7 +257,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         isActivityDied = true;
-        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
 
         mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
@@ -273,38 +274,38 @@ public class MainActivity extends Activity {
         });
     }
 
-    @Override
     protected void onStop() {
         super.onStop();
         isPaused = true;
-        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
 
-        mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
-            @Override
-            public void onSuccess(String result) {
-                Log.d(TAG, "onSuccess: canceled updates: " + result);
-            }
-
-            @Override
-            public void onError(Exception error) {
-                error.printStackTrace();
-                Log.d(TAG, "onError: failed to cancel updates: " + error.getMessage());
-            }
-        });
+        if (!cancelInProgress) {
+            cancelInProgress = true;
+            mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
+                @Override
+                public void onSuccess(String result) {
+                    cancelInProgress = false;
+                    tryStartPolling();
+                }
+                @Override
+                public void onError(Exception error) {
+                    cancelInProgress = false;
+                    tryStartPolling();
+                }
+            });
+        }
     }
 
     protected void onStart() {
         super.onStart();
         isPaused = false;
-        if (!isPolling) {
-            if (dialogResponse != null) {
-                chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
-            } else {
-                if (!isLoading) {
-                    loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
-                }
-            }
+        tryStartPolling();
+    }
+
+    private void tryStartPolling() {
+        if (!isPaused && !cancelInProgress && !isPolling && dialogResponse != null) {
+            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
         }
     }
 
@@ -493,13 +494,13 @@ public class MainActivity extends Activity {
                                     }
                                     updates = new ArrayList<Update>();
 
-                                    if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                    if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
                                 }
 
                                 @Override
                                 public void onError(Exception error) {
                                     error.printStackTrace();
-                                    if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                    if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
                                 }
                             });
                         } else {

@@ -27,8 +27,10 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
                         "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                         "filename TEXT NOT NULL, " +
                         "peer TEXT NOT NULL, " +
+                        "messageId TEXT, " +
                         "size INTEGER NOT NULL DEFAULT 0, " +
                         "isAvatar INTEGER NOT NULL DEFAULT 0, " +
+                        "preview INTEGER NOT NULL DEFAULT 0, " +
                         "createdAt INTEGER NOT NULL DEFAULT 0, " +
                         "lastUsed INTEGER NOT NULL DEFAULT 0" +
                         ")";
@@ -67,7 +69,7 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         CacheFile cacheFile = new CacheFile();
         Cursor cursor = null;
         try {
-            cursor = db.query("files", new String[]{"_id","filename","peer","size","isAvatar","createdAt","lastUsed"},
+            cursor = db.query("files", new String[]{"_id","filename","peer","messageId","size","isAvatar","createdAt","lastUsed"},
                     "peer = ? AND isAvatar = 1",
                     new String[]{peer}, null, null, "createdAt DESC", "1");
 
@@ -75,6 +77,7 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
                 cacheFile.id = cursor.getLong(cursor.getColumnIndex("_id"));
                 cacheFile.filename = cursor.getString(cursor.getColumnIndex("filename"));
                 cacheFile.peer = cursor.getString(cursor.getColumnIndex("peer"));
+                cacheFile.messageId = cursor.getString(cursor.getColumnIndex("messageId"));
                 cacheFile.size = cursor.getLong(cursor.getColumnIndex("size"));
                 cacheFile.isAvatar = cursor.getInt(cursor.getColumnIndex("isAvatar")) > 0;
                 cacheFile.createdAt = cursor.getLong(cursor.getColumnIndex("createdAt"));
@@ -92,16 +95,55 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public void saveAvatar(CacheFile cacheFile) {
+    public CacheFile findFile(String peer, String messageId, boolean preview) {
+        SQLiteDatabase db = getReadableDatabase();
+
+        CacheFile cacheFile = new CacheFile();
+        Cursor cursor = null;
+        try {
+            cursor = db.query("files", new String[]{"_id","filename","peer","messageId","size","isAvatar","createdAt","lastUsed"},
+                    "peer = ? AND messageId = ? AND isAvatar = 0 AND preview = ?",
+                    new String[]{peer, messageId, preview ? "1" : "0"}, null, null, "createdAt DESC", "1");
+
+            if (cursor.moveToFirst()) {
+                cacheFile.id = cursor.getLong(cursor.getColumnIndex("_id"));
+                cacheFile.filename = cursor.getString(cursor.getColumnIndex("filename"));
+                cacheFile.peer = cursor.getString(cursor.getColumnIndex("peer"));
+                cacheFile.messageId = cursor.getString(cursor.getColumnIndex("messageId"));
+                cacheFile.size = cursor.getLong(cursor.getColumnIndex("size"));
+                cacheFile.isAvatar = cursor.getInt(cursor.getColumnIndex("isAvatar")) > 0;
+                cacheFile.createdAt = cursor.getLong(cursor.getColumnIndex("createdAt"));
+                cacheFile.lastUsed = cursor.getLong(cursor.getColumnIndex("lastUsed"));
+
+                return cacheFile;
+            }
+
+            return null;
+
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    public void saveFile(CacheFile cacheFile) {
         SQLiteDatabase db = getWritableDatabase();
 
-        CacheFile existing = findAvatar(cacheFile.peer);
+        CacheFile existing;
+        if (cacheFile.isAvatar) {
+            existing = findAvatar(cacheFile.peer);
+        } else {
+            existing = findFile(cacheFile.peer, cacheFile.messageId, cacheFile.preview);
+        }
 
         ContentValues values = new ContentValues();
         values.put("filename", cacheFile.filename);
         values.put("peer", cacheFile.peer);
+        values.put("messageId", cacheFile.messageId);
         values.put("size", cacheFile.size);
         values.put("isAvatar", cacheFile.isAvatar);
+        values.put("preview", cacheFile.preview);
         values.put("createdAt", cacheFile.createdAt);
         values.put("lastUsed", cacheFile.lastUsed);
 
@@ -135,11 +177,11 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         getWritableDatabase().delete("files", "peer = ? AND isAvatar = 1", new String[]{peer});
     }
 
-    public long getTotalFilesSize(boolean avatarsOnly) {
+    public long getFilesSize(boolean avatars) {
         Cursor cursor = null;
         try {
             cursor = getReadableDatabase().rawQuery(
-                    "SELECT COALESCE(SUM(size), 0) FROM files" + (avatarsOnly ? " WHERE isAvatar = 1" : ""),
+                    "SELECT COALESCE(SUM(size), 0) FROM files" + (avatars ? " WHERE isAvatar = 1" : " WHERE isAvatar = 0"),
                     null
             );
 
@@ -155,13 +197,13 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public CacheFile getOldestAvatarFile() {
+    public CacheFile getOldestFile(boolean avatars) {
         SQLiteDatabase db = getReadableDatabase();
         Cursor cursor = null;
         try {
             cursor = db.query("files",
                     new String[]{"_id", "filename", "size"},
-                    "isAvatar = 1", null, null, null, "lastUsed ASC", "1");
+                    "isAvatar = " + (avatars ? "1" : "0"), null, null, null, "lastUsed ASC", "1");
             if (cursor.moveToFirst()) {
                 CacheFile cacheFile = new CacheFile();
                 cacheFile.id = cursor.getLong(cursor.getColumnIndex("_id"));

@@ -11,6 +11,7 @@ import android.widget.Toast;
 
 import com.val00n.dmpg.cache.CacheManager;
 import com.val00n.dmpg.network.HttpClient;
+import com.val00n.dmpg.services.FileDownloader;
 import com.val00n.dmpg.services.InstanceManager;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
@@ -22,6 +23,7 @@ public class App extends Application {
     private static InstanceManager instanceManager;
     private static SessionManager sessionManager;
     private static CacheManager cacheManager;
+    private static FileDownloader fileDownloader;
     private static MPGramService mpgService;
     private static ConnectivityManager cm;
     private static String[] sessionDeathMarkers;
@@ -44,6 +46,13 @@ public class App extends Application {
     public static CacheManager getCacheManager() {
         if (cacheManager == null) cacheManager = new CacheManager(app);
         return cacheManager;
+    }
+
+    public static FileDownloader getFileDownloader() {
+        if (fileDownloader == null) {
+            fileDownloader = new FileDownloader(getMPGramService());
+        }
+        return fileDownloader;
     }
 
     public static MPGramService getMPGramService() {

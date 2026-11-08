@@ -13,6 +13,11 @@ public class BitmapUtils {
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(filePath, options);
 
+        if (reqHeight < 0 || reqWidth < 0) {
+            reqHeight = options.outHeight;
+            reqWidth = options.outWidth;
+        }
+
         options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
         options.inJustDecodeBounds = false;
 
@@ -42,6 +47,11 @@ public class BitmapUtils {
         final BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(data, 0, data.length, options);
+
+        if (reqHeight < 0 || reqWidth < 0) {
+            reqHeight = options.outHeight;
+            reqWidth = options.outWidth;
+        }
 
         options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
         options.inJustDecodeBounds = false;

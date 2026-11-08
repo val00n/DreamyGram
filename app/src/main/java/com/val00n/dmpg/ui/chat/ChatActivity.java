@@ -28,9 +28,12 @@ import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.model.message.MessageReply;
+import com.val00n.dmpg.model.message.MessageRow;
 import com.val00n.dmpg.model.message.PendingMessage;
 import com.val00n.dmpg.services.MPGramService;
+import com.val00n.dmpg.services.MessageFileActions;
 import com.val00n.dmpg.ui.AvatarViewBinder;
+import com.val00n.dmpg.ui.ImageViewBinder;
 import com.val00n.dmpg.ui.main.MainActivity;
 import com.val00n.dmpg.ui.StartupActivity;
 import java.util.ArrayList;
@@ -81,6 +84,7 @@ public class ChatActivity extends Activity {
     private boolean canType;
     private boolean isTyping;
     private boolean isSavedMessages;
+    private volatile boolean cancelInProgress;
 
     volatile private boolean isPolling;
     volatile private boolean isPaused;
@@ -107,6 +111,10 @@ public class ChatActivity extends Activity {
 
     private enum MessageAction {
         NONE, EDIT, REPLY
+    }
+
+    private enum MessageOptions {
+        COPY, DELETE, EDIT, REPLY, FORWARD, SHARE, SAVE, INFO
     }
 
     public void onCreate(Bundle savedInstanceState) {
@@ -401,34 +409,61 @@ public class ChatActivity extends Activity {
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
 
-        mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
-            @Override
-            public void onSuccess(String result) {
-                Log.d(TAG, "onSuccess: canceled updates: " + result);
-            }
+        if (!cancelInProgress) {
+            cancelInProgress = true;
+            mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
+                @Override
+                public void onSuccess(String result) {
+                    cancelInProgress = false;
+                    tryStartPolling();
+                }
+                @Override
+                public void onError(Exception error) {
+                    cancelInProgress = false;
+                    tryStartPolling();
+                }
+            });
+        }
+    }
 
-            @Override
-            public void onError(Exception error) {
-                error.printStackTrace();
-                Log.d(TAG, "onError: failed to cancel updates: " + error.getMessage());
+    private AlbumView.Listener albumListener = new AlbumView.Listener() {
+        @Override
+        public void onMediaClick(MessageRow item, int index) {
+            openImageViewer(item);
+        }
+
+        @Override
+        public boolean onMediaLongClick(MessageRow item, int index) {
+            if (item.message != null) {
+                showMessageActionMenu(item.message);
+                return true;
             }
-        });
+            return false;
+        }
+    };
+
+    private void openImageViewer(MessageRow item) {
+        if (item == null) return;
+
+        String peer = item.chatPeer != null ? item.chatPeer : item.peer;
+
+        Intent intent = new Intent(this, ImageViewerActivity.class);
+        intent.putExtra("PEER", peer);
+        intent.putExtra("MESSAGE_ID", item.messageId);
+        startActivity(intent);
+    }
+
+    private void tryStartPolling() {
+        if (!isPaused && !cancelInProgress && !isPolling && historyResponse != null) {
+            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+        }
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         isPaused = false;
-        if (!isPolling) {
-            if (historyResponse != null) {
-                chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
-                statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILLIS);
-            } else {
-                if (!isLoading) {
-                    loadHistory(true, null, 0);
-                }
-            }
-        }
+        tryStartPolling();
     }
 
     private void sendMessage(String text) {
@@ -776,19 +811,58 @@ public class ChatActivity extends Activity {
     }
 
     private void showMessageActionMenu(final Message msg) {
-        final String[] options = {"Delete", "Copy", "Edit", "Forward", "Reply", "Share", "Info"};
+        ArrayList<String> options = new ArrayList<String>();
+        final ArrayList<MessageOptions> actions = new ArrayList<MessageOptions>();
+
+        if (msg.text != null && msg.text.length() > 0) {
+            options.add("Copy");
+            actions.add(MessageOptions.COPY);
+        }
+
+        options.add("Delete");
+        actions.add(MessageOptions.DELETE);
+
+        options.add("Forward");
+        actions.add(MessageOptions.FORWARD);
+
+        options.add("Reply");
+        actions.add(MessageOptions.REPLY);
+
+        if (msg.media != null) {
+            options.add("Save");
+            actions.add(MessageOptions.SAVE);
+        }
+
+        if (msg.text != null && msg.text.length() > 0) {
+            options.add("Share");
+            actions.add(MessageOptions.SHARE);
+        }
+
+        options.add("Info");
+        actions.add(MessageOptions.INFO);
+
+        if (msg.text != null && msg.text.length() > 0 && !isMessagePending(msg) && msg.id > 0) {
+            options.add("Edit");
+            actions.add(MessageOptions.EDIT);
+        }
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Choose action");
-        builder.setItems(options, new DialogInterface.OnClickListener() {
+
+        builder.setItems(options.toArray(new String[options.size()]), new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                switch (which) {
-                    case 0:
+                MessageOptions action = actions.get(which);
+
+                switch (action) {
+                    case DELETE:
                         if (isMessagePending(msg)) {
                             PendingMessage entry = findPendingByMessage(msg);
+
                             if (entry != null) {
                                 pendingMessages.remove(entry);
                             }
+
                             historyResponse.messages.remove(msg);
                             messagesAdapter.notifyDataSetChanged();
                         } else {
@@ -811,10 +885,12 @@ public class ChatActivity extends Activity {
                                     .show();
                         }
                         break;
-                    case 1:
+
+                    case COPY:
                         copy(msg.text);
                         break;
-                    case 2:
+
+                    case EDIT:
                         if (isMessagePending(msg)) {
                             Toast.makeText(ChatActivity.this, "Cannot edit pending message", Toast.LENGTH_SHORT).show();
                         } else if (msg.id <= 0) {
@@ -823,33 +899,42 @@ public class ChatActivity extends Activity {
                             editMessage(msg);
                         }
                         break;
-                    case 3:
+
+                    case FORWARD:
                         if (isMessagePending(msg)) {
                             Toast.makeText(ChatActivity.this, "Cannot forward pending message", Toast.LENGTH_SHORT).show();
                         } else {
                             forwardMessage(msg);
                         }
                         break;
-                    case 4:
+
+                    case REPLY:
                         if (isMessagePending(msg)) {
                             Toast.makeText(ChatActivity.this, "Cannot reply to pending message", Toast.LENGTH_SHORT).show();
                         } else {
                             setReply(msg);
                         }
                         break;
-                    case 5:
+
+                    case SAVE:
+                        MessageFileActions.showSaveMenu(ChatActivity.this, peerId, msg, false);
+                        break;
+
+                    case SHARE:
                         if (msg.text != null) {
                             shareMessage(msg.text);
                         } else {
                             Toast.makeText(ChatActivity.this, "Message is empty", Toast.LENGTH_SHORT).show();
                         }
                         break;
-                    case 6:
+
+                    case INFO:
                         showMessageInfo(msg);
                         break;
                 }
             }
         });
+
         builder.create().show();
     }
 
@@ -959,9 +1044,18 @@ public class ChatActivity extends Activity {
 
     private void showMessages() {
         if (messagesAdapter == null) {
-            messagesAdapter = new MessagesAdapter(historyResponse.messages, historyResponse.users, historyResponse.chats, isSavedMessages, new AvatarViewBinder(App.getCacheManager()));
+            messagesAdapter = new MessagesAdapter(
+                    historyResponse.messages,
+                    historyResponse.users,
+                    historyResponse.chats,
+                    isSavedMessages,
+                    new AvatarViewBinder(App.getCacheManager()),
+                    new ImageViewBinder(App.getCacheManager()));
+
+            messagesAdapter.setAlbumListener(albumListener);
             chatMessages.setAdapter(messagesAdapter);
         } else {
+            messagesAdapter.setAlbumListener(albumListener);
             int pos = chatMessages.getFirstVisiblePosition();
             View v = chatMessages.getChildAt(0);
             int top = (v == null) ? 0 : v.getTop();
@@ -1180,7 +1274,6 @@ public class ChatActivity extends Activity {
         if (server.peer_id != null) local.peer_id = server.peer_id;
 
         local.from_id = server.from_id;
-        local.reply = server.reply != null ? server.reply : local.reply;
         local.media = server.media;
         local.fwd = server.fwd;
         local.act = server.act;
@@ -1188,6 +1281,18 @@ public class ChatActivity extends Activity {
         local.edit = server.edit;
         local.silent = server.silent;
         local.mention = server.mention;
+
+        if (server.reply != null) {
+            if (local.reply == null) {
+                local.reply = server.reply;
+            } else {
+                if (server.reply.replyId == null) server.reply.replyId = local.reply.replyId;
+                if (server.reply.peer == null) server.reply.peer = local.reply.peer;
+                if (server.reply.quote == null) server.reply.quote = local.reply.quote;
+                if (server.reply.msg == null) server.reply.msg = local.reply.msg;
+                local.reply = server.reply;
+            }
+        }
 
         local.messageState = Message.MessageState.MESSAGE_SENT;
     }
