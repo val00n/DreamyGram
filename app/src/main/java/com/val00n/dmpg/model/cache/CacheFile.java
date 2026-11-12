@@ -1,4 +1,4 @@
-package com.val00n.dmpg.model;
+package com.val00n.dmpg.model.cache;
 
 public class CacheFile {
     public long id;

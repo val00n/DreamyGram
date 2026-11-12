@@ -5,14 +5,13 @@ import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
 import com.val00n.dmpg.App;
-import com.val00n.dmpg.model.CacheFile;
+import com.val00n.dmpg.model.cache.CacheFile;
+import com.val00n.dmpg.model.cache.CacheHistory;
 import com.val00n.dmpg.model.FileParams;
-import com.val00n.dmpg.services.DownloadTask;
 import com.val00n.dmpg.services.FileDownloader;
 import com.val00n.dmpg.services.FileHelper;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.utils.BitmapUtils;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,17 +28,16 @@ public class CacheManager {
 
     private final BitmapLruCache memoryCache = new BitmapLruCache();
     private final Map<String, ArrayList<ImageCallback>> imageInFlight = new HashMap<String, ArrayList<ImageCallback>>();
-    private final Map<String, DownloadTask> fileTasks = new HashMap<String, DownloadTask>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newFixedThreadPool(2);
     private final Object diskTrimLock = new Object();
 
     private static final long AVATAR_TTL_MILLIS = 10L * 24 * 60 * 60 * 1000; // TODO: unhardcode
     private static final long FILES_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000; // TODO: unhardcode
-    private static final long CHATS_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000; // TODO: unhardcode
 
-    private static final long AVATAR_LIMIT = 32L * 1024 * 1024; // TODO: same
+    private static final long AVATAR_LIMIT = 16L * 1024 * 1024; // TODO: same
     private static final long FILES_LIMIT = 32L * 1024 * 1024; // TODO: same
+    private static final long CHATS_LIMIT = 16L * 1024 * 1024; // TODO: same
 
     public interface ImageCallback {
         void onLoaded(Bitmap bitmap);
@@ -150,8 +148,8 @@ public class CacheManager {
                             if (bitmap != null) {
                                 memoryCache.put(peer, bitmap);
 
-                                if (fresh) {
-                                    dbHelper.touch(cacheFile.id, now);
+                                if (fresh || !App.isNetworkAvailable()) {
+                                    dbHelper.touch(cacheFile.id, now, false);
                                     finishLoadedImage(peer, bitmap);
                                     return;
                                 }
@@ -162,6 +160,12 @@ public class CacheManager {
                         }
 
                         String userToken = App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
+
+                        if (!App.isNetworkAvailable()) {
+                            finishErrorImage(peer, new Exception("Offline"));
+                            return;
+                        }
+
                         mpgService.getAvatar(peer, userToken, new MPGramService.ApiCallback<byte[]>() {
                             @Override
                             public void onSuccess(final byte[] imageBytes) {
@@ -270,8 +274,8 @@ public class CacheManager {
                             if (bitmap != null) {
                                 memoryCache.put(key, bitmap);
 
-                                if (fresh) {
-                                    dbHelper.touch(cacheFile.id, now);
+                                if (fresh || !App.isNetworkAvailable()) {
+                                    dbHelper.touch(cacheFile.id, now, false);
                                     finishLoadedImage(key, bitmap);
                                     return;
                                 }
@@ -282,6 +286,12 @@ public class CacheManager {
                         }
 
                         String userToken = App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
+
+                        if (!App.isNetworkAvailable()) {
+                            finishErrorImage(key, new Exception("Offline"));
+                            return;
+                        }
+
                         mpgService.getFile(peer, messageId, fileParams, userToken, new MPGramService.ApiCallback<byte[]>() {
                             @Override
                             public void onSuccess(final byte[] imageBytes) {
@@ -348,9 +358,10 @@ public class CacheManager {
 
                     if (cacheFile != null) {
                         File file = new File(fileHelper.getFullAppdataPath(cacheFile.filename));
+
                         if (file.exists() && file.length() > 0) {
-                            if (fresh) {
-                                dbHelper.touch(cacheFile.id, now);
+                            if (fresh || !App.isNetworkAvailable()) {
+                                dbHelper.touch(cacheFile.id, now, false);
                                 postVideoLoaded(callback, file);
                                 return;
                             } else {
@@ -358,6 +369,11 @@ public class CacheManager {
                                 fileHelper.deleteFile(cacheFile.filename, true);
                             }
                         }
+                    }
+
+                    if (!App.isNetworkAvailable()) {
+                        postVideoError(callback, new Exception("Offline"));
+                        return;
                     }
 
                     App.getFileDownloader().download(peer, messageId, null, safeName, true, new FileDownloader.FileCallback() {
@@ -411,6 +427,31 @@ public class CacheManager {
         });
     }
 
+    public void saveHistory(final String peer, final long lastUsed, final String jsonString) {
+        String filename = "hist_" + peer;
+        fileHelper.saveFileText(filename, jsonString, true);
+        dbHelper.saveHistory(peer, filename, lastUsed);
+    }
+
+    public String loadHistory(final String peer) {
+        CacheHistory history = dbHelper.findHistory(peer);
+        if (history != null) {
+            dbHelper.touch(history.id, System.currentTimeMillis(), true);
+            trimChatsDiskCache();
+            return fileHelper.loadFileText(history.filename, true);
+        } else {
+            return null;
+        }
+    }
+
+    public void saveDialogs(final String jsonString) {
+        fileHelper.saveFileText("dialogs", jsonString, true); // bruh
+    }
+
+    public String loadDialogs() {
+        return fileHelper.loadFileText("dialogs", true); // bruh 2
+    }
+
     public void saveCachedFileToMedia(final String peer, final String messageId, final String targetName, final boolean preferNonPreview, final SaveFileCallback callback) {
         ioExecutor.execute(new Runnable() {
             @Override
@@ -454,7 +495,7 @@ public class CacheManager {
                     final File dst = new File(FileHelper.getMediaDirectoryPath(), safeName);
 
                     if (fileHelper.copyFile(src, dst)) {
-                        dbHelper.touch(cacheFile.id, System.currentTimeMillis());
+                        dbHelper.touch(cacheFile.id, System.currentTimeMillis(), false);
                         mainHandler.post(new Runnable() {
                             @Override
                             public void run() {
@@ -525,6 +566,24 @@ public class CacheManager {
                 }
 
                 dbHelper.deleteFileById(oldest.id);
+                fileHelper.deleteFile(oldest.filename, true);
+
+                currentSize -= oldest.size;
+            }
+        }
+    }
+
+    private void trimChatsDiskCache() {
+        synchronized (diskTrimLock) {
+            long currentSize = dbHelper.getHistorySize();
+
+            while (currentSize > CHATS_LIMIT) {
+                CacheHistory oldest = dbHelper.getOldestHistory();
+                if (oldest == null) {
+                    break;
+                }
+
+                dbHelper.deleteHistoryById(oldest.id);
                 fileHelper.deleteFile(oldest.filename, true);
 
                 currentSize -= oldest.size;

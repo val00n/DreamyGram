@@ -5,11 +5,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import com.val00n.dmpg.model.CacheFile;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
+import com.val00n.dmpg.model.cache.CacheFile;
+import com.val00n.dmpg.model.cache.CacheHistory;
 
 public class CacheDatabaseHelper extends SQLiteOpenHelper {
 
@@ -42,11 +39,13 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
                 "CREATE TABLE chats (" +
                         "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                         "peer TEXT NOT NULL, " +
+                        "lastUsed INTEGER NOT NULL DEFAULT 0, " +
+                        "size INTEGER NOT NULL DEFAULT 0, " +
                         "filename TEXT NOT NULL)";
 
         db.execSQL(createChatsTable);
 
-        String createPendingTable =
+        String createPendingTable = // TODO
                 "CREATE TABLE pending (" +
                         "_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                         "peer TEXT NOT NULL, " +
@@ -127,6 +126,54 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    public CacheHistory findHistory(String peer) {
+        SQLiteDatabase db = getReadableDatabase();
+
+        Cursor cursor = null;
+        try {
+            cursor = db.query("chats", new String[]{"_id", "peer", "filename", "size", "lastUsed"},
+                    "peer = ?",
+                    new String[]{peer}, null, null, null, "1");
+
+            if (cursor.moveToFirst()) {
+                CacheHistory cacheHistory = new CacheHistory();
+                cacheHistory.id = cursor.getLong(cursor.getColumnIndex("_id"));
+                cacheHistory.filename = cursor.getString(cursor.getColumnIndex("filename"));
+                cacheHistory.size = cursor.getLong(cursor.getColumnIndex("size"));
+                cacheHistory.lastUsed = cursor.getLong(cursor.getColumnIndex("lastUsed"));
+                return cacheHistory;
+            }
+
+            return null;
+
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    public void saveHistory(String peer, String filename, long lastUsed) {
+        SQLiteDatabase db = getWritableDatabase();
+
+        ContentValues values = new ContentValues();
+        values.put("peer", peer);
+        values.put("filename", filename);
+        values.put("lastUsed", lastUsed);
+
+        CacheHistory existing = findHistory(peer);
+        if (existing != null) {
+
+            String whereClause = "peer = ?";
+
+            String[] whereArgs = new String[] { String.valueOf(existing.peer) };
+
+            db.update("chats", values, whereClause, whereArgs);
+        } else {
+            db.insert("chats", null, values);
+        }
+    }
+
     public void saveFile(CacheFile cacheFile) {
         SQLiteDatabase db = getWritableDatabase();
 
@@ -160,7 +207,7 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    public void touch(long id, long lastUsed) {
+    public void touch(long id, long lastUsed, boolean chats) {
         SQLiteDatabase db = getWritableDatabase();
 
         ContentValues values = new ContentValues();
@@ -170,7 +217,7 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
 
         String[] whereArgs = new String[] { String.valueOf(id) };
 
-        db.update("files", values, whereClause, whereArgs);
+        db.update(chats ? "chats" : "files", values, whereClause, whereArgs);
     }
 
     public void deleteAvatar(String peer) {
@@ -190,6 +237,49 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
             }
 
             return 0L;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    public long getHistorySize() {
+        Cursor cursor = null;
+        try {
+            cursor = getReadableDatabase().rawQuery(
+                    "SELECT COALESCE(SUM(size), 0) FROM chats",
+                    null
+            );
+
+            if (cursor.moveToFirst()) {
+                return cursor.getLong(0);
+            }
+
+            return 0L;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    public CacheHistory getOldestHistory() {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.query("chats",
+                    new String[]{"_id", "filename"},
+                    null, null, null, null, "lastUsed ASC", "1");
+            if (cursor.moveToFirst()) {
+                CacheHistory cacheHistory = new CacheHistory();
+                cacheHistory.id = cursor.getLong(cursor.getColumnIndex("_id"));
+                cacheHistory.filename = cursor.getString(cursor.getColumnIndex("filename"));
+                cacheHistory.size = cursor.getLong(cursor.getColumnIndex("size"));
+                cacheHistory.lastUsed = cursor.getLong(cursor.getColumnIndex("lastUsed"));
+                return cacheHistory;
+            }
+            return null;
         } finally {
             if (cursor != null) {
                 cursor.close();
@@ -223,7 +313,15 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         getWritableDatabase().delete("files", "_id = ?", new String[]{String.valueOf(id)});
     }
 
+    public void deleteHistoryById(long id) {
+        getWritableDatabase().delete("chats", "_id = ?", new String[]{String.valueOf(id)});
+    }
+
     public void clearFiles() {
         getWritableDatabase().delete("files", null, null);
+    }
+
+    public void clearHistory() {
+        getWritableDatabase().delete("chats", null, null);
     }
 }

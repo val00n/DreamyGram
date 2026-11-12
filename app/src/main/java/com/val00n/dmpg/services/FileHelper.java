@@ -3,10 +3,7 @@ package com.val00n.dmpg.services;
 import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
-
 import com.val00n.dmpg.App;
-import com.val00n.dmpg.model.CacheFile;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;

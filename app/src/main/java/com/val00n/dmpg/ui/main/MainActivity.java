@@ -11,12 +11,13 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
-import com.val00n.dmpg.model.Dialog;
-import com.val00n.dmpg.model.DialogResponse;
-import com.val00n.dmpg.model.DialogRow;
+import com.val00n.dmpg.model.dialog.Dialog;
+import com.val00n.dmpg.model.dialog.DialogResponse;
+import com.val00n.dmpg.model.dialog.DialogRow;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.User;
@@ -29,6 +30,9 @@ import com.val00n.dmpg.ui.AvatarViewBinder;
 import com.val00n.dmpg.utils.SortUtils;
 import java.util.ArrayList;
 import java.util.Collections;
+
+import cc.nnproject.json.JSONObject;
+
 import static android.content.ContentValues.TAG;
 
 public class MainActivity extends Activity {
@@ -40,6 +44,7 @@ public class MainActivity extends Activity {
     private ImageButton settingsButton;
     private Button loadMoreButton;
     private View footerView;
+    private TextView networkStatusText;
 
     private MPGramService mpgService;
     private DialogResponse dialogResponse;
@@ -63,6 +68,11 @@ public class MainActivity extends Activity {
     private String updateOffset = "-1";
     private int updateFails = 0;
 
+    private App.NetworkListener networkListener;
+    private boolean hasCachedDialogs = false;
+    private boolean startedOnce = false;
+
+    private static final int OFFLINE_CHECK_MILLIS = 5000;
     private static final int GET_DIALOG_LIMIT = 25; // TODO change this in settings
     private static final int UPDATE_TIMEOUT_SECS = 30;
     private static final int UPDATE_POLL_MILLIS = 3000; // TODO change this in settings
@@ -110,6 +120,7 @@ public class MainActivity extends Activity {
         dialogsListView = (ListView) findViewById(R.id.mainDialogsListView);
         searchButton = (ImageButton) findViewById(R.id.mainSearchButton);
         settingsButton = (ImageButton) findViewById(R.id.mainSettingsButton);
+        networkStatusText = (TextView) findViewById(R.id.mainNetworkStatusText);
 
         forwardMode = getIntent().getBooleanExtra("FORWARD_MODE", false); //TODO: meh
         if (forwardMode) {
@@ -163,6 +174,14 @@ public class MainActivity extends Activity {
         dialogsUpdateTask = new Runnable() {
             @Override
             public void run() {
+                if (isActivityDied || isPolling || isPaused) return;
+
+                if (!App.isNetworkAvailable()) {
+                    isPolling = false;
+                    dialogsUpdatesHandler.postDelayed(this, OFFLINE_CHECK_MILLIS);
+                    return;
+                }
+
                 isPolling = true;
                 mpgService.getUpdates(updatesFilter, updateLimit, updateOffset, null, false, UPDATE_TIMEOUT_SECS, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
                     @Override
@@ -242,6 +261,26 @@ public class MainActivity extends Activity {
             }
         };
 
+        networkListener = new App.NetworkListener() {
+            @Override
+            public void onNetworkChanged(final boolean available) {
+                if (isActivityDied) return;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isActivityDied) return;
+
+                        if (available) {
+                            onNetworkRestored();
+                        } else {
+                            onNetworkLost();
+                        }
+                    }
+                });
+            }
+        };
+
         addFooter();
         loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
     }
@@ -274,39 +313,71 @@ public class MainActivity extends Activity {
         });
     }
 
+    @Override
     protected void onStop() {
         super.onStop();
+
         isPaused = true;
+
+        App.removeNetworkListener(networkListener);
+
         dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
 
+        if (!App.isNetworkAvailable()) {
+            return;
+        }
+
         if (!cancelInProgress) {
             cancelInProgress = true;
+
             mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
                 @Override
                 public void onSuccess(String result) {
                     cancelInProgress = false;
-                    tryStartPolling();
                 }
+
                 @Override
                 public void onError(Exception error) {
                     cancelInProgress = false;
-                    tryStartPolling();
                 }
             });
         }
     }
 
+    @Override
     protected void onStart() {
         super.onStart();
+
         isPaused = false;
-        tryStartPolling();
+
+        App.addNetworkListener(networkListener);
+
+        if (App.isNetworkAvailable()) {
+            if (startedOnce
+                    && (dialogResponse == null
+                    || dialogResponse.dialogs == null
+                    || dialogResponse.dialogs.isEmpty())
+                    && !isLoading) {
+                loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
+            }
+
+            tryStartPolling();
+        } else {
+            onNetworkLost();
+        }
+
+        startedOnce = true;
     }
 
     private void tryStartPolling() {
-        if (!isPaused && !cancelInProgress && !isPolling && dialogResponse != null) {
-            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+        dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+
+        if (isPaused || cancelInProgress || isPolling || dialogResponse == null || !App.isNetworkAvailable()) {
+            return;
         }
+
+        dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
     }
 
     private void update(ArrayList<Update> u) {
@@ -429,8 +500,13 @@ public class MainActivity extends Activity {
     }
 
     private void refreshDialogs(final int limit) {
+        if (!App.isNetworkAvailable()) {
+            isLoading = false;
+            return;
+        }
+
         isLoading = true;
-        mpgService.getDialogs(limit, null, null, 0, userToken, new MPGramService.ApiCallback<DialogResponse>() {
+        mpgService.getDialogs(limit, null, null, 0, userToken, false, new MPGramService.ApiCallback<DialogResponse>() {
             @Override
             public void onSuccess(final DialogResponse result) {
                 Collections.sort(result.dialogs, SortUtils.PINNED_FIRST);
@@ -467,14 +543,54 @@ public class MainActivity extends Activity {
     }
 
     private void loadDialogs(final boolean initial, final int limit, final String offsetPeer, final String offsetId, final long offsetDate) {
+        isLoading = true;
+
         if (initial) {
             loadedDialogs = 0;
+            hasCachedDialogs = false;
+
+            String cachedJsonString = App.getCacheManager().loadDialogs();
+            if (cachedJsonString != null) {
+                try {
+                    JSONObject cachedJson = (JSONObject) cc.nnproject.json.JSON.get(cachedJsonString);
+                    DialogResponse dr = new DialogResponse(cachedJson);
+
+                    if (dr != null && dr.dialogs != null) {
+                        Collections.sort(dr.dialogs, SortUtils.PINNED_FIRST);
+                        applyDialogResponse(dr);
+                        showDialogs();
+                        hasCachedDialogs = true;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Log.e(TAG, "Failed to parse cached dialogs", e);
+                }
+            }
+
+            if (!App.isNetworkAvailable()) {
+                isLoading = false;
+                progressBar.setVisibility(View.GONE);
+
+                if (!hasCachedDialogs) {
+                    Toast.makeText(MainActivity.this, "No network or cached dialogs", Toast.LENGTH_LONG).show();
+                }
+
+                return;
+            }
         } else {
             loadMoreButton.setEnabled(false);
+
+            if (!App.isNetworkAvailable()) {
+                isLoading = false;
+                loadMoreButton.setEnabled(true);
+
+                Toast.makeText(MainActivity.this, "No network", Toast.LENGTH_SHORT).show();
+
+                return;
+            }
         }
 
-        isLoading = true;
-        mpgService.getDialogs(limit, offsetPeer, offsetId, offsetDate, userToken, new MPGramService.ApiCallback<DialogResponse>() {
+        mpgService.getDialogs(limit, offsetPeer, offsetId, offsetDate, userToken, initial, new MPGramService.ApiCallback<DialogResponse>() {
             @Override
             public void onSuccess(final DialogResponse result) {
                 loadedDialogs += result.dialogs.size();
@@ -485,6 +601,7 @@ public class MainActivity extends Activity {
                     public void run() {
                         if (initial) {
                             applyDialogResponse(result);
+                            hasCachedDialogs = true;
 
                             mpgService.getLastUpdate(userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
                                 @Override
@@ -536,7 +653,14 @@ public class MainActivity extends Activity {
                         @Override
                         public void run() {
                             progressBar.setVisibility(View.GONE);
-                            Toast.makeText(MainActivity.this, "Failed to load dialogResponse " + error.getMessage(), Toast.LENGTH_SHORT).show();
+
+                            if (initial && !hasCachedDialogs) {
+                                Toast.makeText(MainActivity.this, "Failed to load dialogResponse " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                            } else if (!initial) {
+                                loadMoreButton.setEnabled(true);
+
+                                Toast.makeText(MainActivity.this, "Failed to load dialogs " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                            }
                         }
                     });
                 }
@@ -624,5 +748,32 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, StartupActivity.class);
         startActivity(intent);
         finish();
+    }
+
+    private void onNetworkLost() {
+        dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+        statusUpdateHandler.removeCallbacks(statusUpdateTask);
+
+        if (networkStatusText != null) {
+            networkStatusText.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void onNetworkRestored() {
+        if (networkStatusText != null) {
+            networkStatusText.setVisibility(View.GONE);
+        }
+
+        if (dialogResponse == null
+                || dialogResponse.dialogs == null
+                || dialogResponse.dialogs.isEmpty()) {
+            if (!isLoading) {
+                loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
+            }
+        } else {
+            refreshDialogs(loadedDialogs > 0 ? loadedDialogs : GET_DIALOG_LIMIT);
+        }
+
+        tryStartPolling();
     }
 }

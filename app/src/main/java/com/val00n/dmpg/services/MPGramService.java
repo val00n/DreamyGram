@@ -6,9 +6,9 @@ import android.os.Looper;
 import android.util.Log;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.BuildConfig;
-import com.val00n.dmpg.model.DialogResponse;
+import com.val00n.dmpg.model.dialog.DialogResponse;
 import com.val00n.dmpg.model.FileParams;
-import com.val00n.dmpg.model.HistoryResponse;
+import com.val00n.dmpg.model.message.HistoryResponse;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.model.Update;
@@ -442,7 +442,7 @@ public class MPGramService {
         });
     }
 
-    public void getDialogs(int limit, String offset_peer, String offset_id, long offset_date, String userToken, final ApiCallback<DialogResponse> callback) {
+    public void getDialogs(int limit, String offset_peer, String offset_id, long offset_date, String userToken, final boolean cache, final ApiCallback<DialogResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getDialogs");
         queryParams.put("v", instance.apiVersion);
@@ -467,6 +467,10 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    if (cache && parsedJson.has("count") && !parsedJson.has("error")) {
+                        App.getCacheManager().saveDialogs(stringResponse);
+                    }
+
                     DialogResponse response = new DialogResponse(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
@@ -477,7 +481,7 @@ public class MPGramService {
         });
     }
 
-    public void getHistory(String peer, String offset_id, long offset_date, String userToken, final ApiCallback<HistoryResponse> callback) {
+    public void getHistory(final String peer, String offset_id, long offset_date, String userToken, final boolean cache, final ApiCallback<HistoryResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getHistory");
         queryParams.put("v", instance.apiVersion);
@@ -506,6 +510,10 @@ public class MPGramService {
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    if (cache && parsedJson.has("messages") && !parsedJson.has("error")) {
+                        App.getCacheManager().saveHistory(peer, System.currentTimeMillis(), stringResponse);
+                    }
+
                     HistoryResponse response = new HistoryResponse(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
@@ -851,12 +859,7 @@ public class MPGramService {
         });
     }
 
-    public DownloadTask downloadFile(String peerId,
-                                     String messageId,
-                                     FileParams fileParams,
-                                     String userToken,
-                                     final File targetFile,
-                                     final DownloadCallback callback) {
+    public DownloadTask downloadFile(String peerId, String messageId, FileParams fileParams, String userToken, final File targetFile, final DownloadCallback callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("c", peerId);
         queryParams.put("m", messageId);

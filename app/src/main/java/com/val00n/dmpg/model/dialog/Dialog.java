@@ -1,5 +1,7 @@
-package com.val00n.dmpg.model;
+package com.val00n.dmpg.model.dialog;
 
+import com.val00n.dmpg.model.Chat;
+import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.utils.DateUtils;
 import cc.nnproject.json.JSONObject;

@@ -144,7 +144,30 @@ public class StartupActivity extends Activity {
 
     private void checkSessionStatus() {
         if (isChecking || isActivityDied) return;
+
+        if (instance == null) return;
+
+        if (!App.isNetworkAvailable()) {
+            String savedToken = App.getSessionManager().loadSession(instance.baseURL);
+
+            if (savedToken != null && savedToken.length() > 0) {
+                navigateToMain();
+            } else {
+                Toast.makeText(this, "No network or known session", Toast.LENGTH_LONG).show();
+
+                hideEverything();
+
+                if (!isMessagesSeen)
+                    welcomeLayout.setVisibility(View.VISIBLE);
+                else
+                    loginTypesLayout.setVisibility(View.VISIBLE);
+            }
+
+            return;
+        }
+
         isChecking = true;
+
         mpgService.checkAuth(userToken, new MPGramService.ApiCallback<Boolean>() {
             @Override
             public void onSuccess(final Boolean response) {
@@ -152,6 +175,7 @@ public class StartupActivity extends Activity {
                     @Override
                     public void run() {
                         if (isActivityDied) return;
+
                         isChecking = false;
 
                         if (!instance.equals(App.getInstanceManager().getSelectedInstance())) {
@@ -163,8 +187,11 @@ public class StartupActivity extends Activity {
                             navigateToMain();
                         } else {
                             Log.d(TAG, "checkAuth: User has invalid/no session");
+
                             App.getSessionManager().clearSession(instance.baseURL);
+
                             hideEverything();
+
                             if (!isMessagesSeen)
                                 welcomeLayout.setVisibility(View.VISIBLE);
                             else
@@ -177,11 +204,26 @@ public class StartupActivity extends Activity {
             @Override
             public void onError(final Exception error) {
                 error.printStackTrace();
+
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         Log.d(TAG, "AUTH onError: " + error.getMessage());
+
                         if (isActivityDied) return;
+
+                        isChecking = false;
+
+                        String savedToken = App.getSessionManager().loadSession(instance.baseURL);
+
+                        if (!App.isNetworkAvailable() && savedToken != null && savedToken.length() > 0) {
+                            navigateToMain();
+                            return;
+                        }
+
+                        if (App.isSessionDead(error.getMessage(), StartupActivity.this)) {
+                            return;
+                        }
 
                         if (error.getMessage() != null) {
                             Toast.makeText(StartupActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
@@ -189,7 +231,6 @@ public class StartupActivity extends Activity {
                             Toast.makeText(StartupActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
                         }
 
-                        isChecking = false;
                         hideEverything();
 
                         if (!isMessagesSeen)

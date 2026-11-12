@@ -1,6 +1,6 @@
 package com.val00n.dmpg.utils;
 
-import com.val00n.dmpg.model.Dialog;
+import com.val00n.dmpg.model.dialog.Dialog;
 import java.util.Comparator;
 
 public class SortUtils {

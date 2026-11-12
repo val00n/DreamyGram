@@ -20,7 +20,7 @@
                 android:id="@+id/chatTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="User"
+                android:text="Loading..."
                 android:textColor="@android:color/primary_text_dark"
                 android:textSize="24sp"
                 android:maxLines="1"
@@ -163,4 +163,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:visibility="visible"/>
+
+    <TextView
+        android:id="@+id/chatNetworkStatusText"
+        android:layout_above="@id/chatBottomContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:padding="3dp"
+        android:visibility="gone"
+        android:background="@android:color/background_dark"
+        android:textColor="@android:color/primary_text_dark_nodisable"
+        android:text="Network lost..."/>
 </RelativeLayout>

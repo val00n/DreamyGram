@@ -2,8 +2,10 @@ package com.val00n.dmpg;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
@@ -17,6 +19,8 @@ import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
 import com.val00n.dmpg.ui.StartupActivity;
 
+import java.util.ArrayList;
+
 public class App extends Application {
 
     private static App app;
@@ -27,9 +31,17 @@ public class App extends Application {
     private static MPGramService mpgService;
     private static ConnectivityManager cm;
     private static String[] sessionDeathMarkers;
+    private static boolean lastNetworkState = false;
 
     public static volatile String selfId;
     public static volatile boolean sessionDead;
+
+    private static final ArrayList<NetworkListener> networkListeners =
+            new ArrayList<NetworkListener>();
+
+    public interface NetworkListener {
+        void onNetworkChanged(boolean available);
+    }
 
     public static Context get() {
         return app;
@@ -70,6 +82,11 @@ public class App extends Application {
         instanceManager = new InstanceManager(this);
         sessionManager = new SessionManager(this);
 
+        registerReceiver(
+                connectivityReceiver,
+                new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
+        );
+
         cm = (ConnectivityManager) this.getSystemService(this.CONNECTIVITY_SERVICE);
 
         instanceManager.loadInstances();
@@ -84,11 +101,6 @@ public class App extends Application {
         };
 
         HttpClient.setUserAgent("DMPG/" + BuildConfig.VERSION_NAME + " (Android SDK " + Build.VERSION.RELEASE + "; " + Build.MODEL + ')');
-    }
-
-    public static boolean isNetworkAvailable() {
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        return activeNetwork != null && activeNetwork.isConnected();
     }
 
     public static boolean isSessionDead(String text, final Activity activity) {
@@ -115,5 +127,47 @@ public class App extends Application {
             }
         }
         return false;
+    }
+
+    public static boolean isNetworkAvailable() {
+        if (cm == null) return false;
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        return activeNetwork != null && activeNetwork.isConnected();
+    }
+
+    private static BroadcastReceiver connectivityReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            boolean available = isNetworkAvailable();
+
+            if (available == lastNetworkState) return;
+            lastNetworkState = available;
+
+            ArrayList<NetworkListener> copy;
+            synchronized (networkListeners) {
+                copy = new ArrayList<NetworkListener>(networkListeners);
+            }
+
+            for (int i = 0; i < copy.size(); i++) {
+                NetworkListener listener = copy.get(i);
+                if (listener != null) {
+                    listener.onNetworkChanged(available);
+                }
+            }
+        }
+    };
+
+    public static void addNetworkListener(NetworkListener listener) {
+        if (listener == null) return;
+        synchronized (networkListeners) {
+            networkListeners.add(listener);
+        }
+    }
+
+    public static void removeNetworkListener(NetworkListener listener) {
+        if (listener == null) return;
+        synchronized (networkListeners) {
+            networkListeners.remove(listener);
+        }
     }
 }

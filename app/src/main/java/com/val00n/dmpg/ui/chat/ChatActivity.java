@@ -17,12 +17,13 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.Chat;
-import com.val00n.dmpg.model.HistoryResponse;
+import com.val00n.dmpg.model.message.HistoryResponse;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.message.Message;
@@ -39,6 +40,9 @@ import com.val00n.dmpg.ui.StartupActivity;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+
+import cc.nnproject.json.JSONObject;
+
 import static android.content.ContentValues.TAG;
 
 public class ChatActivity extends Activity {
@@ -61,6 +65,7 @@ public class ChatActivity extends Activity {
     private LinearLayout bottomContainerContent;
     private ImageButton tooltipClose;
     private ImageButton backToBottomButton;
+    private TextView networkStatusText;
 
     private MPGramService mpgService;
     private HistoryResponse historyResponse;
@@ -103,6 +108,12 @@ public class ChatActivity extends Activity {
     private final ArrayList<PendingMessage> pendingMessages = new ArrayList<PendingMessage>();
     private int nextLocalMessageId = -1;
 
+    private App.NetworkListener networkListener;
+    private boolean hasCachedHistory = false;
+    private boolean sendingPending = false;
+    private boolean startedOnce = false;
+
+    private static final int OFFLINE_CHECK_MILLIS = 6000;
     private static final long PENDING_MATCH_WINDOW_SECS = 300;
     private static final int UPDATE_TIMEOUT_SECS = 30;
     private static final int UPDATE_POLL_MILLIS = 3000;
@@ -168,6 +179,7 @@ public class ChatActivity extends Activity {
         tooltipText = (TextView) findViewById(R.id.chatTooltipText);
         bottomContainerContent = (LinearLayout) findViewById(R.id.chatBottomContainerContent);
         backToBottomButton = (ImageButton) findViewById(R.id.chatBackToBottomButton);
+        networkStatusText = (TextView) findViewById(R.id.chatNetworkStatusText);
 
         chatUpdatesHandler = new Handler();
         statusUpdateHandler = new Handler();
@@ -175,11 +187,21 @@ public class ChatActivity extends Activity {
         chatUpdateTask = new Runnable() {
             @Override
             public void run() {
+                if (isActivityDied || isPolling || isPaused) return;
+
+                if (!App.isNetworkAvailable()) {
+                    isPolling = false;
+                    chatUpdatesHandler.postDelayed(this, OFFLINE_CHECK_MILLIS);
+                    return;
+                }
+
                 isPolling = true;
                 mpgService.getUpdates(peerId, null, updateLimit, updateOffset, firstMessageId, true, UPDATE_TIMEOUT_SECS, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
                     @Override
                     public void onSuccess(ArrayList<Update> result) {
                         if (isActivityDied) return;
+                        isPolling = false;
+                        updateFails = 0;
 
                         updates = result;
                         if (result != null && result.size() > 0) {
@@ -193,28 +215,23 @@ public class ChatActivity extends Activity {
                             });
                         }
 
-                        updateFails = 0;
-                        isPolling = false;
-                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                        if (!isPaused && App.isNetworkAvailable()) {
+                            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                        }
                     }
 
                     @Override
                     public void onError(Exception error) {
                         if (isActivityDied) return;
-                        Log.d(TAG, "UPDATE FAILED: " + error.getMessage());
                         isPolling = false;
+                        Log.d(TAG, "UPDATE FAILED: " + error.getMessage());
 
                         if (!App.isSessionDead(error.getMessage(), ChatActivity.this)) {
                             if (updateFails > 10) {
                                 mpgService.getLastUpdate(peerId, userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
                                     @Override
                                     public void onSuccess(Update result) {
-                                        if (result != null) {
-                                            updateOffset = Integer.toString(result.update_id);
-                                        } else {
-                                            updateOffset = "-1";
-                                        }
-
+                                        updateOffset = result != null ? Integer.toString(result.update_id) : "-1";
                                         if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
                                     }
 
@@ -230,7 +247,7 @@ public class ChatActivity extends Activity {
                                 updateFails = 0;
                             } else {
                                 updateFails++;
-                                if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS * updateFails);
+                                if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, Math.min(UPDATE_POLL_MILLIS * updateFails, 20000));
                             }
                         }
                     }
@@ -245,6 +262,26 @@ public class ChatActivity extends Activity {
                     isTyping = false;
                     showStatus();
                 }
+            }
+        };
+
+        networkListener = new App.NetworkListener() {
+            @Override
+            public void onNetworkChanged(final boolean available) {
+                if (isActivityDied) return;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isActivityDied) return;
+
+                        if (available) {
+                            onNetworkRestored();
+                        } else {
+                            onNetworkLost();
+                        }
+                    }
+                });
             }
         };
 
@@ -406,8 +443,15 @@ public class ChatActivity extends Activity {
     protected void onStop() {
         super.onStop();
         isPaused = true;
+
+        App.removeNetworkListener(networkListener);
+
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
+
+        if (!App.isNetworkAvailable()) {
+            return;
+        }
 
         if (!cancelInProgress) {
             cancelInProgress = true;
@@ -415,15 +459,32 @@ public class ChatActivity extends Activity {
                 @Override
                 public void onSuccess(String result) {
                     cancelInProgress = false;
-                    tryStartPolling();
                 }
                 @Override
                 public void onError(Exception error) {
                     cancelInProgress = false;
-                    tryStartPolling();
                 }
             });
         }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        isPaused = false;
+        App.addNetworkListener(networkListener);
+
+        if (App.isNetworkAvailable()) {
+            if (startedOnce && historyResponse == null && !isLoading) {
+                loadHistory(true, null, 0);
+            }
+
+            tryStartPolling();
+        } else {
+            onNetworkLost();
+        }
+
+        startedOnce = true;
     }
 
     private AlbumView.Listener albumListener = new AlbumView.Listener() {
@@ -454,16 +515,13 @@ public class ChatActivity extends Activity {
     }
 
     private void tryStartPolling() {
-        if (!isPaused && !cancelInProgress && !isPolling && historyResponse != null) {
-            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
-        }
-    }
+        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        isPaused = false;
-        tryStartPolling();
+        if (isPaused || cancelInProgress || isPolling || historyResponse == null || !App.isNetworkAvailable()) {
+            return;
+        }
+
+        chatUpdatesHandler.post(chatUpdateTask);
     }
 
     private void sendMessage(String text) {
@@ -548,6 +606,7 @@ public class ChatActivity extends Activity {
                     }
                 });
     }
+
 
     private void update(ArrayList<Update> u) {
         for (final Update upd : u) {
@@ -1106,7 +1165,86 @@ public class ChatActivity extends Activity {
     private void loadHistory(final boolean initial, final String offsetId, final long offsetDate) {
         if (initial) {
             loadedHistory = 0;
+            hasCachedHistory = false;
+
+            String cachedJsonString = App.getCacheManager().loadHistory(peerId);
+
+            if (cachedJsonString != null) {
+                try {
+                    JSONObject cachedJson = (JSONObject) cc.nnproject.json.JSON.get(cachedJsonString);
+                    HistoryResponse hr = new HistoryResponse(cachedJson);
+                    if (hr.messages != null && !hr.messages.isEmpty()) {
+                        Collections.reverse(hr.messages);
+
+                        historyResponse = hr;
+                        initialLoaded = true;
+
+                        if (!historyResponse.messages.isEmpty()) {
+                            firstMessageId = String.valueOf(
+                                    historyResponse.messages.get(historyResponse.messages.size() - 1).id);
+                        }
+
+                        canType = true;
+
+                        if (peerId != null && peerId.startsWith("-")) {
+                            canType = false;
+
+                            if (historyResponse.chats != null) {
+                                Chat chat = historyResponse.chats.get(peerId);
+                                if (chat != null) canType = !chat.c && !chat.l;
+                            }
+                        }
+                        if (canType) {
+                            bottomContainerContent.setVisibility(View.VISIBLE);
+                        }
+                        showMessages();
+
+                        chatMessages.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                chatMessages.setSelection(chatMessages.getCount() - 1);
+                            }
+                        });
+
+                        hasCachedHistory = true;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Log.e(TAG, "Failed to parse cached history", e);
+                }
+            }
+
+            if (!App.isNetworkAvailable()) {
+                isLoading = false;
+                progressBar.setVisibility(View.GONE);
+
+                if (hasCachedHistory) {
+                    if (networkStatusText != null) {
+                        networkStatusText.setVisibility(View.VISIBLE);
+                        updateNetworkStatusPosition();
+                    }
+                } else {
+                    Toast.makeText(ChatActivity.this, "No network or cached history", Toast.LENGTH_LONG).show();
+                    finish();
+                }
+
+                return;
+            }
         } else {
+            if (!App.isNetworkAvailable()) {
+                isLoading = false;
+
+                headerView.setVisibility(View.VISIBLE);
+                headerProgressBar.setVisibility(View.GONE);
+                headerButton.setVisibility(View.VISIBLE);
+                if (networkStatusText != null) {
+                    networkStatusText.setVisibility(View.VISIBLE);
+                    updateNetworkStatusPosition();
+                }
+
+                return;
+            }
+
             headerText.setVisibility(View.VISIBLE);
             headerText.setText("Loading messages...");
             headerProgressBar.setVisibility(View.VISIBLE);
@@ -1115,7 +1253,7 @@ public class ChatActivity extends Activity {
 
         isLoading = true;
 
-        mpgService.getHistory(peerId, offsetId, offsetDate, userToken, new MPGramService.ApiCallback<HistoryResponse>() {
+        mpgService.getHistory(peerId, offsetId, offsetDate, userToken, initial, new MPGramService.ApiCallback<HistoryResponse>() {
             @Override
             public void onSuccess(final HistoryResponse result) {
                runOnUiThread(new Runnable() {
@@ -1128,10 +1266,13 @@ public class ChatActivity extends Activity {
 
                        if (initial) {
                            historyResponse = result;
-
                            markRead(readOut);
-
                            initialLoaded = true;
+
+                           if (messagesAdapter != null) {
+                               messagesAdapter = null;
+                           }
+
                            showMessages();
 
                            if (!historyResponse.messages.isEmpty()) {
@@ -1165,13 +1306,19 @@ public class ChatActivity extends Activity {
                                    }
                                    updates = new ArrayList<Update>();
 
-                                   if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                   if (!isPaused && !isPolling) {
+                                       chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                                       chatUpdatesHandler.postDelayed(chatUpdateTask, (long) (UPDATE_POLL_MILLIS * 1.5f)); // FIXME
+                                   }
                                }
 
                                @Override
                                public void onError(Exception error) {
                                    error.printStackTrace();
-                                   if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                   if (!isPaused && !isPolling) {
+                                       chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                                       chatUpdatesHandler.postDelayed(chatUpdateTask, (long) (UPDATE_POLL_MILLIS * 1.5f)); // FIXME
+                                   }
                                }
                            });
                        } else {
@@ -1205,13 +1352,21 @@ public class ChatActivity extends Activity {
 
                             if (initial) {
                                 progressBar.setVisibility(View.GONE);
-                                Toast.makeText(ChatActivity.this, "Failed to load history " + error.getMessage(), Toast.LENGTH_SHORT).show();
+
+                                if (!hasCachedHistory) {
+                                    Toast.makeText(ChatActivity.this, "Failed to load history " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                                } else {
+                                    if (networkStatusText != null) {
+                                        networkStatusText.setVisibility(View.VISIBLE);
+                                        updateNetworkStatusPosition();
+                                    }
+                                }
                             } else {
                                 fetchError = true;
                                 headerView.setVisibility(View.VISIBLE);
                                 headerProgressBar.setVisibility(View.GONE);
                                 headerButton.setVisibility(View.VISIBLE);
-                                headerText.setText("Failed to load: " + error.getMessage());
+                                Toast.makeText(ChatActivity.this, "Failed to load: " + error.getMessage(), Toast.LENGTH_SHORT).show();
                             }
                         }
                     });
@@ -1297,6 +1452,29 @@ public class ChatActivity extends Activity {
         local.messageState = Message.MessageState.MESSAGE_SENT;
     }
 
+    private void onNetworkLost() {
+        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        statusUpdateHandler.removeCallbacks(statusUpdateTask);
+
+        if (networkStatusText != null) {
+            networkStatusText.setVisibility(View.VISIBLE);
+            updateNetworkStatusPosition();
+        }
+    }
+
+    private void onNetworkRestored() {
+        if (!isLoading) {
+            loadHistory(true, null, 0);
+        }
+
+        if (networkStatusText != null) {
+            networkStatusText.setVisibility(View.GONE);
+        }
+
+        isPolling = false;
+        tryStartPolling();
+    }
+
     private boolean isMessagePending(Message msg) {
         return msg.messageState == Message.MessageState.MESSAGE_SENDING
                 || msg.messageState == Message.MessageState.MESSAGE_ERROR;
@@ -1343,6 +1521,17 @@ public class ChatActivity extends Activity {
                 loadHistory(false, historyResponse.offsetId, historyResponse.offsetDate);
             }
         });
+    }
+
+    private void updateNetworkStatusPosition() { // FIXME: dumb
+        if (networkStatusText == null) return;
+
+        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) networkStatusText.getLayoutParams();
+
+        params.addRule(RelativeLayout.ABOVE, R.id.chatBottomContainer);
+        params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM, 0);
+
+        networkStatusText.setLayoutParams(params);
     }
 
     private void navigateToStartup() {

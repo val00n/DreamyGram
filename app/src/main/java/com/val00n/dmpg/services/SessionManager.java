@@ -2,13 +2,9 @@ package com.val00n.dmpg.services;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
-
 import com.val00n.dmpg.App;
 import java.util.HashMap;
 import java.util.Map;
-
-import static android.content.ContentValues.TAG;
 
 public class SessionManager {
 
@@ -39,7 +35,6 @@ public class SessionManager {
         }
         String t = prefs.getString(baseUrl, null);
         if (t != null) synchronized (cache) { cache.put(baseUrl, t); }
-        Log.d(TAG, "loadSession: " + t);
         return t;
     }
 
