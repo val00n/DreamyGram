@@ -9,30 +9,33 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/startupWelcomeLayout"
-        android:layout_centerHorizontal="true"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="48dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:visibility="gone">
         <ImageView
+            android:id="@+id/startupAppIcon"
             android:layout_width="128dp"
             android:layout_height="128dp"
+            android:layout_centerInParent="true"
             android:src="@android:drawable/sym_def_app_icon"/>
         <TextView
+            android:layout_above="@+id/startupAppDesc"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
             android:text="@string/app_name"
             android:textColor="@android:color/primary_text_dark"
             android:textStyle="bold"
             android:textSize="28sp"/>
         <TextView
+            android:id="@+id/startupAppDesc"
+            android:layout_above="@id/startupAppIcon"
             android:layout_width="256dp"
             android:layout_height="wrap_content"
-            android:text="Android 1.5+ lightweight Telegram client. Powered by MPGram WEB API."
+            android:layout_centerInParent="true"
+            android:text="Android 1.0+ lightweight Telegram client. Powered by MPGram WEB API."
             android:gravity="center"
             android:layout_marginTop="6dp"/>
         <Button
@@ -43,88 +46,114 @@
             android:text="Next"
             android:layout_alignParentBottom="true"
             android:layout_marginTop="72dp"/>
-    </LinearLayout>
+    </RelativeLayout>
 
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/startupWarningLayout"
-        android:layout_centerHorizontal="true"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="36dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:visibility="gone">
         <TextView
+            android:id="@+id/startupWarningTitle"
+            android:layout_alignParentTop="true"
+            android:layout_centerHorizontal="true"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="WARNING!!!"
             android:textColor="@android:color/primary_text_dark"
             android:textStyle="bold"
-            android:textSize="28sp"/>
-        <TextView
-            android:gravity="center"
-            android:layout_width="300dp"
-            android:layout_height="wrap_content"
-            android:textSize="17sp"
-            android:textColor="@android:color/primary_text_dark"
-            android:text="Using this app, may lead to some risk about your telegram account.\n1) If your account is younger than 6 months, and you never used third party clients, your account may very likely be banned. If it's not, anyway account safety cannot be guaranteed. \n2) Using this client, instance owner may have access to your data (phone number, chats, media, etc). So if you really care about this, you can use your own instance, or delete this app.\n3) The developers are not responsible for your account anyhow. It is just MPGram Client. Pressing the button below, means, that you accepted all of above listed.\nEnjoy :)"
-            android:layout_marginTop="6dp"/>
+            android:textSize="28sp"
+            android:layout_marginTop="12dp"/>
+        <ScrollView
+            android:layout_below="@id/startupWarningTitle"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_above="@+id/startupWarningNextButton">
+            <TextView
+                android:padding="3dp"
+                android:gravity="center"
+                android:layout_width="300dp"
+                android:layout_height="wrap_content"
+                android:textSize="17sp"
+                android:textColor="@android:color/primary_text_dark"
+                android:text="Using this app, may lead to some risk about your telegram account.\n1) If your account is younger than 6 months, and you never used third party clients, your account may very likely be banned. If it's not, anyway account safety cannot be guaranteed. \n2) Using this client, instance owner may have access to your data (phone number, chats, media, etc). So if you really care about this, you can use your own instance, or delete this app.\n3) The developers are not responsible for your account anyhow. It is just MPGram Client. Pressing the button below, means, that you accepted all of above listed.\nEnjoy :)"
+                android:layout_marginTop="6dp"/>
+        </ScrollView>
         <Button
             android:id="@+id/startupWarningNextButton"
-            android:layout_centerInParent="true"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
             android:layout_width="128dp"
             android:layout_height="wrap_content"
             android:text="Agree"
-            android:layout_alignParentBottom="true"
-            android:layout_marginTop="18dp"/>
-    </LinearLayout>
+            android:layout_marginTop="8dp"/>
+    </RelativeLayout>
 
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/startupLoginTypesLayout"
-        android:layout_centerHorizontal="true"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="36dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:visibility="gone">
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Log in"
-            android:textColor="@android:color/primary_text_dark"
+            android:textSize="48sp"
             android:textStyle="bold"
-            android:textSize="56sp"/>
-        <Button
-            android:id="@+id/startupQRLoginButton"
+            android:layout_centerHorizontal="true"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="24dp"/>
+        <LinearLayout
+            android:id="@+id/startupLoginButtonsLayout"
             android:layout_centerInParent="true"
-            android:layout_width="196dp"
-            android:layout_height="wrap_content"
-            android:text="QR code login"
-            android:layout_alignParentBottom="true"
-            android:layout_marginTop="48dp"/>
-        <Button
-            android:id="@+id/startupPhoneLoginButton"
-            android:layout_centerInParent="true"
-            android:layout_width="196dp"
-            android:layout_height="wrap_content"
-            android:text="Phone number login"
-            android:layout_alignParentBottom="true"
-            android:layout_marginTop="2dp"/>
-        <Button
-            android:id="@+id/startupInstanceSettingsButton"
-            android:layout_centerInParent="true"
-            android:layout_width="196dp"
-            android:layout_height="wrap_content"
-            android:text="Instance settings"
-            android:layout_alignParentBottom="true"
-            android:layout_marginTop="2dp"/>
+            android:orientation="vertical"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+            <Button
+                android:id="@+id/startupQRLoginButton"
+                android:layout_centerInParent="true"
+                android:layout_width="196dp"
+                android:layout_height="wrap_content"
+                android:text="QR code login"
+                android:layout_alignParentBottom="true"/>
+            <Button
+                android:id="@+id/startupPhoneLoginButton"
+                android:layout_centerInParent="true"
+                android:layout_width="196dp"
+                android:layout_height="wrap_content"
+                android:text="Phone number login"
+                android:layout_alignParentBottom="true"
+                android:layout_marginTop="2dp"/>
+            <Button
+                android:id="@+id/startupInstanceSettingsButton"
+                android:layout_centerInParent="true"
+                android:layout_width="196dp"
+                android:layout_height="wrap_content"
+                android:text="Instance settings"
+                android:layout_alignParentBottom="true"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+
         <TextView
-            android:layout_width="280dp"
+            android:id="@+id/startupChosenInstanceText"
+            android:padding="4dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/startupLoginButtonsLayout"
+            android:text="Chosen instance:\nexample.com"
+            android:gravity="center"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="2dp"/>
+
+        <TextView
+            android:padding="4dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Phone number login is not recommended, because code may not be sent."
             android:gravity="center"
-            android:layout_marginTop="48dp"/>
-    </LinearLayout>
+            android:textStyle=""
+            android:layout_marginBottom="12dp"
+            android:layout_alignParentBottom="true"/>
+    </RelativeLayout>
 
 </RelativeLayout>

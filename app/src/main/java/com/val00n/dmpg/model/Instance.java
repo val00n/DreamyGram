@@ -22,4 +22,18 @@ public class Instance {
         disableCertCheck = false;
         instancePassword = "";
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Instance)) return false;
+
+        Instance other = (Instance) o;
+        return baseURL != null && baseURL.equals(other.baseURL);
+    }
+
+    @Override
+    public int hashCode() {
+        return baseURL != null ? baseURL.hashCode() : 0;
+    }
 }

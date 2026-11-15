@@ -23,6 +23,7 @@ public class MessageRow {
     public boolean hasMedia;
     public int mediaWidth;
     public int mediaHeight;
+    public boolean thumb;
     public boolean isPhoto;
     public boolean isVideo;
     public boolean isSticker;

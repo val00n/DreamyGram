@@ -83,6 +83,10 @@ public class FileParams {
         }
     }
 
+    public boolean isThumbnail() {
+        return p != null && p.startsWith("thumb");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

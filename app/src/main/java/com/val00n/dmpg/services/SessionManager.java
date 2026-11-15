@@ -2,9 +2,13 @@ package com.val00n.dmpg.services;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
+
 import com.val00n.dmpg.App;
 import java.util.HashMap;
 import java.util.Map;
+
+import static android.content.ContentValues.TAG;
 
 public class SessionManager {
 
@@ -41,6 +45,14 @@ public class SessionManager {
     public void clearSession(String baseUrl) {
         synchronized (cache) { cache.remove(baseUrl); }
         prefs.edit().remove(baseUrl).commit();
+        App.selfId = null;
+    }
+
+    public void clearAllSessions() {
+        synchronized (cache) {
+            cache.clear();
+        }
+        prefs.edit().clear().commit();
         App.selfId = null;
     }
 }

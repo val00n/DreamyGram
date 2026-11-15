@@ -23,14 +23,13 @@ import static android.content.ContentValues.TAG;
 
 public class InstanceSettingsActivity extends Activity {
 
-    // UI
     private ListView instancesList;
     private InstancesAdapter instancesAdapter;
     private Button checkButton;
     private Button addButton;
     private Button logoutButton;
     private ArrayList<Instance> instances;
-    // Others
+
     private MPGramService mpgService;
 
     public void onCreate(Bundle savedInstanceState) {
@@ -204,82 +203,62 @@ public class InstanceSettingsActivity extends Activity {
     }
 
     private void logout() {
-        mpgService.logout(App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl()), new MPGramService.ApiCallback<AuthResponse>() {
-            @Override
-            public void onSuccess(AuthResponse result) {
-                if (result.response.equals("1")) {
-                    App.getSessionManager().clearSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
+        Instance instance = App.getInstanceManager().getSelectedInstance();
+        if (instance == null) return;
 
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(InstanceSettingsActivity.this, "Successfully logged out", Toast.LENGTH_LONG).show();
-                            navigateToStartup();
-                        }
-                    });
-                } else {
-                    onError(new Exception("Invalid res: " + result.response));
-                }
-            }
+        String token = App.getSessionManager().loadSession(instance.baseURL);
 
-            @Override
-            public void onError(final Exception error) {
-                Log.d(TAG, "onError: " + error.getMessage());
+        if (token != null && token.length() > 0) {
+            mpgService.logout(instance, token, null);
+        }
 
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(InstanceSettingsActivity.this, error.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                });
-            }
-        });
+        App.getSessionManager().clearSession(instance.baseURL);
+
+        wipeAndNavigate("Logged out");
     }
 
     private void logoutEverywhere() {
         SessionManager sm = App.getSessionManager();
         ArrayList<Instance> instances = App.getInstanceManager().getInstances();
-        final int[] remaining = {0};
 
-        for (final Instance instance : instances) {
-            String instanceUserToken = sm.loadSession(instance.baseURL);
-            if (instanceUserToken != null && instanceUserToken.length() > 0) {
-                remaining[0]++;
-                mpgService.logout(instance, instanceUserToken, new MPGramService.ApiCallback<AuthResponse>() {
-                    @Override
-                    public void onSuccess(AuthResponse result) {
-                        if (result.response.equals("1")) {
-                            App.getSessionManager().clearSession(instance.baseURL);
-                        }
-                        done();
-                    }
+        if (instances == null) return;
 
-                    @Override
-                    public void onError(Exception error) {
-                        Log.d(TAG, "onError: " + error.getMessage());
-                        done();
-                    }
+        ArrayList<Instance> toLogout = new ArrayList<Instance>();
+        ArrayList<String> tokens = new ArrayList<String>();
 
-                    private void done() {
-                        remaining[0]--;
-                        if (remaining[0] == 0) {
-                            runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(InstanceSettingsActivity.this, "Successfully logged out", Toast.LENGTH_LONG).show();
-                                    navigateToStartup();
-                                }
-                            });
-                        }
-                    }
-                });
+        for (Instance instance : instances) {
+            String token = sm.loadSession(instance.baseURL);
+            if (token != null && token.length() > 0) {
+                toLogout.add(instance);
+                tokens.add(token);
             }
         }
 
-        if (remaining[0] == 0) {
+        if (toLogout.isEmpty()) {
             Toast.makeText(this, "No active sessions", Toast.LENGTH_SHORT).show();
+            App.getCacheManager().wipeCache(null);
             return;
         }
+
+        sm.clearAllSessions();
+
+        for (int i = 0; i < toLogout.size(); i++) {
+            mpgService.logout(toLogout.get(i), tokens.get(i), null);
+        }
+
+        wipeAndNavigate("Logged out everywhere");
+    }
+
+    private void wipeAndNavigate(final String message) {
+        App.getCacheManager().wipeCache(new Runnable() {
+            @Override
+            public void run() {
+                if (isFinishing()) return;
+
+                Toast.makeText(InstanceSettingsActivity.this, message, Toast.LENGTH_LONG).show();
+                navigateToStartup();
+            }
+        });
     }
 
     private void getInstances() {

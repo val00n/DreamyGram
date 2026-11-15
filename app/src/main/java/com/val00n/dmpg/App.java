@@ -69,7 +69,7 @@ public class App extends Application {
 
     public static MPGramService getMPGramService() {
         if (mpgService == null) {
-            mpgService = new MPGramService(3);
+            mpgService = new MPGramService(4); // FIXME: 4 is just random number
         }
         return mpgService;
     }
@@ -82,12 +82,13 @@ public class App extends Application {
         instanceManager = new InstanceManager(this);
         sessionManager = new SessionManager(this);
 
+        cm = (ConnectivityManager) this.getSystemService(Context.CONNECTIVITY_SERVICE);
+        lastNetworkState = isNetworkAvailable();
+
         registerReceiver(
                 connectivityReceiver,
                 new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
         );
-
-        cm = (ConnectivityManager) this.getSystemService(this.CONNECTIVITY_SERVICE);
 
         instanceManager.loadInstances();
 
@@ -114,15 +115,22 @@ public class App extends Application {
                 sessionManager.clearSession(instanceManager.getSelectedInstanceBaseUrl());
                 sessionDead = true;
 
-                activity.runOnUiThread(new Runnable() {
+                getCacheManager().wipeCache(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(activity, "session has died", Toast.LENGTH_SHORT).show();
-                        Intent intent = new Intent(activity, StartupActivity.class);
-                        activity.startActivity(intent);
-                        activity.finish();
+                        activity.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(activity, "session has died", Toast.LENGTH_SHORT).show();
+
+                                Intent intent = new Intent(activity, StartupActivity.class);
+                                activity.startActivity(intent);
+                                activity.finish();
+                            }
+                        });
                     }
                 });
+
                 return true;
             }
         }

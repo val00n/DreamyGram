@@ -17,19 +17,35 @@ public class ImageViewBinder {
         this.cacheManager = cacheManager;
     }
 
-    public void bind(final ImageView view, final String peer, final String messageId, final FileParams fileParams) {
-        view.setImageResource(0);
+    public void bind(final ImageView view, final String peer, final String messageId, final boolean thumb, final FileParams fileParams) {
+        if (fileParams != null && fileParams.isThumbnail() && !thumb) {
+            if (!"no_thumb".equals(view.getTag())) {
+                view.setTag("no_thumb");
+                view.setImageResource(android.R.drawable.ic_menu_report_image);
+            }
+            return;
+        }
 
         if (peer == null || peer.length() == 0 || messageId == null || messageId.length() == 0) {
             view.setTag(null);
+            view.setImageDrawable(null);
             return;
         }
-        view.setTag(messageId);
+
+        boolean isThumb = fileParams != null && fileParams.isThumbnail();
+        final String bindKey = peer + "|" + messageId + "|" + (isThumb ? "1" : "0");
+
+        if (bindKey.equals(view.getTag())) {
+            return;
+        }
+
+        view.setTag(bindKey);
+        view.setImageDrawable(null);
 
         cacheManager.loadImage(peer, messageId, fileParams, new CacheManager.ImageCallback() {
             @Override
             public void onLoaded(Bitmap bitmap) {
-                if (!messageId.equals(view.getTag())) return;
+                if (!bindKey.equals(view.getTag())) return;
 
                 if (bitmap != null) {
                     view.setImageBitmap(bitmap);
@@ -40,7 +56,7 @@ public class ImageViewBinder {
 
             @Override
             public void onError(Exception error) {
-                if (!messageId.equals(view.getTag())) return;
+                if (!bindKey.equals(view.getTag())) return;
                 view.setImageResource(android.R.drawable.ic_menu_report_image); // TODO
             }
         });

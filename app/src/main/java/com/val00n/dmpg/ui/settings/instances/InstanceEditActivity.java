@@ -13,7 +13,6 @@ import com.val00n.dmpg.model.Instance;
 
 public class InstanceEditActivity extends Activity {
 
-    // UI
     private EditText baseURLEditText;
     private EditText APIEditText;
     private EditText avatarEditText;
@@ -24,7 +23,7 @@ public class InstanceEditActivity extends Activity {
     private EditText passwordEditText;
     private CheckBox checkCertsCheckBox;
     private Button saveButton;
-    // Others
+
     private int instanceIndex;
 
     public void onCreate(Bundle savedInstanceState) {
@@ -102,6 +101,7 @@ public class InstanceEditActivity extends Activity {
                 }
 
                 App.getInstanceManager().editInstance(instance, instanceIndex);
+                App.getInstanceManager().selectInstance(instanceIndex);
             } else {
                 if (App.getInstanceManager().hasInstanceWithUrl(baseURL, -1)) {
                     Toast.makeText(this, "Instance with this base URL already exists", Toast.LENGTH_SHORT).show();
@@ -109,6 +109,7 @@ public class InstanceEditActivity extends Activity {
                 }
 
                 App.getInstanceManager().addInstance(instance);
+                App.getInstanceManager().selectInstance(App.getInstanceManager().getInstances().size() - 1);
             }
 
             finish();

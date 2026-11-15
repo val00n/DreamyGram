@@ -23,14 +23,16 @@ public class Login2FAActivity extends Activity {
 
     private MPGramService mpgService;
     private String userToken;
-    private SessionManager sessionManager;
+    private String loginBaseUrl;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login_2fa);
 
         mpgService = App.getMPGramService();
-        sessionManager = App.getSessionManager();
+
+        loginBaseUrl = App.getInstanceManager().getSelectedInstanceBaseUrl();
+        mpgService.refreshInstance();
 
         submitButton = (Button) findViewById(R.id.login2FASubmitButton);
         passwordEditText = (EditText) findViewById(R.id.login2FAPasswordEditText);
@@ -50,7 +52,7 @@ public class Login2FAActivity extends Activity {
             @Override
             public void onSuccess(AuthResponse result) {
                 if (result.response.equals("1")) {
-                    sessionManager.saveSession(userToken);
+                    App.getSessionManager().saveSession(userToken, loginBaseUrl);
                     navigateToMain();
                 } else if (result.response.equals("password_hash_invalid")) {
                     runOnUiThread(new Runnable() {

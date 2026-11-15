@@ -9,6 +9,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
@@ -18,15 +20,15 @@ import com.val00n.dmpg.ui.login.LoginPhoneActivity;
 import com.val00n.dmpg.ui.login.LoginQRActivity;
 import com.val00n.dmpg.ui.main.MainActivity;
 import com.val00n.dmpg.ui.settings.instances.InstanceSettingsActivity;
-
 import static android.content.ContentValues.TAG;
 
 public class StartupActivity extends Activity {
 
     private ProgressBar startupProgressBar;
-    private LinearLayout welcomeLayout;
-    private LinearLayout warningLayout;
-    private LinearLayout loginTypesLayout;
+    private RelativeLayout welcomeLayout;
+    private RelativeLayout warningLayout;
+    private RelativeLayout loginTypesLayout;
+    private TextView chosenInstanceText;
     private Button welcomeNextButton;
     private Button warningNextButton;
     private Button QRLoginButton;
@@ -49,9 +51,10 @@ public class StartupActivity extends Activity {
         instance = App.getInstanceManager().getSelectedInstance();
 
         startupProgressBar = (ProgressBar) findViewById(R.id.startupProgressBar);
-        welcomeLayout = (LinearLayout) findViewById(R.id.startupWelcomeLayout);
-        warningLayout = (LinearLayout) findViewById(R.id.startupWarningLayout);
-        loginTypesLayout = (LinearLayout) findViewById(R.id.startupLoginTypesLayout);
+        welcomeLayout = (RelativeLayout) findViewById(R.id.startupWelcomeLayout);
+        warningLayout = (RelativeLayout) findViewById(R.id.startupWarningLayout);
+        loginTypesLayout = (RelativeLayout) findViewById(R.id.startupLoginTypesLayout);
+        chosenInstanceText = (TextView) findViewById(R.id.startupChosenInstanceText);
         welcomeNextButton = (Button) findViewById(R.id.startupWelcomeNextButton);
         warningNextButton = (Button) findViewById(R.id.startupWarningNextButton);
         QRLoginButton = (Button) findViewById(R.id.startupQRLoginButton);
@@ -104,6 +107,8 @@ public class StartupActivity extends Activity {
         if (!App.isNetworkAvailable()) {
             Toast.makeText(this, "Network unavailable", Toast.LENGTH_SHORT).show();
         }
+
+        updateChosenInstanceText();
     }
 
     protected void onResume() {
@@ -113,6 +118,7 @@ public class StartupActivity extends Activity {
 
         instance = currentInstance;
         mpgService = App.getMPGramService();
+        mpgService.refreshInstance();
         userToken = App.getSessionManager().loadSession(instance.baseURL);
 
         if (App.sessionDead) {
@@ -131,6 +137,8 @@ public class StartupActivity extends Activity {
         } else {
             checkSessionStatus();
         }
+
+        updateChosenInstanceText();
     }
 
     protected void onDestroy() {
@@ -151,7 +159,7 @@ public class StartupActivity extends Activity {
             String savedToken = App.getSessionManager().loadSession(instance.baseURL);
 
             if (savedToken != null && savedToken.length() > 0) {
-                navigateToMain();
+                navigateToMain(false);
             } else {
                 Toast.makeText(this, "No network or known session", Toast.LENGTH_LONG).show();
 
@@ -184,11 +192,12 @@ public class StartupActivity extends Activity {
 
                         if (response) {
                             Log.d(TAG, "checkAuth: User has valid session");
-                            navigateToMain();
+                            navigateToMain(false);
                         } else {
                             Log.d(TAG, "checkAuth: User has invalid/no session");
 
                             App.getSessionManager().clearSession(instance.baseURL);
+                            App.getCacheManager().wipeCache(null);
 
                             hideEverything();
 
@@ -211,19 +220,27 @@ public class StartupActivity extends Activity {
                         Log.d(TAG, "AUTH onError: " + error.getMessage());
 
                         if (isActivityDied) return;
+                        if (!instance.equals(App.getInstanceManager().getSelectedInstance())) return;
 
                         isChecking = false;
 
                         String savedToken = App.getSessionManager().loadSession(instance.baseURL);
 
                         if (!App.isNetworkAvailable() && savedToken != null && savedToken.length() > 0) {
-                            navigateToMain();
+                            navigateToMain(false);
                             return;
                         }
 
                         if (App.isSessionDead(error.getMessage(), StartupActivity.this)) {
                             return;
                         }
+
+                        if (savedToken != null && savedToken.length() > 0 && App.getCacheManager().hasCachedDialogs()) {
+                            Toast.makeText(StartupActivity.this, "Server unavailable, showing cached data", Toast.LENGTH_LONG).show();
+                            navigateToMain(true);
+                            return;
+                        }
+
 
                         if (error.getMessage() != null) {
                             Toast.makeText(StartupActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
@@ -261,8 +278,9 @@ public class StartupActivity extends Activity {
         }.start();
     }
 
-    private void navigateToMain() {
+    private void navigateToMain(boolean serverUnavailable) {
         Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("SERVER_UNAVAILABLE", serverUnavailable);
         startActivity(intent);
         finish();
     }
@@ -272,6 +290,16 @@ public class StartupActivity extends Activity {
         welcomeLayout.setVisibility(View.GONE);
         warningLayout.setVisibility(View.GONE);
         loginTypesLayout.setVisibility(View.GONE);
+    }
+
+    private void updateChosenInstanceText() {
+        Instance selected = App.getInstanceManager().getSelectedInstance();
+
+        if (selected != null) {
+            chosenInstanceText.setText("Chosen instance:\n" + selected.baseURL);
+        } else {
+            chosenInstanceText.setText("No instance selected");
+        }
     }
 
     private void navigateToLoginQR() {

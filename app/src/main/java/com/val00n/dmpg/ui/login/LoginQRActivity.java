@@ -26,7 +26,6 @@ public class LoginQRActivity extends Activity {
 
     private ProgressBar progressBar;
     private LinearLayout captchaLayout;
-    private LinearLayout qrLayout;
     private ImageView captchaImageView;
     private ImageView qrImageView;
     private EditText captchaSolutionEditText;
@@ -38,6 +37,7 @@ public class LoginQRActivity extends Activity {
     private Runnable qrPollTask;
     private String captchaId;
     private String qrLink;
+    private String loginBaseUrl;
     private String userToken;
 
     public void onCreate(Bundle savedInstanceState) {
@@ -46,6 +46,9 @@ public class LoginQRActivity extends Activity {
 
         mpgService = App.getMPGramService();
         sessionManager = App.getSessionManager();
+
+        loginBaseUrl = App.getInstanceManager().getSelectedInstanceBaseUrl();
+        mpgService.refreshInstance();
 
         qrPollingHandler = new Handler();
 
@@ -56,7 +59,7 @@ public class LoginQRActivity extends Activity {
                     @Override
                     public void onSuccess(AuthResponse result) {
                         if ("1".equals(result.response)) {
-                            sessionManager.saveSession(userToken);
+                            sessionManager.saveSession(userToken, loginBaseUrl);
                             navigateToMain(userToken);
                         } else if ("password".equals(result.response)) {
                             navigateTo2FA(userToken);
@@ -83,7 +86,6 @@ public class LoginQRActivity extends Activity {
 
         progressBar = (ProgressBar) findViewById(R.id.loginQRProgressBar);
         captchaLayout = (LinearLayout) findViewById(R.id.loginQRCaptchaLayout);
-        qrLayout = (LinearLayout) findViewById(R.id.loginQRLayout);
         captchaImageView = (ImageView) findViewById(R.id.loginQRCaptchaImageView);
         qrImageView = (ImageView) findViewById(R.id.loginQRImageView);
         captchaSolutionEditText = (EditText) findViewById(R.id.loginQRCaptchaEditText);
@@ -214,7 +216,7 @@ public class LoginQRActivity extends Activity {
             @Override
             public void run() {
                 progressBar.setVisibility(View.INVISIBLE);
-                qrLayout.setVisibility(View.VISIBLE);
+                qrImageView.setVisibility(View.VISIBLE);
 
                 if (imageBytes != null && imageBytes.length > 0) {
                     Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);

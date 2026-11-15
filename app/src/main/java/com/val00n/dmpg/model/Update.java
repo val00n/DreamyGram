@@ -7,6 +7,7 @@ import cc.nnproject.json.JSONObject;
 
 public class Update {
     public int update_id;
+    public boolean exact;
     public int max_id;
     public String from_id;
     public String user_id;
@@ -22,6 +23,7 @@ public class Update {
     public Update(JSONObject json) {
         JSONObject u = json.getObject("update");
         update_id = json.getInt("update_id", -1);
+        exact = json.getBoolean("exact", false);
 
         type = u.getNullableString("_");
         if (u.has("message")) {

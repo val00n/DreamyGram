@@ -31,6 +31,7 @@ public class CacheManager {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newFixedThreadPool(2);
     private final Object diskTrimLock = new Object();
+    private final java.util.Set<String> failedImageKeys = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
 
     private static final long AVATAR_TTL_MILLIS = 10L * 24 * 60 * 60 * 1000; // TODO: unhardcode
     private static final long FILES_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000; // TODO: unhardcode
@@ -218,46 +219,53 @@ public class CacheManager {
     }
 
     public void loadImage(final String peer, final String messageId, final FileParams fileParams, final ImageCallback callback) {
-        final Bitmap cached = memoryCache.get(peer + messageId);
+        final boolean preview = fileParams != null && !fileParams.equals(FileParams.original());
+        final String key = "img_" + peer + "_" + messageId + (preview ? "_p" : "");
+
+        if (failedImageKeys.contains(key)) {
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    callback.onError(new Exception("Cached image error"));
+                }
+            });
+            return;
+        }
+
+        final Bitmap cached = memoryCache.get(key);
         if (cached != null) {
             deliverLoadedImage(callback, cached);
             return;
         }
-
-        final boolean preview = fileParams != null && !fileParams.equals(FileParams.original());
-
         Bitmap cachedUnderLock;
         boolean owner = false;
         synchronized (imageInFlight) {
-            cachedUnderLock = memoryCache.get(peer + messageId);
+            cachedUnderLock = memoryCache.get(key);
             if (cachedUnderLock == null) {
-                ArrayList<ImageCallback> queue = imageInFlight.get(peer + messageId);
+                ArrayList<ImageCallback> queue = imageInFlight.get(key);
                 if (queue != null) {
                     queue.add(callback);
                     return;
                 }
-
                 queue = new ArrayList<ImageCallback>();
                 queue.add(callback);
-                imageInFlight.put(peer + messageId, queue);
+                imageInFlight.put(key, queue);
                 owner = true;
             }
         }
-
         if (cachedUnderLock != null) {
             deliverLoadedImage(callback, cachedUnderLock);
             return;
         }
-
         if (owner) {
             ioExecutor.execute(new Runnable() {
                 @Override
                 public void run() {
+                    Bitmap fallbackBitmap = null;
                     try {
                         final CacheFile cacheFile = dbHelper.findFile(peer, messageId, preview);
                         final long now = System.currentTimeMillis();
                         final boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= FILES_TTL_MILLIS;
-                        final String key = peer + messageId;
 
                         if (cacheFile != null) {
                             Bitmap bitmap;
@@ -272,6 +280,7 @@ public class CacheManager {
                             }
 
                             if (bitmap != null) {
+                                fallbackBitmap = bitmap;
                                 memoryCache.put(key, bitmap);
 
                                 if (fresh || !App.isNetworkAvailable()) {
@@ -288,15 +297,18 @@ public class CacheManager {
                         String userToken = App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
 
                         if (!App.isNetworkAvailable()) {
-                            finishErrorImage(key, new Exception("Offline"));
+                            if (fallbackBitmap != null) finishLoadedImage(key, fallbackBitmap);
+                            else finishErrorImage(key, new Exception("Offline"));
                             return;
                         }
+                        final Bitmap finalFallback = fallbackBitmap;
 
                         mpgService.getFile(peer, messageId, fileParams, userToken, new MPGramService.ApiCallback<byte[]>() {
                             @Override
                             public void onSuccess(final byte[] imageBytes) {
                                 if (imageBytes == null || imageBytes.length == 0) {
-                                    finishErrorImage(key, new Exception("Empty bitmap"));
+                                    if (finalFallback != null) finishLoadedImage(key, finalFallback);
+                                    else finishErrorImage(key, new Exception("Empty bitmap"));
                                     return;
                                 }
 
@@ -323,22 +335,28 @@ public class CacheManager {
                                         memoryCache.put(key, bitmap);
                                         finishLoadedImage(key, bitmap);
                                     } else {
-                                        finishErrorImage(key, new Exception("Fresh bitmap is null"));
+                                        if (finalFallback != null) finishLoadedImage(key, finalFallback);
+                                        else finishErrorImage(key, new Exception("Fresh bitmap is null"));
                                     }
                                 } catch (Exception e) {
-                                    finishErrorImage(key, e);
+                                    if (finalFallback != null) finishLoadedImage(key, finalFallback);
+                                    else finishErrorImage(key, e);
                                     return;
                                 }
                             }
 
                             @Override
                             public void onError(Exception error) {
-                                error.printStackTrace();
-                                finishErrorImage(key, error);
+                                if (error != null && error.getMessage() != null && error.getMessage().contains("HTTP 500")) {
+                                    failedImageKeys.add(key);
+                                }
+
+                                if (finalFallback != null) finishLoadedImage(key, finalFallback);
+                                else finishErrorImage(key, error);
                             }
                         });
                     } catch (Exception e) {
-                        finishErrorImage(peer + messageId, e);
+                        finishErrorImage(key, e);
                     }
                 }
             });
@@ -449,7 +467,13 @@ public class CacheManager {
     }
 
     public String loadDialogs() {
+        if (!FileHelper.isFileExist("dialogs", true)) return null;
         return fileHelper.loadFileText("dialogs", true); // bruh 2
+    }
+
+    public boolean hasCachedDialogs() {
+        File file = new File(fileHelper.getFullAppdataPath("dialogs"));
+        return file.exists() && file.length() > 0;
     }
 
     public void saveCachedFileToMedia(final String peer, final String messageId, final String targetName, final boolean preferNonPreview, final SaveFileCallback callback) {
@@ -589,5 +613,47 @@ public class CacheManager {
                 currentSize -= oldest.size;
             }
         }
+    }
+
+    public void wipeCache(final Runnable onDone) {
+        memoryCache.trimToSize(0);
+
+        synchronized (imageInFlight) {
+            imageInFlight.clear();
+        }
+
+        failedImageKeys.clear();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    dbHelper.clearFiles();
+                    dbHelper.clearHistory();
+                    dbHelper.clearPending();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    File dir = new File(FileHelper.getAppDataDirectoryPath());
+                    File[] files = dir.listFiles();
+
+                    if (files != null) {
+                        for (File file : files) {
+                            if (file.isFile() && !"instances.json".equals(file.getName())) {
+                                file.delete();
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                if (onDone != null) {
+                    mainHandler.post(onDone);
+                }
+            }
+        }, "cache-wipe").start();
     }
 }

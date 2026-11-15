@@ -127,6 +127,10 @@ public class FileHelper {
     public byte[] loadFileBytes(String fileName, String directory) {
         File file = new File(directory, fileName);
 
+        if (!file.exists()) {
+            return null;
+        }
+
         FileInputStream fis = null;
         ByteArrayOutputStream bos = null;
         try {

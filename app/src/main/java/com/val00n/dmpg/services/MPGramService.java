@@ -37,10 +37,15 @@ public class MPGramService {
 
     private final ExecutorService updatesExecutor = Executors.newSingleThreadExecutor();
     private final Object updatesLock = new Object();
+
     private volatile boolean updatesInFlight = false;
+    private volatile long pollTokenSeq = 0;
+    private volatile long activePollToken = 0;
+    private volatile boolean cancelDispatched = false;
 
     private static final int GET_HISTORY_LIMIT = 30; // TODO change this in settings
-    private static final int CHECK_AUTH_TIMEOUT = 2;
+    private static final int CHECK_AUTH_TIMEOUT = 10;
+    private static final int PROBE_HISTORY_LIMIT = 5;
 
     public static final int AVATAR_SIZE = 48; // TODO change this in settings
     public static final String FILE_PREVIEW_SIZE = "256"; // TODO change this in settings
@@ -57,6 +62,33 @@ public class MPGramService {
         void onCancelled();
     }
 
+    public static class PollCancelledException extends Exception {
+        public PollCancelledException() { super("Poll session cancelled"); }
+    }
+
+    public long beginPollSession(String userToken) {
+        long token; boolean needCancel = false;
+        synchronized (updatesLock) {
+            token = ++pollTokenSeq;
+            activePollToken = token;
+            if (updatesInFlight && !cancelDispatched) { cancelDispatched = true; needCancel = true; }
+        }
+        if (needCancel && userToken != null) cancelUpdates(userToken, null);
+        return token;
+    }
+
+    public void endPollSession(long token, String userToken) {
+        boolean needCancel = false;
+        synchronized (updatesLock) {
+            if (activePollToken != token) return;
+            activePollToken = 0;
+            if (updatesInFlight && !cancelDispatched) { cancelDispatched = true; needCancel = true; }
+        }
+        if (needCancel && userToken != null) cancelUpdates(userToken, null);
+    }
+
+    public boolean isPollTokenActive(long token) { return token != 0 && activePollToken == token; }
+
     public MPGramService(int threads) {
         this.restClient = new RestClient();
         executor = Executors.newFixedThreadPool(threads);
@@ -66,10 +98,11 @@ public class MPGramService {
 
     public void refreshInstance() {
         instance = instanceManager.getSelectedInstance();
+        Log.d(TAG, "refreshInstance: " + (instance != null ? instance.baseURL : "null"));
     }
 
     private Map<String, String> buildHeaders(String userToken, boolean includeInstancePassword, boolean includeClientInfo) {
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new HashMap<String, String>();
         if (userToken != null && userToken.length() > 0) {
             headers.put("X-MPGRAM-USER", userToken);
         }
@@ -102,7 +135,8 @@ public class MPGramService {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getDialogs"); // i hate it. but i think this is only way to do something with telegram itself
         queryParams.put("v", pickedInstance.apiVersion);
-        queryParams.put("limit", Integer.toString(2));
+        queryParams.put("limit", "1");
+        queryParams.put("fields", "dialogs");
 
         final Map<String, String> headers = buildHeaders(userToken, false, true);
 
@@ -110,10 +144,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(pickedInstance.baseURL, pickedInstance.apiEndpoint, CHECK_AUTH_TIMEOUT, queryParams, headers);
-                    boolean result = stringResponse.contains("\"dialogs\":");
+                    String stringResponse = restClient.postString(pickedInstance.baseURL, pickedInstance.apiEndpoint, CHECK_AUTH_TIMEOUT, queryParams, headers, pickedInstance.disableCertCheck);
 
-                    Log.d(TAG, "checkAuth (getDialogs) Raw Response (" + pickedInstance.baseURL + "/" + pickedInstance.apiEndpoint + "): " + stringResponse);
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
+                    boolean result = stringResponse.contains("\"dialogs\":");
+                    Log.d(TAG, "checkAuth (getDialogs) Raw Response ( " + stringResponse + " )");
                     if (callback != null) callback.onSuccess(result);
                 } catch (IOException e) {
                     String msg = e.getMessage();
@@ -121,7 +162,7 @@ public class MPGramService {
                     if (msg != null) {
                         msg = msg.toLowerCase();
 
-                        if ((msg.contains("401") || msg.contains("authentication challenge") || msg.contains("unsupported API version"))) {
+                        if ((msg.contains("401") || msg.contains("authentication challenge") || msg.contains("unsupported api version"))) {
                             // code 401 means that session is expired
                             // ugly as hell, needs refactor
 
@@ -167,11 +208,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
                     User response = new User(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
@@ -196,7 +243,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -223,7 +270,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -249,7 +296,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "poll Raw Response: " + stringResponse);
 
@@ -274,7 +321,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    byte[] imageBytes = restClient.getBytes(instance.baseURL, instance.apiEndpoint, queryParams);
+                    byte[] imageBytes = restClient.getBytes(instance.baseURL, instance.apiEndpoint, queryParams, instance.disableCertCheck);
 
                     if (callback != null) callback.onSuccess(imageBytes);
                 } catch (IOException e) {
@@ -298,7 +345,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -327,7 +374,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -354,7 +401,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -382,7 +429,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -405,7 +452,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    byte[] imageBytes = restClient.getBytes(instance.baseURL, instance.qrcodeEndpoint, queryParams);
+                    byte[] imageBytes = restClient.getBytes(instance.baseURL, instance.qrcodeEndpoint, queryParams, instance.disableCertCheck);
 
                     if (callback != null) callback.onSuccess(imageBytes);
                 } catch (Exception e) {
@@ -427,7 +474,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -462,11 +509,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
                     if (cache && parsedJson.has("count") && !parsedJson.has("error")) {
                         App.getCacheManager().saveDialogs(stringResponse);
                     }
@@ -505,11 +558,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
                     if (cache && parsedJson.has("messages") && !parsedJson.has("error")) {
                         App.getCacheManager().saveHistory(peer, System.currentTimeMillis(), stringResponse);
                     }
@@ -517,6 +576,41 @@ public class MPGramService {
                     HistoryResponse response = new HistoryResponse(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
+                } catch (Exception e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
+    public void getRecentMessages(String peer, String userToken,
+                                  final ApiCallback<HistoryResponse> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "getHistory");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("peer", peer);
+        queryParams.put("limit", Integer.toString(PROBE_HISTORY_LIMIT));
+        queryParams.put("media", "0");
+        queryParams.put("fields", "messages");
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
+                    if (callback != null) {
+                        callback.onSuccess(new HistoryResponse(parsedJson));
+                    }
                 } catch (Exception e) {
                     if (callback != null) callback.onError(e);
                 }
@@ -556,11 +650,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
                     String response = parsedJson.getNullableString("res");
 
                     if (callback != null) callback.onSuccess(response);
@@ -588,11 +688,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
                     String response = parsedJson.getNullableString("res");
 
                     if (callback != null) callback.onSuccess(response);
@@ -617,11 +723,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
                     String response = parsedJson.getNullableString("res");
 
                     if (callback != null) callback.onSuccess(response);
@@ -637,14 +749,7 @@ public class MPGramService {
     }
 
     public void getUpdates(String peer, String[] filter, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, String userToken, final ApiCallback<ArrayList<Update>> callback) {
-        synchronized (updatesLock) {
-            if (updatesInFlight) {
-                if (callback != null) callback.onError(
-                        new IllegalStateException("Updates polling already in progress"));
-                return;
-            }
-            updatesInFlight = true;
-        }
+        final long enqueuedToken = activePollToken;
 
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "updates");
@@ -675,8 +780,14 @@ public class MPGramService {
         updatesExecutor.execute(new Runnable() {
             @Override
             public void run() {
+                if (enqueuedToken != activePollToken) {
+                    if (callback != null) callback.onError(new PollCancelledException());
+                    return;
+                }
+                synchronized (updatesLock) { updatesInFlight = true; cancelDispatched = false; }
+
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, timeoutSeconds, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, timeoutSeconds, queryParams, headers, instance.disableCertCheck);
                     stringResponse = stringResponse.trim();
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
@@ -693,10 +804,17 @@ public class MPGramService {
                         Log.d(TAG, parsedJson.getObject("error").getString("stack_trace", "(no stack trace)"));
                     } else {
                         JSONArray res = parsedJson.getArray("res");
-                        ArrayList<Update> response= new ArrayList<Update>();
+                        ArrayList<Update> response = new ArrayList<Update>();
+                        java.util.HashSet<Integer> seenUpdateIds = new java.util.HashSet<Integer>();
 
                         for (int i = 0; i < res.size(); i++) {
-                            response.add(new Update(res.getObject(i)));
+                            Update update = new Update(res.getObject(i));
+
+                            if (update.update_id > 0 && !seenUpdateIds.add(update.update_id)) {
+                                continue;
+                            }
+
+                            response.add(update);
                         }
 
                         if (callback != null) callback.onSuccess(response);
@@ -704,29 +822,34 @@ public class MPGramService {
                 } catch (Exception e) {
                     if (callback != null) callback.onError(e);
                 } finally {
-                    synchronized (updatesLock) { updatesInFlight = false; }
+                    synchronized (updatesLock) { updatesInFlight = false; cancelDispatched = false; }
                 }
             }
         });
     }
 
     public void getLastUpdate(String userToken, final int timeoutSeconds, final ApiCallback<Update> callback) {
-        getLastUpdate(null, userToken, timeoutSeconds, callback);
+        getLastUpdate(null, null, userToken, timeoutSeconds, callback);
     }
 
     public void getLastUpdate(String peer, String userToken, final int timeoutSeconds, final ApiCallback<Update> callback) {
+        getLastUpdate(peer, null, userToken, timeoutSeconds, callback);
+    }
+
+    public void getLastUpdate(String peer, String messageId, String userToken, final int timeoutSeconds, final ApiCallback<Update> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getLastUpdate");
         queryParams.put("v", instance.apiVersion);
         if (peer != null) queryParams.put("peer", peer);
+        if (messageId != null) queryParams.put("id", messageId);
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
-        executor.execute(new Runnable() {
+        updatesExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, timeoutSeconds, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, timeoutSeconds, queryParams, headers, instance.disableCertCheck);
                     stringResponse = stringResponse.trim();
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
@@ -764,7 +887,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -791,11 +914,17 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
                     User response = new User(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
@@ -817,7 +946,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    byte[] imageBytes = restClient.postBytes(instance.baseURL, instance.avatarEndpoint, queryParams, headers);
+                    byte[] imageBytes = restClient.postBytes(instance.baseURL, instance.avatarEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     if (callback != null) callback.onSuccess(imageBytes);
                 } catch (Exception e) {
@@ -842,7 +971,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    byte[] fileBytes = restClient.postBytes(instance.baseURL, instance.fileEndpoint, queryParams, headers);
+                    byte[] fileBytes = restClient.postBytes(instance.baseURL, instance.fileEndpoint, queryParams, headers, instance.disableCertCheck);
 
                     if (callback != null) callback.onSuccess(fileBytes);
                 } catch (Throwable t) {
@@ -875,7 +1004,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    restClient.downloadFile(instance.baseURL, instance.fileEndpoint, queryParams, headers, targetFile, task);
+                    restClient.downloadFile(instance.baseURL, instance.fileEndpoint, queryParams, headers, targetFile, instance.disableCertCheck, task);
 
                     if (task.isCancelled()) {
                         deleteQuietly(targetFile);
@@ -914,7 +1043,7 @@ public class MPGramService {
             @Override
             public void run() {
                 try {
-                    String stringResponse = restClient.postString(pickedInstance.baseURL, pickedInstance.apiEndpoint, queryParams, headers);
+                    String stringResponse = restClient.postString(pickedInstance.baseURL, pickedInstance.apiEndpoint, queryParams, headers, pickedInstance.disableCertCheck);
 
                     Log.d(TAG, "Raw API Response: " + stringResponse);
 
@@ -973,5 +1102,13 @@ public class MPGramService {
             return (Exception) t;
         }
         return new Exception(t);
+    }
+
+    private Exception extractJsonError(JSONObject parsedJson) {
+        if (parsedJson != null && parsedJson.has("error")) {
+            JSONObject err = parsedJson.getObject("error");
+            return new Exception(err != null ? err.getString("message", "(no message)") : "(no message)");
+        }
+        return null;
     }
 }

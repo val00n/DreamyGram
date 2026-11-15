@@ -44,12 +44,16 @@ public class LoginPhoneActivity extends Activity {
     private String captchaId;
     private String phoneNumber;
     private String phoneCodeHash;
+    private String loginBaseUrl;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.login_phone);
 
         mpgService = App.getMPGramService();
+
+        loginBaseUrl = App.getInstanceManager().getSelectedInstanceBaseUrl();
+        mpgService.refreshInstance();
 
         progressBar = (ProgressBar) findViewById(R.id.loginPhoneProgressBar);
         phoneNumberLayout = (LinearLayout) findViewById(R.id.loginPhoneNumberLayout);
@@ -201,7 +205,7 @@ public class LoginPhoneActivity extends Activity {
             @Override
             public void onSuccess(final AuthResponse response) {
                 if ("1".equals(response.response)) {
-                    App.getSessionManager().saveSession(userToken);
+                    App.getSessionManager().saveSession(userToken, loginBaseUrl);
                     navigateToMain(userToken);
                 } else if ("password".equals(response.response)) {
                     navigateTo2FA(userToken);

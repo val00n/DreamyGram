@@ -3,6 +3,7 @@ package com.val00n.dmpg.ui.chat;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,6 +25,8 @@ import com.val00n.dmpg.ui.ImageViewBinder;
 import com.val00n.dmpg.utils.DateUtils;
 import java.util.ArrayList;
 import java.util.Map;
+
+import static android.content.ContentValues.TAG;
 
 public class MessagesAdapter extends BaseAdapter {
 
@@ -207,13 +210,12 @@ public class MessagesAdapter extends BaseAdapter {
         }
 
         LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) holder.textLayout.getLayoutParams();
-        lp.setMargins(
-                rowMarginPx,
-                row.grouped ? 0 : rowMarginPx,
-                rowMarginPx,
-                row.grouped ? 0 : rowMarginPx
-        );
-        holder.textLayout.setLayoutParams(lp);
+        int vMargin = row.grouped ? 0 : rowMarginPx;
+        if (lp.leftMargin != rowMarginPx || lp.rightMargin != rowMarginPx
+                || lp.topMargin != vMargin || lp.bottomMargin != vMargin) {
+            lp.setMargins(rowMarginPx, vMargin, rowMarginPx, vMargin);
+            holder.textLayout.setLayoutParams(lp);
+        }
 
         if (row.quoteText != null) {
             holder.quoteLayout.setVisibility(View.VISIBLE);
@@ -253,6 +255,7 @@ public class MessagesAdapter extends BaseAdapter {
 
                 holder.image.setVisibility(View.GONE);
                 holder.image.setOnClickListener(null);
+                holder.image.setTag(null);
                 holder.image.setImageDrawable(null);
                 holder.image.setSourceSize(0, 0);
                 if (holder.playOverlay != null) {
@@ -262,6 +265,7 @@ public class MessagesAdapter extends BaseAdapter {
             } else if (row.isPhoto || row.isSticker) {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
+                    holder.album.unbind();
                 }
                 holder.image.setVisibility(View.VISIBLE);
                 holder.image.square(false);
@@ -270,35 +274,10 @@ public class MessagesAdapter extends BaseAdapter {
                 }
                 holder.file.setVisibility(View.GONE);
 
-                holder.image.setImageDrawable(null);
                 holder.image.setSourceSize(row.mediaWidth, row.mediaHeight);
+                updateImageLayoutParams(holder.image, row.isSticker, viewType);
 
                 final String imagePeer = row.chatPeer != null ? row.chatPeer : row.peer;
-
-                ViewGroup.LayoutParams layoutParams = holder.image.getLayoutParams();
-                if (row.isSticker) {
-                    if (layoutParams instanceof FrameLayout.LayoutParams) {
-                        FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) layoutParams;
-                        if (flp.width != stickerSizePx || flp.height != stickerSizePx) {
-                            flp.width = stickerSizePx;
-                            flp.height = stickerSizePx;
-                            flp.gravity = android.view.Gravity.RIGHT;
-                            holder.image.setLayoutParams(flp);
-                        }
-                    }
-                } else {
-                    if (layoutParams instanceof FrameLayout.LayoutParams) {
-                        FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) layoutParams;
-                        if (flp.width != ViewGroup.LayoutParams.MATCH_PARENT ||
-                                flp.height != ViewGroup.LayoutParams.WRAP_CONTENT) {
-                            flp.width = ViewGroup.LayoutParams.MATCH_PARENT;
-                            flp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                            flp.gravity = android.view.Gravity.RIGHT;
-                            holder.image.setLayoutParams(flp);
-                        }
-                    }
-                    holder.image.setSourceSize(row.mediaWidth, row.mediaHeight);
-                }
 
                 holder.image.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -313,15 +292,23 @@ public class MessagesAdapter extends BaseAdapter {
                     }
                 });
 
-                imageViewBinder.bind(holder.image, imagePeer, row.messageId, FileParams.preview());
+                FileParams params = (row.isSticker
+                        && ("application/x-tgsticker".equals(row.mediaMime)
+                        || "video/webm".equals(row.mediaMime)))
+                        ? FileParams.fileThumb()
+                        : FileParams.preview();
+
+                imageViewBinder.bind(holder.image, imagePeer, row.messageId, row.thumb, params);
             } else if (row.isVideo) {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
+                    holder.album.unbind();
                 }
                 holder.image.setVisibility(View.VISIBLE);
                 holder.image.square(true);
+                holder.image.setSourceSize(0, 0);
+                updateImageLayoutParams(holder.image, false, viewType);
                 holder.file.setVisibility(View.GONE);
-                holder.image.setImageDrawable(null);
 
                 if (holder.playOverlay != null) {
                     holder.playOverlay.setVisibility(View.VISIBLE);
@@ -329,7 +316,7 @@ public class MessagesAdapter extends BaseAdapter {
 
                 final String imagePeer = row.chatPeer != null ? row.chatPeer : row.peer;
 
-                imageViewBinder.bind(holder.image, imagePeer, row.messageId, FileParams.fileThumb());
+                imageViewBinder.bind(holder.image, imagePeer, row.messageId, row.thumb, FileParams.fileThumb());
 
                 holder.image.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -344,8 +331,11 @@ public class MessagesAdapter extends BaseAdapter {
             } else if (row.isFile) {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
+                    holder.album.unbind();
                 }
                 holder.image.setVisibility(View.GONE);
+                holder.image.setTag(null);
+                holder.image.setImageDrawable(null);
                 if (holder.playOverlay != null) {
                     holder.playOverlay.setVisibility(View.GONE);
                 }
@@ -354,8 +344,11 @@ public class MessagesAdapter extends BaseAdapter {
             } else {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
+                    holder.album.unbind();
                 }
                 holder.image.setVisibility(View.GONE);
+                holder.image.setTag(null);
+                holder.image.setImageDrawable(null);
                 if (holder.playOverlay != null) {
                     holder.playOverlay.setVisibility(View.GONE);
                 }
@@ -364,8 +357,11 @@ public class MessagesAdapter extends BaseAdapter {
         } else {
             if (holder.album != null) {
                 holder.album.setVisibility(View.GONE);
+                holder.album.unbind();
             }
             holder.image.setVisibility(View.GONE);
+            holder.image.setTag(null);
+            holder.image.setImageDrawable(null);
             if (holder.playOverlay != null) {
                 holder.playOverlay.setVisibility(View.GONE);
             }
@@ -470,6 +466,7 @@ public class MessagesAdapter extends BaseAdapter {
             row.mediaHeight = item.media.height;
             row.mediaType = item.media.type;
             row.mediaMime = item.media.mime;
+            row.thumb = item.media.thumb;
         }
 
         if (outgoing) {
@@ -642,6 +639,7 @@ public class MessagesAdapter extends BaseAdapter {
                 child.mediaWidth = message.media.width;
                 child.mediaHeight = message.media.height;
                 child.mediaType = message.media.type;
+                child.thumb = message.media.thumb;
             }
 
             group.items.add(child);
@@ -809,6 +807,55 @@ public class MessagesAdapter extends BaseAdapter {
         String id = item.from_id != null && item.from_id.length() > 0 ? item.from_id : item.peer_id;
         String prevId = prev.from_id != null && prev.from_id.length() > 0 ? prev.from_id : prev.peer_id;
         return id != null && id.equals(prevId);
+    }
+
+    public int findRowPositionByMessageId(int messageId) {
+        for (int i = 0; i < rows.size(); i++) {
+            MessageRow row = rows.get(i);
+            if (row.message != null && row.message.id == messageId) {
+                return i;
+            }
+            if (row.mediaGroup != null) {
+                for (int j = 0; j < row.mediaGroup.items.size(); j++) {
+                    MessageRow child = row.mediaGroup.items.get(j);
+                    if (child.message != null && child.message.id == messageId) {
+                        return i;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+    public int findAnchorMessageId(int startPosition) {
+        for (int i = Math.max(0, startPosition); i < rows.size(); i++) {
+            MessageRow row = rows.get(i);
+            if (row.message != null && row.message.id > 0) {
+                return row.message.id;
+            }
+        }
+        return -1;
+    }
+
+    private void updateImageLayoutParams(AspectImageView image, boolean isSticker, int viewType) {
+        ViewGroup.LayoutParams layoutParams = image.getLayoutParams();
+        if (!(layoutParams instanceof FrameLayout.LayoutParams)) {
+            return;
+        }
+
+        FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) layoutParams;
+        int targetWidth = isSticker ? stickerSizePx : ViewGroup.LayoutParams.MATCH_PARENT;
+        int targetHeight = isSticker ? stickerSizePx : ViewGroup.LayoutParams.WRAP_CONTENT;
+        int targetGravity = (isSticker && viewType == VIEW_TYPE_OUT)
+                ? android.view.Gravity.RIGHT
+                : android.view.Gravity.LEFT;
+
+        if (flp.width != targetWidth || flp.height != targetHeight || flp.gravity != targetGravity) {
+            flp.width = targetWidth;
+            flp.height = targetHeight;
+            flp.gravity = targetGravity;
+            image.setLayoutParams(flp);
+        }
     }
 
     static class ViewHolder {

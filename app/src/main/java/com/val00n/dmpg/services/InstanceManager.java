@@ -3,13 +3,11 @@ package com.val00n.dmpg.services;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
-
+import com.val00n.dmpg.App;
 import com.val00n.dmpg.model.Instance;
-
 import java.util.ArrayList;
 import cc.nnproject.json.JSONArray;
 import cc.nnproject.json.JSONObject;
-
 import static android.content.ContentValues.TAG;
 
 public class InstanceManager {
@@ -65,8 +63,12 @@ public class InstanceManager {
     }
 
     public void selectInstance(int index) {
+        if (instances == null || index < 0 || index >= instances.size()) return;
+
         selectedInstanceIndex = index;
         saveSelectedIndex();
+
+        App.getMPGramService().refreshInstance();
     }
 
     public void addInstance(Instance instance) {
@@ -78,13 +80,20 @@ public class InstanceManager {
         instances.set(index, instance);
         saveInstances(instances);
     }
-
+    
     public void deleteInstance(int index) {
+        if (instances == null || index < 0 || index >= instances.size()) {
+            return;
+        }
+
+        if (instances.size() <= 1) {
+            Log.d(TAG, "deleteInstance: At least one instance is required");
+            return;
+        }
+
         instances.remove(index);
 
-        if (instances.isEmpty()) {
-            selectedInstanceIndex = 0;
-        } else if (index < selectedInstanceIndex) {
+        if (index < selectedInstanceIndex) {
             selectedInstanceIndex--;
         } else if (index == selectedInstanceIndex) {
             selectedInstanceIndex = Math.max(0, instances.size() - 1);
@@ -92,40 +101,57 @@ public class InstanceManager {
 
         saveInstances(instances);
         saveSelectedIndex();
+
+        App.getMPGramService().refreshInstance();
     }
 
     public void loadInstances() {
         if (fileHelper.isFileExist(INSTANCES_FILENAME, true)) {
             String json = fileHelper.loadFileText(INSTANCES_FILENAME, true);
+
             if (json == null || json.length() == 0) {
                 addDefaultInstances();
-                return;
-            }
+            } else {
+                try {
+                    JSONArray arr = new JSONArray(json);
+                    if (arr != null && arr.size() > 0) {
+                        instances = new ArrayList<Instance>();
 
-            JSONArray arr = new JSONArray(json);
-            if (arr != null && arr.size() > 0) {
-                instances = new ArrayList<Instance>();
-                for (int i = 0; i < arr.size(); i++) {
-                    JSONObject obj = (JSONObject) arr.get(i);
-                    if (obj.getNullable("baseURL") == null) {
-                        continue;
+                        for (int i = 0; i < arr.size(); i++) {
+                            JSONObject obj = (JSONObject) arr.get(i);
+                            if (obj.getNullable("baseURL") == null) {
+                                continue;
+                            }
+
+                            Instance instance = new Instance(obj.getNullable("baseURL").toString());
+
+                            instance.apiEndpoint = obj.getNullable("apiEndpoint") != null ? obj.getNullable("apiEndpoint").toString() : "api.php";
+                            instance.avatarEndpoint = obj.getNullable("avatarEndpoint") != null ? obj.getNullable("avatarEndpoint").toString() : "ava.php";
+                            instance.fileEndpoint = obj.getNullable("fileEndpoint") != null ? obj.getNullable("fileEndpoint").toString() : "file.php";
+                            instance.voiceEndpoint = obj.getNullable("voiceEndpoint") != null ? obj.getNullable("voiceEndpoint").toString() : "voice.php";
+                            instance.qrcodeEndpoint = obj.getNullable("qrcodeEndpoint") != null ? obj.getNullable("qrcodeEndpoint").toString() : "qrcode.php";
+                            instance.apiVersion = obj.getNullable("apiVersion") != null ? obj.getNullable("apiVersion").toString() : "12";
+                            instance.instancePassword = obj.getNullable("instancePassword") != null ? obj.getNullable("instancePassword").toString() : "";
+
+                            instances.add(instance);
+                        }
                     }
-
-                    Instance instance = new Instance(obj.getNullable("baseURL").toString());
-
-                    instance.apiEndpoint = obj.getNullable("apiEndpoint") != null ? obj.getNullable("apiEndpoint").toString() : "api.php";
-                    instance.avatarEndpoint = obj.getNullable("avatarEndpoint") != null ? obj.getNullable("avatarEndpoint").toString() : "ava.php";
-                    instance.fileEndpoint = obj.getNullable("fileEndpoint") != null ? obj.getNullable("fileEndpoint").toString() : "file.php";
-                    instance.voiceEndpoint = obj.getNullable("voiceEndpoint") != null ? obj.getNullable("voiceEndpoint").toString() : "voice.php";
-                    instance.qrcodeEndpoint = obj.getNullable("qrcodeEndpoint") != null ? obj.getNullable("qrcodeEndpoint").toString() : "qrcode.php";
-                    instance.apiVersion = obj.getNullable("apiVersion") != null ? obj.getNullable("apiVersion").toString() : "12";
-                    instance.instancePassword = obj.getNullable("instancePassword") != null ? obj.getNullable("instancePassword").toString() : "";
-
-                    instances.add(instance);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    instances = null;
                 }
             }
         } else {
             addDefaultInstances();
+        }
+
+        if (instances == null || instances.isEmpty()) {
+            addDefaultInstances();
+        }
+
+        if (selectedInstanceIndex < 0 || selectedInstanceIndex >= instances.size()) {
+            selectedInstanceIndex = 0;
+            saveSelectedIndex();
         }
     }
 
@@ -179,7 +205,7 @@ public class InstanceManager {
         nnchan.instancePassword = "";
         instances.add(nnchan);
 
-        Instance nnchan2 = new Instance("http://10.0.2.2.");
+        Instance nnchan2 = new Instance("http://10.0.2.2");
         nnchan2.apiEndpoint = "api.php";
         nnchan2.avatarEndpoint = "ava.php";
         nnchan2.fileEndpoint = "file.php";
@@ -189,5 +215,7 @@ public class InstanceManager {
         nnchan2.disableCertCheck = false;
         nnchan2.instancePassword = "";
         instances.add(nnchan2);
+
+        saveInstances(instances);
     }
 }

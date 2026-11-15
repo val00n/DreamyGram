@@ -324,4 +324,8 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
     public void clearHistory() {
         getWritableDatabase().delete("chats", null, null);
     }
+
+    public void clearPending() {
+        getWritableDatabase().delete("pending", null, null);
+    }
 }

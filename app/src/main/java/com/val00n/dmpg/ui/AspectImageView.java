@@ -11,6 +11,7 @@ public class AspectImageView extends ImageView {
     private float maxRatio = 0f;
     private int srcW, srcH;
     private boolean square;
+    private boolean ignoreRequestLayout;
 
     public AspectImageView(Context c) { super(c); }
     public AspectImageView(Context c, AttributeSet a) { super(c, a); }
@@ -32,7 +33,10 @@ public class AspectImageView extends ImageView {
     }
 
     public void square(boolean square) {
-        this.square = square;
+        if (this.square != square) {
+            this.square = square;
+            requestLayout();
+        }
     }
 
     @Override
@@ -74,5 +78,39 @@ public class AspectImageView extends ImageView {
         else if (hMode == MeasureSpec.AT_MOST) h = Math.min(h, hSize);
 
         setMeasuredDimension(w, Math.max(h, 1));
+    }
+
+    @Override
+    public void requestLayout() {
+        if (ignoreRequestLayout) {
+            return;
+        }
+        super.requestLayout();
+    }
+
+    @Override
+    public void setImageDrawable(Drawable drawable) {
+        boolean suppress = hasKnownSize() && getWidth() > 0 && getHeight() > 0;
+        if (suppress) ignoreRequestLayout = true;
+        try {
+            super.setImageDrawable(drawable);
+        } finally {
+            ignoreRequestLayout = false;
+        }
+    }
+
+    @Override
+    public void setImageResource(int resId) {
+        boolean suppress = hasKnownSize() && getWidth() > 0 && getHeight() > 0;
+        if (suppress) ignoreRequestLayout = true;
+        try {
+            super.setImageResource(resId);
+        } finally {
+            ignoreRequestLayout = false;
+        }
+    }
+
+    private boolean hasKnownSize() {
+        return square || (srcW > 0 && srcH > 0);
     }
 }

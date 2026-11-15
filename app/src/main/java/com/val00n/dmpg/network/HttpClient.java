@@ -10,6 +10,15 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.HttpsURLConnection;
 
 public class HttpClient {
     private static final int DEFAULT_TIMEOUT = 25000;
@@ -27,12 +36,13 @@ public class HttpClient {
         void onConnectionOpened(HttpURLConnection connection);
     }
 
-    public static HttpResponse send(HttpRequest request) throws IOException {
-        return send(request, DEFAULT_TIMEOUT, DEFAULT_READ_TIMEOUT);
+    public static HttpResponse send(HttpRequest request, boolean disableCertCheck) throws IOException {
+        return send(request, DEFAULT_TIMEOUT, DEFAULT_READ_TIMEOUT, disableCertCheck);
     }
 
-    public static HttpResponse send(HttpRequest request, int connectTimeout, int readTimeout) throws IOException {
+    public static HttpResponse send(HttpRequest request, int connectTimeout, int readTimeout, boolean disableCertCheck) throws IOException {
         HttpURLConnection connection = null;
+
         try {
             URL url = new URL(request.buildUrl());
             connection = (HttpURLConnection) url.openConnection();
@@ -40,6 +50,10 @@ public class HttpClient {
             connection.setConnectTimeout(connectTimeout);
             connection.setReadTimeout(readTimeout);
             connection.setInstanceFollowRedirects(true);
+
+            if (disableCertCheck && connection instanceof HttpsURLConnection) {
+                configureTrustAll((HttpsURLConnection) connection);
+            }
 
             // headers
             connection.setRequestProperty("User-Agent", userAgent);
@@ -79,15 +93,11 @@ public class HttpClient {
         }
     }
 
-    public static void sendToFile(HttpRequest request, File file) throws IOException {
-        sendToFile(request, file, DEFAULT_TIMEOUT, DEFAULT_READ_TIMEOUT, null);
+    public static void sendToFile(HttpRequest request, File file, boolean disableCertCheck) throws IOException {
+        sendToFile(request, file, DEFAULT_TIMEOUT, DEFAULT_READ_TIMEOUT, disableCertCheck, null);
     }
 
-    public static void sendToFile(HttpRequest request,
-                                  File file,
-                                  int connectTimeout,
-                                  int readTimeout,
-                                  FileDownloadListener listener) throws IOException {
+    public static void sendToFile(HttpRequest request, File file, int connectTimeout, int readTimeout, boolean disableCertCheck, FileDownloadListener listener) throws IOException {
         if (file == null) {
             throw new IOException("file is null");
         }
@@ -111,6 +121,10 @@ public class HttpClient {
 
             connection.setRequestProperty("User-Agent", userAgent);
             connection.setRequestProperty("Accept", "*/*");
+
+            if (disableCertCheck && connection instanceof HttpsURLConnection) {
+                configureTrustAll((HttpsURLConnection) connection);
+            }
 
             for (Map.Entry<String, String> h : request.getHeaders().entrySet()) {
                 connection.setRequestProperty(h.getKey(), h.getValue());
@@ -249,5 +263,24 @@ public class HttpClient {
 
         connection.disconnect();
         return (int) elapsed;
+    }
+
+    private static void configureTrustAll(HttpsURLConnection https) {
+        try {
+            TrustManager[] trustAll = new TrustManager[] {
+                    new X509TrustManager() {
+                        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                        public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                        public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                    }
+            };
+
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAll, new SecureRandom());
+            https.setSSLSocketFactory(sslContext.getSocketFactory());
+            https.setHostnameVerifier(new HostnameVerifier() {
+                public boolean verify(String hostname, SSLSession session) { return true; }
+            });
+        } catch (Exception e) {}
     }
 }

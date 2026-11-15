@@ -56,12 +56,18 @@ public class MainActivity extends Activity {
     private Runnable dialogsUpdateTask;
     private String[] updatesFilter;
     private int loadedDialogs;
+    private final ArrayList<String> dialogsRefreshPeers = new ArrayList<String>();
+    private boolean dialogsRefreshPending = false;
     private boolean forwardMode;
     volatile private boolean isLoading;
     volatile private boolean isPaused;
     volatile private boolean isPolling;
     volatile private boolean isActivityDied;
+
     private volatile boolean cancelInProgress = false;
+    private volatile long pollToken = 0;
+    private volatile boolean hasUpdateOffset = false;
+    private volatile boolean initialSyncInProgress = false;
 
     private ArrayList<Update> updates;
     private String updateLimit = "200";
@@ -70,7 +76,6 @@ public class MainActivity extends Activity {
 
     private App.NetworkListener networkListener;
     private boolean hasCachedDialogs = false;
-    private boolean startedOnce = false;
 
     private static final int OFFLINE_CHECK_MILLIS = 5000;
     private static final int GET_DIALOG_LIMIT = 25; // TODO change this in settings
@@ -84,6 +89,8 @@ public class MainActivity extends Activity {
 
         mpgService = App.getMPGramService();
         instance = App.getInstanceManager().getSelectedInstance();
+        mpgService.refreshInstance();
+
         if (instance.baseURL != null) {
             userToken = App.getSessionManager().loadSession(instance.baseURL);
 
@@ -121,6 +128,10 @@ public class MainActivity extends Activity {
         searchButton = (ImageButton) findViewById(R.id.mainSearchButton);
         settingsButton = (ImageButton) findViewById(R.id.mainSettingsButton);
         networkStatusText = (TextView) findViewById(R.id.mainNetworkStatusText);
+
+        if (getIntent().getBooleanExtra("SERVER_UNAVAILABLE", false)) {
+            showServerUnavailable();
+        }
 
         forwardMode = getIntent().getBooleanExtra("FORWARD_MODE", false); //TODO: meh
         if (forwardMode) {
@@ -174,7 +185,8 @@ public class MainActivity extends Activity {
         dialogsUpdateTask = new Runnable() {
             @Override
             public void run() {
-                if (isActivityDied || isPolling || isPaused) return;
+                final long currentToken = pollToken;
+                if (isActivityDied || isPolling || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
 
                 if (!App.isNetworkAvailable()) {
                     isPolling = false;
@@ -186,58 +198,52 @@ public class MainActivity extends Activity {
                 mpgService.getUpdates(updatesFilter, updateLimit, updateOffset, null, false, UPDATE_TIMEOUT_SECS, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
                     @Override
                     public void onSuccess(ArrayList<Update> result) {
-                        if (isActivityDied) return;
+                        isPolling = false;
+                        if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
 
                         updates = result;
-                        if (updates.size() > 0) {
+                        if (updates != null && updates.size() > 0) {
                             updateOffset = Integer.toString(updates.get(updates.size() - 1).update_id);
 
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
-                                    update(updates);
+                                    if (!isActivityDied && !isPaused) update(updates);
                                 }
                             });
                         }
 
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (!isActivityDied && !isPaused) hideNetworkStatus();
+                            }
+                        });
+
                         updateFails = 0;
-                        isPolling = false;
-                        if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+                        if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
+                            dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+                        }
                     }
 
                     @Override
                     public void onError(Exception error) {
-                        if (isActivityDied) return;
-                        Log.d(TAG, "UPDATE FAILED: " + error.getMessage());
                         isPolling = false;
+                        if (error instanceof MPGramService.PollCancelledException) return;
+                        if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
+                        Log.d(TAG, "UPDATE FAILED: " + error.getMessage());
 
                         if (!App.isSessionDead(error.getMessage(), MainActivity.this)) {
                             if (updateFails > 10) {
-                                mpgService.getLastUpdate(userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
-                                    @Override
-                                    public void onSuccess(Update result) {
-                                        if (result != null) {
-                                            updateOffset = Integer.toString(result.update_id);
-                                        } else {
-                                            updateOffset = "-1";
-                                        }
-
-                                        if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
-                                    }
-
-                                    @Override
-                                    public void onError(Exception error) {
-                                        error.printStackTrace();
-                                        if (!App.isSessionDead(error.getMessage(), MainActivity.this)) {
-                                            if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
-                                        }
-                                    }
-                                });
-
                                 updateFails = 0;
+                                syncLastUpdateAndStartPolling(currentToken);
                             } else {
                                 updateFails++;
-                                if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS * updateFails);
+                                if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
+                                    dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+                                    dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, Math.min(UPDATE_POLL_MILLIS * updateFails, 20000));
+                                }
                             }
                         }
                     }
@@ -290,6 +296,32 @@ public class MainActivity extends Activity {
         if (instance == null || !instance.equals(App.getInstanceManager().getSelectedInstance())) {
             App.selfId = null;
             navigateToStartup();
+            return;
+        }
+
+        String currentToken = App.getSessionManager().loadSession(instance.baseURL);
+        if (currentToken == null || currentToken.length() == 0
+                || userToken == null || !currentToken.equals(userToken)) {
+            App.selfId = null;
+            navigateToStartup();
+            return;
+        }
+
+        isPaused = false;
+        isPolling = false;
+        pollToken = mpgService.beginPollSession(userToken);
+
+        dialogsRefreshPeers.clear();
+        dialogsRefreshPending = false;
+
+        if (App.isNetworkAvailable()) {
+            if ((dialogResponse == null || dialogResponse.dialogs == null || dialogResponse.dialogs.isEmpty()) && !isLoading) {
+                loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
+            } else {
+                tryStartPolling();
+            }
+        } else {
+            onNetworkLost();
         }
     }
 
@@ -298,127 +330,141 @@ public class MainActivity extends Activity {
         isActivityDied = true;
         dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
-
-        mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
-            @Override
-            public void onSuccess(String result) {
-                Log.d(TAG, "onSuccess: canceled updates: " + result);
-            }
-
-            @Override
-            public void onError(Exception error) {
-                error.printStackTrace();
-                Log.d(TAG, "onError: failed to cancel updates: " + error.getMessage());
-            }
-        });
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-
-        isPaused = true;
-
         App.removeNetworkListener(networkListener);
-
-        dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
-        statusUpdateHandler.removeCallbacks(statusUpdateTask);
-
-        if (!App.isNetworkAvailable()) {
-            return;
-        }
-
-        if (!cancelInProgress) {
-            cancelInProgress = true;
-
-            mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
-                @Override
-                public void onSuccess(String result) {
-                    cancelInProgress = false;
-                }
-
-                @Override
-                public void onError(Exception error) {
-                    cancelInProgress = false;
-                }
-            });
-        }
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-
-        isPaused = false;
-
         App.addNetworkListener(networkListener);
+    }
 
-        if (App.isNetworkAvailable()) {
-            if (startedOnce
-                    && (dialogResponse == null
-                    || dialogResponse.dialogs == null
-                    || dialogResponse.dialogs.isEmpty())
-                    && !isLoading) {
-                loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
-            }
-
-            tryStartPolling();
-        } else {
-            onNetworkLost();
-        }
-
-        startedOnce = true;
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isPaused = true;
+        isPolling = false;
+        dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+        statusUpdateHandler.removeCallbacks(statusUpdateTask);
+        mpgService.endPollSession(pollToken, userToken);
     }
 
     private void tryStartPolling() {
         dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
-
-        if (isPaused || cancelInProgress || isPolling || dialogResponse == null || !App.isNetworkAvailable()) {
+        if (isPaused || isPolling || initialSyncInProgress || dialogResponse == null
+                || !App.isNetworkAvailable() || !mpgService.isPollTokenActive(pollToken)) {
             return;
         }
-
+        if (!hasUpdateOffset) {
+            syncLastUpdateAndStartPolling(pollToken);
+            return;
+        }
         dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+    }
+
+    private void syncLastUpdateAndStartPolling(final long currentToken) {
+        if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken) || !App.isNetworkAvailable()) return;
+        initialSyncInProgress = true;
+        mpgService.getLastUpdate(userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
+            @Override
+            public void onSuccess(final Update result) {
+                initialSyncInProgress = false;
+                if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
+                updateOffset = result != null ? Integer.toString(result.update_id) : "-1";
+                hasUpdateOffset = true;
+                updates = new ArrayList<Update>();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                            dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+                        }
+                    }
+                });
+            }
+            @Override
+            public void onError(Exception error) {
+                initialSyncInProgress = false;
+                if (error instanceof MPGramService.PollCancelledException) return;
+                if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
+                if (App.isSessionDead(error.getMessage(), MainActivity.this)) return;
+                hasUpdateOffset = true;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                            dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     private void update(ArrayList<Update> u) {
         if (u == null) return;
         boolean needRefresh = false;
+
         for (final Update upd : u) {
             if (upd == null || upd.type == null) continue;
+
             switch (upd.type) {
                 case "updateEditChannelMessage":
                 case "updateEditMessage":
                 case "updateNewChannelMessage":
                 case "updateNewMessage":
                     if (upd.msg != null) {
-                        String peerId = upd.getPeerId();
+                        String peerId = getDialogPeerId(upd);
                         if (peerId == null) break;
                         if (dialogResponse == null || dialogResponse.dialogs == null || dialogsAdapter == null) break;
 
                         boolean found = false;
                         boolean isEdit = upd.type.contains("Edit");
+
                         for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                             Dialog d = dialogResponse.dialogs.get(i);
                             if (d != null && peerId.equals(d.peerId)) {
-                                if (d.msg != null && d.msg.id == upd.msg.id) {
+                                dialogsRefreshPeers.remove(peerId);
+
+                                if (!isEdit && d.msg != null && d.msg.id == upd.msg.id) {
                                     d.isTyping = false;
                                     found = true;
                                     break;
                                 }
+
+                                if (isEdit && (d.msg == null || d.msg.id != upd.msg.id)) {
+                                    found = true;
+                                    break;
+                                }
+
                                 d.msg = upd.msg;
                                 if (!isEdit && !upd.msg.out) d.unread++;
                                 d.isTyping = false;
+
                                 if (i != 0 && !isEdit) {
                                     dialogResponse.dialogs.remove(i);
                                     dialogResponse.dialogs.add(0, d);
                                     Collections.sort(dialogResponse.dialogs, SortUtils.PINNED_FIRST);
                                 }
+
                                 found = true;
                                 break;
                             }
                         }
 
-                        if (!found && !isEdit) needRefresh = true;
+                        if (!found && !isEdit) {
+                            if (!dialogsRefreshPeers.contains(peerId)) {
+                                dialogsRefreshPeers.add(peerId);
+                                needRefresh = true;
+                            }
+                        }
                     }
                     break;
                 case "updateDeleteChannelMessages":
@@ -426,6 +472,7 @@ public class MainActivity extends Activity {
                     String delPeer = upd.getPeerId();
                     if (delPeer == null) break;
                     if (dialogResponse == null || dialogResponse.dialogs == null) break;
+
                     for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                         Dialog d = dialogResponse.dialogs.get(i);
                         if (d != null && delPeer.equals(d.peerId)) {
@@ -471,32 +518,34 @@ public class MainActivity extends Activity {
                         statusUpdateHandler.removeCallbacks(statusUpdateTask);
                         statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILLIS);
                     }
-
                     break;
                 case "updateReadHistoryOutbox":
                 case "updateReadChannelOutbox":
                     String readPeer = upd.getPeerId();
                     if (readPeer == null) break;
                     if (dialogResponse == null || dialogResponse.dialogs == null || dialogsAdapter == null) break;
+
                     for (int i = 0; i < dialogResponse.dialogs.size(); i++) {
                         Dialog d = dialogResponse.dialogs.get(i);
                         if (d != null && readPeer.equals(d.peerId)) {
                             d.readOut = Math.max(d.readOut, upd.max_id);
-                            if (d.msg != null && d.msg.out && (upd.max_id == 0 || d.msg.id <= upd.max_id))
+                            if (d.msg != null && d.msg.out && (upd.max_id == 0 || d.msg.id <= upd.max_id)) {
                                 d.msg.messageState = Message.MessageState.MESSAGE_WAS_READ;
+                            }
                             break;
                         }
                     }
-
                     break;
             }
         }
 
+        if (needRefresh) {
+            dialogsRefreshPending = true;
+        }
+
         if (dialogsAdapter != null) dialogsAdapter.notifyDataSetChanged();
 
-        if (needRefresh && !isLoading) {
-            refreshDialogs(loadedDialogs > 0 ? loadedDialogs : GET_DIALOG_LIMIT);
-        }
+        maybeRefreshDialogs();
     }
 
     private void refreshDialogs(final int limit) {
@@ -509,18 +558,35 @@ public class MainActivity extends Activity {
         mpgService.getDialogs(limit, null, null, 0, userToken, false, new MPGramService.ApiCallback<DialogResponse>() {
             @Override
             public void onSuccess(final DialogResponse result) {
+                if (result == null || result.dialogs == null) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            isLoading = false;
+                            updateDialogsFooter();
+                            maybeRefreshDialogs();
+                        }
+                    });
+                    return;
+                }
+
                 Collections.sort(result.dialogs, SortUtils.PINNED_FIRST);
 
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        applyDialogResponse(result);
+                        hideNetworkStatus();
 
+                        applyDialogResponse(result);
                         loadedDialogs = dialogResponse.dialogs.size();
 
-                        loadMoreButton.setEnabled(true);
-                        showDialogs();
+                        removeMissingRefreshPeers();
+
                         isLoading = false;
+                        updateDialogsFooter();
+                        showDialogs();
+
+                        maybeRefreshDialogs();
                     }
                 });
             }
@@ -528,13 +594,18 @@ public class MainActivity extends Activity {
             @Override
             public void onError(final Exception error) {
                 Log.d(TAG, "MAIN ACT onError: " + error.getMessage());
+
+                isLoading = false;
+
                 if (!App.isSessionDead(error.getMessage(), MainActivity.this)) {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             progressBar.setVisibility(View.GONE);
                             Log.d(TAG, "refreshDialogs: Failed to load dialogResponse" + error.getMessage());
-                            isLoading = false;
+
+                            updateDialogsFooter();
+                            maybeRefreshDialogs();
                         }
                     });
                 }
@@ -546,8 +617,11 @@ public class MainActivity extends Activity {
         isLoading = true;
 
         if (initial) {
+            initialSyncInProgress = true;
             loadedDialogs = 0;
             hasCachedDialogs = false;
+            dialogsRefreshPeers.clear();
+            dialogsRefreshPending = false;
 
             String cachedJsonString = App.getCacheManager().loadDialogs();
             if (cachedJsonString != null) {
@@ -558,6 +632,7 @@ public class MainActivity extends Activity {
                     if (dr != null && dr.dialogs != null) {
                         Collections.sort(dr.dialogs, SortUtils.PINNED_FIRST);
                         applyDialogResponse(dr);
+                        loadedDialogs = dialogResponse.dialogs.size();
                         showDialogs();
                         hasCachedDialogs = true;
                     }
@@ -569,7 +644,9 @@ public class MainActivity extends Activity {
 
             if (!App.isNetworkAvailable()) {
                 isLoading = false;
+                initialSyncInProgress = false;
                 progressBar.setVisibility(View.GONE);
+                updateDialogsFooter();
 
                 if (!hasCachedDialogs) {
                     Toast.makeText(MainActivity.this, "No network or cached dialogs", Toast.LENGTH_LONG).show();
@@ -582,7 +659,7 @@ public class MainActivity extends Activity {
 
             if (!App.isNetworkAvailable()) {
                 isLoading = false;
-                loadMoreButton.setEnabled(true);
+                updateDialogsFooter();
 
                 Toast.makeText(MainActivity.this, "No network", Toast.LENGTH_SHORT).show();
 
@@ -593,53 +670,48 @@ public class MainActivity extends Activity {
         mpgService.getDialogs(limit, offsetPeer, offsetId, offsetDate, userToken, initial, new MPGramService.ApiCallback<DialogResponse>() {
             @Override
             public void onSuccess(final DialogResponse result) {
-                loadedDialogs += result.dialogs.size();
+                if (result == null || result.dialogs == null) {
+                    isLoading = false;
+                    if (initial) initialSyncInProgress = false;
+                    return;
+                }
+
                 Collections.sort(result.dialogs, SortUtils.PINNED_FIRST);
 
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
                         if (initial) {
+                            hideNetworkStatus();
                             applyDialogResponse(result);
                             hasCachedDialogs = true;
 
-                            mpgService.getLastUpdate(userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
-                                @Override
-                                public void onSuccess(Update result) {
-                                    if (result != null) {
-                                        updateOffset = Integer.toString(result.update_id);
-                                    }
-                                    updates = new ArrayList<Update>();
-
-                                    if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
-                                }
-
-                                @Override
-                                public void onError(Exception error) {
-                                    error.printStackTrace();
-                                    if (!isPaused) dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
-                                }
-                            });
+                            initialSyncInProgress = false;
+                            if (!isPaused) syncLastUpdateAndStartPolling(pollToken);
                         } else {
                             dialogResponse.offsetPeer = result.offsetPeer;
                             dialogResponse.offsetId = result.offsetId;
                             dialogResponse.offsetDate = result.offsetDate;
 
-                            dialogResponse.dialogs.addAll(result.dialogs);
+                            appendDialogs(result.dialogs);
                             Collections.sort(dialogResponse.dialogs, SortUtils.PINNED_FIRST);
-
-                            loadMoreButton.setEnabled(true);
                         }
 
-                        if (loadedDialogs >= dialogResponse.totalCount || result.dialogs.isEmpty()) {
+                        loadedDialogs = dialogResponse.dialogs.size();
+
+                        boolean allLoaded = result.dialogs.isEmpty()
+                                || (dialogResponse.totalCount > 0
+                                && loadedDialogs >= dialogResponse.totalCount);
+
+                        if (allLoaded && !initial) {
                             Toast.makeText(MainActivity.this, "Everything is loaded", Toast.LENGTH_SHORT).show();
-                            footerView.setVisibility(View.GONE);
-                        } else {
-                            footerView.setVisibility(View.VISIBLE);
                         }
 
                         isLoading = false;
+                        updateDialogsFooter();
                         showDialogs();
+
+                        maybeRefreshDialogs();
                     }
                 });
             }
@@ -647,7 +719,10 @@ public class MainActivity extends Activity {
             @Override
             public void onError(final Exception error) {
                 Log.d(TAG, "MAIN ACT onError: " + error.getMessage());
+
                 isLoading = false;
+                if (initial) initialSyncInProgress = false;
+
                 if (!App.isSessionDead(error.getMessage(), MainActivity.this)) {
                     runOnUiThread(new Runnable() {
                         @Override
@@ -656,11 +731,15 @@ public class MainActivity extends Activity {
 
                             if (initial && !hasCachedDialogs) {
                                 Toast.makeText(MainActivity.this, "Failed to load dialogResponse " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                            } else if (initial && hasCachedDialogs) {
+                                showServerUnavailable();
+                                tryStartPolling();
                             } else if (!initial) {
                                 loadMoreButton.setEnabled(true);
-
                                 Toast.makeText(MainActivity.this, "Failed to load dialogs " + error.getMessage(), Toast.LENGTH_SHORT).show();
                             }
+
+                            maybeRefreshDialogs();
                         }
                     });
                 }
@@ -729,6 +808,109 @@ public class MainActivity extends Activity {
         progressBar.setVisibility(View.GONE);
     }
 
+    private void maybeRefreshDialogs() {
+        if (!dialogsRefreshPending) return;
+        if (isActivityDied || isPaused || isLoading || initialSyncInProgress) return;
+        if (!App.isNetworkAvailable()) return;
+
+        dialogsRefreshPending = false;
+
+        int limit = loadedDialogs > 0 ? loadedDialogs : GET_DIALOG_LIMIT;
+
+        refreshDialogs(limit);
+    }
+
+    private void removeMissingRefreshPeers() {
+        if (dialogsRefreshPeers.isEmpty()) return;
+
+        if (dialogResponse == null || dialogResponse.dialogs == null) {
+            dialogsRefreshPeers.clear();
+            return;
+        }
+
+        for (int i = dialogsRefreshPeers.size() - 1; i >= 0; i--) {
+            String peer = dialogsRefreshPeers.get(i);
+            boolean present = false;
+
+            for (int j = 0; j < dialogResponse.dialogs.size(); j++) {
+                Dialog d = dialogResponse.dialogs.get(j);
+                if (d != null && peer.equals(d.peerId)) {
+                    present = true;
+                    break;
+                }
+            }
+
+            if (present) {
+                dialogsRefreshPeers.remove(i);
+            } else {
+                Log.d(TAG, "dialog still missing after refresh: " + peer);
+            }
+        }
+    }
+
+    private void appendDialogs(ArrayList<Dialog> incoming) {
+        if (incoming == null || incoming.isEmpty()) return;
+        if (dialogResponse == null || dialogResponse.dialogs == null) return;
+
+        for (int i = 0; i < incoming.size(); i++) {
+            Dialog d = incoming.get(i);
+            if (d == null || d.peerId == null) continue;
+
+            boolean exists = false;
+            for (int j = 0; j < dialogResponse.dialogs.size(); j++) {
+                Dialog existing = dialogResponse.dialogs.get(j);
+                if (existing != null && d.peerId.equals(existing.peerId)) {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists) {
+                dialogResponse.dialogs.add(d);
+            }
+        }
+    }
+
+    private String getDialogPeerId(Update upd) {
+        if (upd == null) return null;
+        if (upd.msg == null) return upd.getPeerId();
+
+        String peerId = upd.msg.peer_id;
+        if (peerId == null) {
+            peerId = upd.getPeerId();
+        }
+        if (peerId == null) return null;
+
+        String fromId = upd.msg.from_id;
+
+        if (!upd.msg.out
+                && fromId != null
+                && !peerId.equals(fromId)
+                && !peerId.startsWith("-")
+                && !fromId.startsWith("-")
+                && (App.selfId == null || peerId.equals(App.selfId))) {
+            Log.d(TAG, "fix update peer: " + peerId + " -> " + fromId + ", msg=" + upd.msg.id);
+            return fromId;
+        }
+
+        return peerId;
+    }
+
+    private void updateDialogsFooter() {
+        if (footerView == null || loadMoreButton == null) return;
+
+        if (dialogResponse == null || dialogResponse.dialogs == null || dialogResponse.dialogs.isEmpty()) {
+            footerView.setVisibility(View.GONE);
+            return;
+        }
+
+        boolean allLoaded = dialogResponse.totalCount > 0
+                && dialogResponse.dialogs.size() >= dialogResponse.totalCount;
+
+        footerView.setVisibility(allLoaded ? View.GONE : View.VISIBLE);
+        loadMoreButton.setEnabled(!isLoading);
+    }
+
     private void navigateToChat(String id, String name, int readOut) {
         Intent intent = new Intent(this, ChatActivity.class);
 
@@ -755,25 +937,31 @@ public class MainActivity extends Activity {
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
 
         if (networkStatusText != null) {
+            networkStatusText.setText("Network lost...");
             networkStatusText.setVisibility(View.VISIBLE);
         }
     }
 
     private void onNetworkRestored() {
-        if (networkStatusText != null) {
-            networkStatusText.setVisibility(View.GONE);
-        }
-
-        if (dialogResponse == null
-                || dialogResponse.dialogs == null
-                || dialogResponse.dialogs.isEmpty()) {
-            if (!isLoading) {
-                loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
-            }
+        hideNetworkStatus();
+        if (initialSyncInProgress || isLoading) return;
+        if (dialogResponse == null || dialogResponse.dialogs == null || dialogResponse.dialogs.isEmpty()) {
+            loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
         } else {
             refreshDialogs(loadedDialogs > 0 ? loadedDialogs : GET_DIALOG_LIMIT);
+            tryStartPolling();
         }
+    }
 
-        tryStartPolling();
+    private void showServerUnavailable() {
+        if (networkStatusText == null) return;
+        networkStatusText.setText("Server unavailable, showing cached data");
+        networkStatusText.setVisibility(View.VISIBLE);
+    }
+
+    private void hideNetworkStatus() {
+        if (networkStatusText == null) return;
+        networkStatusText.setText("Network lost...");
+        networkStatusText.setVisibility(View.GONE);
     }
 }

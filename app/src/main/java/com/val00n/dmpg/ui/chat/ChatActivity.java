@@ -40,9 +40,8 @@ import com.val00n.dmpg.ui.StartupActivity;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-
+import java.util.TreeMap;
 import cc.nnproject.json.JSONObject;
-
 import static android.content.ContentValues.TAG;
 
 public class ChatActivity extends Activity {
@@ -89,7 +88,14 @@ public class ChatActivity extends Activity {
     private boolean canType;
     private boolean isTyping;
     private boolean isSavedMessages;
+
     private volatile boolean cancelInProgress;
+    private volatile long pollToken = 0;
+    private volatile boolean hasUpdateOffset = false;
+    private volatile boolean initialSyncInProgress = false;
+    private volatile boolean historyGap = false;
+    private volatile boolean historyRefreshInProgress = false;
+    private volatile boolean historyRefreshScheduled = false;
 
     volatile private boolean isPolling;
     volatile private boolean isPaused;
@@ -112,13 +118,33 @@ public class ChatActivity extends Activity {
     private boolean hasCachedHistory = false;
     private boolean sendingPending = false;
     private boolean startedOnce = false;
+    private volatile boolean pendingCheckScheduled = false;
+    private volatile boolean pendingCheckInProgress = false;
 
     private static final int OFFLINE_CHECK_MILLIS = 6000;
-    private static final long PENDING_MATCH_WINDOW_SECS = 300;
     private static final int UPDATE_TIMEOUT_SECS = 30;
     private static final int UPDATE_POLL_MILLIS = 3000;
     private static final int STATUS_UPDATE_MILLIS = 5000;
     private static final int REQUEST_FORWARD = 1;
+    private static final int PENDING_CHECK_DELAY_MILLIS = 3000;
+    private static final int PENDING_CHECK_RETRY_MILLIS = 7000;
+    private static final int PENDING_UNCERTAIN_TIMEOUT_SECS = 20;
+
+    private final Runnable pendingCheckTask = new Runnable() {
+        @Override
+        public void run() {
+            pendingCheckScheduled = false;
+            checkPendingAgainstServer();
+        }
+    };
+
+    private final Runnable historyRefreshTask = new Runnable() {
+        @Override
+        public void run() {
+            historyRefreshScheduled = false;
+            refreshHistoryAfterGap();
+        }
+    };
 
     private enum MessageAction {
         NONE, EDIT, REPLY
@@ -187,10 +213,12 @@ public class ChatActivity extends Activity {
         chatUpdateTask = new Runnable() {
             @Override
             public void run() {
-                if (isActivityDied || isPolling || isPaused) return;
+                final long currentToken = pollToken;
+                if (isActivityDied || isPolling || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
 
                 if (!App.isNetworkAvailable()) {
                     isPolling = false;
+                    historyGap = true;
                     chatUpdatesHandler.postDelayed(this, OFFLINE_CHECK_MILLIS);
                     return;
                 }
@@ -199,55 +227,73 @@ public class ChatActivity extends Activity {
                 mpgService.getUpdates(peerId, null, updateLimit, updateOffset, firstMessageId, true, UPDATE_TIMEOUT_SECS, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
                     @Override
                     public void onSuccess(ArrayList<Update> result) {
-                        if (isActivityDied) return;
                         isPolling = false;
-                        updateFails = 0;
 
-                        updates = result;
-                        if (result != null && result.size() > 0) {
-                            updateOffset = Integer.toString(updates.get(updates.size() - 1).update_id);
+                        if (isActivityDied) return;
+                        if (!isPaused && !mpgService.isPollTokenActive(currentToken)) return;
+
+                        updateFails = 0;
+                        final ArrayList<Update> batch = result;
+
+                        if (batch != null && batch.size() > 0) {
+                            updateOffset = Integer.toString(batch.get(batch.size() - 1).update_id);
 
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
-                                    update(updates);
+                                    if (!isActivityDied) update(batch);
                                 }
                             });
                         }
 
-                        if (!isPaused && App.isNetworkAvailable()) {
-                            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                        if (!isPaused) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (!isActivityDied) hideNetworkStatus();
+                                }
+                            });
                         }
+
+                        if (isPaused) return;
+                        if (!mpgService.isPollTokenActive(currentToken) || !App.isNetworkAvailable()) return;
+
+                        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                        chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
                     }
 
                     @Override
                     public void onError(Exception error) {
-                        if (isActivityDied) return;
                         isPolling = false;
-                        Log.d(TAG, "UPDATE FAILED: " + error.getMessage());
+                        if (error instanceof MPGramService.PollCancelledException) return;
+                        if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
 
                         if (!App.isSessionDead(error.getMessage(), ChatActivity.this)) {
+                            String errMsg = error.getMessage();
+                            Log.d(TAG, "UPDATE FAILED: " + errMsg);
+
+                            if (errMsg != null && errMsg.contains("Concurrent getUpdates")) {
+                                if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
+                                    chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                                    chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                }
+                                return;
+                            }
+
+                            historyGap = true;
+
                             if (updateFails > 10) {
-                                mpgService.getLastUpdate(peerId, userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
-                                    @Override
-                                    public void onSuccess(Update result) {
-                                        updateOffset = result != null ? Integer.toString(result.update_id) : "-1";
-                                        if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
-                                    }
-
-                                    @Override
-                                    public void onError(Exception error) {
-                                        error.printStackTrace();
-                                        if (!App.isSessionDead(error.getMessage(), ChatActivity.this)) {
-                                            if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
-                                        }
-                                    }
-                                });
-
                                 updateFails = 0;
+                                refreshHistoryAfterGap();
                             } else {
                                 updateFails++;
-                                if (!isPaused) chatUpdatesHandler.postDelayed(chatUpdateTask, Math.min(UPDATE_POLL_MILLIS * updateFails, 20000));
+                                scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS * 3);
+                            }
+
+                            if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
+                                chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                                chatUpdatesHandler.postDelayed(chatUpdateTask,
+                                        Math.min(UPDATE_POLL_MILLIS * Math.max(updateFails, 1), 20000));
                             }
                         }
                     }
@@ -340,7 +386,7 @@ public class ChatActivity extends Activity {
                     pendingMessages.add(entry);
 
                     chatSendButton.setEnabled(false);
-                    sendPending(entry);
+                    retryPending(entry);
                     chatMessages.setSelection(chatMessages.getCount() - 1);
                 } else {
                     historyResponse.messages.remove(msg);
@@ -411,86 +457,85 @@ public class ChatActivity extends Activity {
         });
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        App.addNetworkListener(networkListener);
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         Instance selected = App.getInstanceManager().getSelectedInstance();
         if (instance == null || !instance.equals(selected)) {
             navigateToStartup();
+            return;
+        }
+
+        String currentToken = App.getSessionManager().loadSession(instance.baseURL);
+        if (currentToken == null || currentToken.length() == 0
+                || userToken == null || !currentToken.equals(userToken)) {
+            navigateToStartup();
+            return;
+        }
+
+        isPaused = false;
+        isPolling = false;
+        pollToken = mpgService.beginPollSession(userToken);
+
+        if (App.isNetworkAvailable()) {
+            if (historyResponse == null && !isLoading) {
+                loadHistory(true, null, 0);
+            } else if (historyGap) {
+                refreshHistoryAfterGap();
+            } else {
+                tryStartPolling();
+            }
+        } else {
+            onNetworkLost();
         }
     }
 
-    protected void onDestroy() {
-        super.onDestroy();
-        isActivityDied = true;
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isPaused = true;
+        isPolling = false;
+        historyGap = true;
+        historyRefreshScheduled = false;
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        chatUpdatesHandler.removeCallbacks(historyRefreshTask);
+        chatUpdatesHandler.removeCallbacks(pendingCheckTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
-
-        mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
-            @Override
-            public void onSuccess(String result) {
-                Log.d(TAG, "onSuccess: canceled updates: " + result);
-            }
-
-            @Override
-            public void onError(Exception error) {
-                error.printStackTrace();
-                Log.d(TAG, "onError: failed to cancel updates: " + error.getMessage());
-            }
-        });
+        mpgService.endPollSession(pollToken, userToken);
+        pendingCheckScheduled = false;
+        pendingCheckInProgress = false;
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        isPaused = true;
-
         App.removeNetworkListener(networkListener);
-
-        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-        statusUpdateHandler.removeCallbacks(statusUpdateTask);
-
-        if (!App.isNetworkAvailable()) {
-            return;
-        }
-
-        if (!cancelInProgress) {
-            cancelInProgress = true;
-            mpgService.cancelUpdates(userToken, new MPGramService.ApiCallback<String>() {
-                @Override
-                public void onSuccess(String result) {
-                    cancelInProgress = false;
-                }
-                @Override
-                public void onError(Exception error) {
-                    cancelInProgress = false;
-                }
-            });
-        }
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
-        isPaused = false;
-        App.addNetworkListener(networkListener);
-
-        if (App.isNetworkAvailable()) {
-            if (startedOnce && historyResponse == null && !isLoading) {
-                loadHistory(true, null, 0);
-            }
-
-            tryStartPolling();
-        } else {
-            onNetworkLost();
-        }
-
-        startedOnce = true;
+    protected void onDestroy() {
+        super.onDestroy();
+        isActivityDied = true;
+        historyRefreshScheduled = false;
+        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        chatUpdatesHandler.removeCallbacks(historyRefreshTask);
+        statusUpdateHandler.removeCallbacks(statusUpdateTask);
     }
 
     private AlbumView.Listener albumListener = new AlbumView.Listener() {
         @Override
         public void onMediaClick(MessageRow item, int index) {
-            openImageViewer(item);
+            if (item.isVideo) {
+                openVideoViewer(item);
+            } else {
+                openImageViewer(item);
+            }
         }
 
         @Override
@@ -514,14 +559,90 @@ public class ChatActivity extends Activity {
         startActivity(intent);
     }
 
+    private void openVideoViewer(MessageRow item) {
+        if (item == null || item.message == null || item.message.media == null) return;
+
+        String peer = item.chatPeer != null ? item.chatPeer : item.peer;
+
+        Intent intent = new Intent(this, VideoViewerActivity.class);
+        intent.putExtra("PEER", peer);
+        intent.putExtra("MESSAGE_ID", item.messageId);
+        intent.putExtra("FILENAME", item.message.media.name);
+        intent.putExtra("MEDIA_MIME", item.message.media.mime);
+        startActivity(intent);
+    }
+
     private void tryStartPolling() {
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-
-        if (isPaused || cancelInProgress || isPolling || historyResponse == null || !App.isNetworkAvailable()) {
+        if (isPaused || isPolling || initialSyncInProgress || historyResponse == null
+                || !App.isNetworkAvailable() || !mpgService.isPollTokenActive(pollToken)) {
             return;
         }
+        if (!hasUpdateOffset) {
+            syncLastUpdateAndStartPolling(pollToken);
+            return;
+        }
+        chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+    }
 
-        chatUpdatesHandler.post(chatUpdateTask);
+    private void syncLastUpdateAndStartPolling(final long currentToken) {
+        if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken) || !App.isNetworkAvailable()) return;
+        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        initialSyncInProgress = true;
+        mpgService.getLastUpdate(peerId, firstMessageId, userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
+            @Override
+            public void onSuccess(final Update result) {
+                initialSyncInProgress = false;
+                if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
+
+                if (result == null || result.update_id < 0) {
+                    updateOffset = "-1";
+                } else {
+                    int offset = result.update_id;
+
+                    if (!result.exact) {
+                        offset--;
+                    }
+
+                    if (offset < 0) offset = 0;
+                    updateOffset = Integer.toString(offset);
+                }
+
+                Log.d(TAG, "sync offset: update_id=" + (result != null ? result.update_id : -1)
+                        + " exact=" + (result != null && result.exact)
+                        + " firstMessageId=" + firstMessageId
+                        + " offset=" + updateOffset);
+
+                hasUpdateOffset = true;
+                updates = new ArrayList<Update>();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                            chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                        }
+                    }
+                });
+            }
+            @Override
+            public void onError(Exception error) {
+                initialSyncInProgress = false;
+                if (error instanceof MPGramService.PollCancelledException) return;
+                if (isActivityDied || isPaused || !mpgService.isPollTokenActive(currentToken)) return;
+                if (App.isSessionDead(error.getMessage(), ChatActivity.this)) return;
+                hasUpdateOffset = true;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                            chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     private void sendMessage(String text) {
@@ -539,7 +660,8 @@ public class ChatActivity extends Activity {
             pending.reply = buildPendingReply(replyId);
         }
 
-        PendingMessage entry = new PendingMessage(pending, replyId);
+        int baseId = getMaxServerMessageId();
+        PendingMessage entry = new PendingMessage(pending, replyId, baseId);
         pendingMessages.add(entry);
         historyResponse.messages.add(pending);
 
@@ -547,11 +669,30 @@ public class ChatActivity extends Activity {
         chatMessages.setSelection(chatMessages.getCount() - 1);
     }
 
+    private int getMaxServerMessageId() {
+        int maxId = 0;
+        try {
+            maxId = Integer.parseInt(firstMessageId);
+        } catch (NumberFormatException ignored) {}
+
+        if (historyResponse != null && historyResponse.messages != null) {
+            for (int i = 0; i < historyResponse.messages.size(); i++) {
+                int id = historyResponse.messages.get(i).id;
+                if (id > maxId) maxId = id;
+            }
+        }
+        return maxId;
+    }
+
     private void sendPending(final PendingMessage entry) {
         final Message pending = entry.message;
 
+        entry.lastAttemptAt = System.currentTimeMillis() / 1000;
+        entry.accepted = false;
+        entry.uncertain = false;
+
+        pending.date = entry.lastAttemptAt;
         pending.messageState = Message.MessageState.MESSAGE_SENDING;
-        pending.date = System.currentTimeMillis() / 1000;
         messagesAdapter.notifyDataSetChanged();
 
         mpgService.sendMessage(userToken, peerId, pending.text, entry.replyId, null, null, null,
@@ -563,18 +704,21 @@ public class ChatActivity extends Activity {
                             public void run() {
                                 if (isActivityDied) return;
 
-                                if (pending.id <= 0) {
-                                    if ("1".equals(result)) {
-                                        pending.messageState = Message.MessageState.MESSAGE_SENT;
-                                    } else {
-                                        pending.messageState = Message.MessageState.MESSAGE_ERROR;
-                                        Toast.makeText(ChatActivity.this,
-                                                "Failed to send message: res: " + result,
-                                                Toast.LENGTH_SHORT).show();
-                                    }
-                                    messagesAdapter.notifyDataSetChanged();
+                                if (pending.id > 0) {
+                                    chatSendButton.setEnabled(true);
+                                    return;
                                 }
 
+                                if ("1".equals(result)) {
+                                    entry.accepted = true;
+                                    pending.messageState = Message.MessageState.MESSAGE_SENT;
+                                } else {
+                                    entry.uncertain = true;
+                                    pending.messageState = Message.MessageState.MESSAGE_SENDING;
+                                }
+
+                                messagesAdapter.notifyDataSetChanged();
+                                schedulePendingCheck(PENDING_CHECK_DELAY_MILLIS);
                                 chatSendButton.setEnabled(true);
                             }
                         });
@@ -592,14 +736,15 @@ public class ChatActivity extends Activity {
                             public void run() {
                                 if (isActivityDied) return;
 
-                                if (pending.id <= 0) {
-                                    pending.messageState = Message.MessageState.MESSAGE_ERROR;
-                                    messagesAdapter.notifyDataSetChanged();
-                                    Toast.makeText(ChatActivity.this,
-                                            "Failed to send message: " + error.getMessage(),
-                                            Toast.LENGTH_SHORT).show();
+                                if (pending.id > 0) {
+                                    chatSendButton.setEnabled(true);
+                                    return;
                                 }
 
+                                entry.uncertain = true;
+                                pending.messageState = Message.MessageState.MESSAGE_SENDING;
+                                messagesAdapter.notifyDataSetChanged();
+                                schedulePendingCheck(PENDING_CHECK_DELAY_MILLIS);
                                 chatSendButton.setEnabled(true);
                             }
                         });
@@ -609,14 +754,15 @@ public class ChatActivity extends Activity {
 
 
     private void update(ArrayList<Update> u) {
+        if (u == null || historyResponse == null || historyResponse.messages == null) return;
         for (final Update upd : u) {
+            if (upd == null || upd.type == null) continue;
             switch (upd.type) {
                 case "updateNewChannelMessage":
                 case "updateNewMessage":
                     if (upd.msg != null) {
                         Message serverMsg = upd.msg;
                         boolean isDupe = false;
-
                         if (serverMsg.id > 0) {
                             for (int i = 0; i < historyResponse.messages.size(); i++) {
                                 if (serverMsg.id == historyResponse.messages.get(i).id) {
@@ -624,16 +770,23 @@ public class ChatActivity extends Activity {
                                     break;
                                 }
                             }
+                            try {
+                                if (serverMsg.id > Integer.parseInt(firstMessageId)) {
+                                    firstMessageId = String.valueOf(serverMsg.id);
+                                }
+                            } catch (NumberFormatException ignored) {}
                         }
                         if (isDupe) continue;
 
                         PendingMessage match = serverMsg.out ? findPendingMatch(serverMsg) : null;
 
                         if (match != null) {
-                            applyServerMessage(match.message, serverMsg);
-                            pendingMessages.remove(match);
+                            replacePendingWithServer(match, serverMsg);
                             messagesAdapter.notifyDataSetChanged();
                         } else {
+                            if (serverMsg.out) {
+                                Log.w(TAG, "updateNewMessage: no pending match for out message id=" + serverMsg.id + " text=" + serverMsg.text);
+                            }
                             historyResponse.messages.add(serverMsg);
                             messagesAdapter.notifyDataSetChanged();
 
@@ -1115,15 +1268,38 @@ public class ChatActivity extends Activity {
             chatMessages.setAdapter(messagesAdapter);
         } else {
             messagesAdapter.setAlbumListener(albumListener);
-            int pos = chatMessages.getFirstVisiblePosition();
-            View v = chatMessages.getChildAt(0);
-            int top = (v == null) ? 0 : v.getTop();
+
+            int headerCount = chatMessages.getHeaderViewsCount();
+            int firstPos = chatMessages.getFirstVisiblePosition();
+            int anchorId = -1;
+            int anchorTop = 0;
+
+            for (int i = 0; i < chatMessages.getChildCount(); i++) {
+                int adapterPos = (firstPos + i) - headerCount;
+                if (adapterPos >= 0 && messagesAdapter.isMessage(adapterPos)) {
+                    Message m = (Message) messagesAdapter.getItem(adapterPos);
+                    if (m != null && m.id > 0) {
+                        anchorId = m.id;
+                        anchorTop = chatMessages.getChildAt(i).getTop();
+                        break;
+                    }
+                }
+            }
 
             int oldCount = messagesAdapter.getCount();
             messagesAdapter.notifyDataSetChanged();
-            int inserted = messagesAdapter.getCount() - oldCount;
 
-            chatMessages.setSelectionFromTop(pos + inserted, top);
+            if (anchorId > 0) {
+                int newAdapterPos = messagesAdapter.findRowPositionByMessageId(anchorId);
+                if (newAdapterPos >= 0) {
+                    chatMessages.setSelectionFromTop(newAdapterPos + headerCount, anchorTop);
+                }
+            } else {
+                View v = chatMessages.getChildAt(0);
+                int top = (v == null) ? 0 : v.getTop();
+                int inserted = messagesAdapter.getCount() - oldCount;
+                chatMessages.setSelectionFromTop(firstPos + inserted, top);
+            }
         }
 
         progressBar.setVisibility(View.GONE);
@@ -1154,7 +1330,7 @@ public class ChatActivity extends Activity {
     private void markRead(int limit) {
         for (int i = historyResponse.messages.size() - 1; i >= 0; i--) {
             Message m = historyResponse.messages.get(i);
-            if (m.out && (m.id > 0 || isMessageSent(m)) && m.id <= limit
+            if (m.out && m.id > 0 && m.id <= limit
                     && m.messageState != Message.MessageState.MESSAGE_ERROR
                     && m.messageState != Message.MessageState.MESSAGE_SENDING) {
                 historyResponse.messages.get(i).messageState = Message.MessageState.MESSAGE_WAS_READ;
@@ -1164,6 +1340,7 @@ public class ChatActivity extends Activity {
 
     private void loadHistory(final boolean initial, final String offsetId, final long offsetDate) {
         if (initial) {
+            initialSyncInProgress = true;
             loadedHistory = 0;
             hasCachedHistory = false;
 
@@ -1216,6 +1393,7 @@ public class ChatActivity extends Activity {
 
             if (!App.isNetworkAvailable()) {
                 isLoading = false;
+                initialSyncInProgress = false;
                 progressBar.setVisibility(View.GONE);
 
                 if (hasCachedHistory) {
@@ -1263,23 +1441,18 @@ public class ChatActivity extends Activity {
                        Collections.reverse(result.messages);
 
                        isLoading = false;
+                       hideNetworkStatus();
 
                        if (initial) {
-                           historyResponse = result;
+                           boolean shouldScrollToBottom = !hasCachedHistory || atBottom;
+
+                           mergeInitialHistory(result);
+                           historyGap = false;
+
                            markRead(readOut);
                            initialLoaded = true;
 
-                           if (messagesAdapter != null) {
-                               messagesAdapter = null;
-                           }
-
                            showMessages();
-
-                           if (!historyResponse.messages.isEmpty()) {
-                               firstMessageId = String.valueOf(
-                                       historyResponse.messages.get(historyResponse.messages.size() - 1).id
-                               );
-                           }
 
                            canType = true;
                            if (peerId != null && peerId.startsWith("-")) {
@@ -1290,37 +1463,23 @@ public class ChatActivity extends Activity {
                                        canType = !chat.c && !chat.l;
                                    }
                                }
-                           } else {
-                               canType = true;
                            }
 
                            if (canType) {
                                bottomContainerContent.setVisibility(View.VISIBLE);
                            }
 
-                           mpgService.getLastUpdate(peerId, userToken, UPDATE_TIMEOUT_SECS, new MPGramService.ApiCallback<Update>() {
-                               @Override
-                               public void onSuccess(Update result) {
-                                   if (result != null) {
-                                       updateOffset = Integer.toString(result.update_id);
-                                   }
-                                   updates = new ArrayList<Update>();
+                           initialSyncInProgress = false;
+                           if (!isPaused) syncLastUpdateAndStartPolling(pollToken);
 
-                                   if (!isPaused && !isPolling) {
-                                       chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-                                       chatUpdatesHandler.postDelayed(chatUpdateTask, (long) (UPDATE_POLL_MILLIS * 1.5f)); // FIXME
+                           if (shouldScrollToBottom) {
+                               chatMessages.post(new Runnable() {
+                                   @Override
+                                   public void run() {
+                                       chatMessages.setSelection(chatMessages.getCount() - 1);
                                    }
-                               }
-
-                               @Override
-                               public void onError(Exception error) {
-                                   error.printStackTrace();
-                                   if (!isPaused && !isPolling) {
-                                       chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-                                       chatUpdatesHandler.postDelayed(chatUpdateTask, (long) (UPDATE_POLL_MILLIS * 1.5f)); // FIXME
-                                   }
-                               }
-                           });
+                               });
+                           }
                        } else {
                            historyResponse.add(result);
                            markRead(readOut);
@@ -1351,15 +1510,18 @@ public class ChatActivity extends Activity {
                             isLoading = false;
 
                             if (initial) {
+                                initialSyncInProgress = false;
                                 progressBar.setVisibility(View.GONE);
 
                                 if (!hasCachedHistory) {
                                     Toast.makeText(ChatActivity.this, "Failed to load history " + error.getMessage(), Toast.LENGTH_SHORT).show();
                                 } else {
                                     if (networkStatusText != null) {
+                                        networkStatusText.setText("Server unavailable");
                                         networkStatusText.setVisibility(View.VISIBLE);
                                         updateNetworkStatusPosition();
                                     }
+                                    tryStartPolling();
                                 }
                             } else {
                                 fetchError = true;
@@ -1373,6 +1535,234 @@ public class ChatActivity extends Activity {
                 }
             }
         });
+    }
+
+    private void schedulePendingCheck(int delayMillis) {
+        if (isActivityDied || isPaused || !hasUnresolvedPending()) return;
+        if (pendingCheckScheduled) return;
+
+        pendingCheckScheduled = true;
+        chatUpdatesHandler.removeCallbacks(pendingCheckTask);
+        chatUpdatesHandler.postDelayed(pendingCheckTask, delayMillis);
+    }
+
+    private boolean hasUnresolvedPending() {
+        long now = System.currentTimeMillis() / 1000;
+        for (int i = 0; i < pendingMessages.size(); i++) {
+            PendingMessage entry = pendingMessages.get(i);
+
+            if (entry.message.id > 0) continue;
+            if (entry.message.messageState == Message.MessageState.MESSAGE_ERROR) continue;
+            if (!entry.accepted && !entry.uncertain) continue;
+            if (entry.accepted && now - entry.lastAttemptAt >= PENDING_UNCERTAIN_TIMEOUT_SECS) continue;
+
+            return true;
+        }
+        return false;
+    }
+
+    private void checkPendingAgainstServer() {
+        if (isActivityDied || isPaused || !hasUnresolvedPending()) return;
+
+        if (pendingCheckInProgress || isLoading || initialSyncInProgress
+                || historyRefreshInProgress || !App.isNetworkAvailable()
+                || !mpgService.isPollTokenActive(pollToken)) {
+            schedulePendingCheck(PENDING_CHECK_RETRY_MILLIS);
+            return;
+        }
+
+        final long currentToken = pollToken;
+        pendingCheckInProgress = true;
+
+        mpgService.getRecentMessages(peerId, userToken,
+                new MPGramService.ApiCallback<HistoryResponse>() {
+                    @Override
+                    public void onSuccess(final HistoryResponse result) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                pendingCheckInProgress = false;
+                                if (isActivityDied
+                                        || !mpgService.isPollTokenActive(currentToken)) return;
+
+                                applyProbeResult(result);
+                                evaluatePendingChecks();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(final Exception error) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                pendingCheckInProgress = false;
+                                if (isActivityDied) return;
+
+                                evaluatePendingChecks();
+                            }
+                        });
+                    }
+                });
+    }
+
+    private boolean applyProbeResult(HistoryResponse result) {
+        if (result == null || result.messages == null
+                || historyResponse == null || historyResponse.messages == null) {
+            return false;
+        }
+
+        boolean changed = false;
+
+        for (int i = result.messages.size() - 1; i >= 0; i--) {
+            Message server = result.messages.get(i);
+
+            if (server.id <= 0 || !server.out) continue;
+
+            PendingMessage match = findPendingMatch(server);
+            if (match == null) continue;
+
+            if (isMessageInHistory(server.id)) {
+                historyResponse.messages.remove(match.message);
+                pendingMessages.remove(match);
+            } else {
+                replacePendingWithServer(match, server);
+            }
+            changed = true;
+        }
+
+        if (changed) {
+            recalculateFirstMessageId();
+            messagesAdapter.notifyDataSetChanged();
+        }
+
+        return changed;
+    }
+
+    private boolean isMessageInHistory(int id) {
+        for (int i = 0; i < historyResponse.messages.size(); i++) {
+            if (historyResponse.messages.get(i).id == id) return true;
+        }
+        return false;
+    }
+
+    private void evaluatePendingChecks() {
+        long now = System.currentTimeMillis() / 1000;
+        boolean changed = false;
+        boolean hasMore = false;
+
+        for (int i = 0; i < pendingMessages.size(); i++) {
+            PendingMessage entry = pendingMessages.get(i);
+            Message local = entry.message;
+
+            if (local.id > 0) continue;
+            if (local.messageState == Message.MessageState.MESSAGE_ERROR) continue;
+
+            entry.confirmAttempts++;
+
+            if (entry.uncertain) {
+                if (now - entry.lastAttemptAt >= PENDING_UNCERTAIN_TIMEOUT_SECS) {
+                    local.messageState = Message.MessageState.MESSAGE_ERROR;
+                    changed = true;
+                    continue;
+                }
+                hasMore = true;
+            } else if (entry.accepted) {
+                if (now - entry.lastAttemptAt < PENDING_UNCERTAIN_TIMEOUT_SECS) {
+                    hasMore = true;
+                }
+            }
+        }
+
+        if (changed) {
+            messagesAdapter.notifyDataSetChanged();
+        }
+
+        if (hasMore) {
+            schedulePendingCheck(PENDING_CHECK_RETRY_MILLIS);
+        }
+    }
+
+    private void refreshHistoryAfterGap() {
+        if (isActivityDied || isPaused || !historyGap) return;
+        if (historyResponse == null || !initialLoaded) return;
+
+        if (historyRefreshInProgress || isLoading || initialSyncInProgress
+                || !App.isNetworkAvailable() || !mpgService.isPollTokenActive(pollToken)) {
+            scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS);
+            return;
+        }
+
+        final long currentToken = pollToken;
+        historyRefreshInProgress = true;
+        historyRefreshScheduled = false;
+        chatUpdatesHandler.removeCallbacks(historyRefreshTask);
+
+        Log.d(TAG, "refreshing history after gap");
+
+        mpgService.getHistory(peerId, null, 0, userToken, false, new MPGramService.ApiCallback<HistoryResponse>() {
+            @Override
+            public void onSuccess(final HistoryResponse result) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        historyRefreshInProgress = false;
+
+                        if (isActivityDied || !mpgService.isPollTokenActive(currentToken)) return;
+
+                        historyGap = false;
+
+                        String keepOffsetId = historyResponse.offsetId;
+                        long keepOffsetDate = historyResponse.offsetDate;
+
+                        Collections.reverse(result.messages);
+                        mergeInitialHistory(result);
+
+                        historyResponse.offsetId = keepOffsetId;
+                        historyResponse.offsetDate = keepOffsetDate;
+
+                        markRead(readOut);
+                        showMessages();
+
+                        if (atBottom) {
+                            chatMessages.setSelection(chatMessages.getCount() - 1);
+                        }
+
+                        hasUpdateOffset = false;
+                        chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+                        syncLastUpdateAndStartPolling(currentToken);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        historyRefreshInProgress = false;
+
+                        if (isActivityDied || !mpgService.isPollTokenActive(currentToken)) return;
+
+                        Log.d(TAG, "history refresh failed: " + error.getMessage());
+
+                        if (isPaused || !App.isNetworkAvailable()) return;
+
+                        scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS * 3);
+
+                        if (!isPolling) tryStartPolling();
+                    }
+                });
+            }
+        });
+    }
+
+    private void scheduleHistoryRefreshRetry(int delayMillis) {
+        if (isActivityDied || isPaused || !historyGap || historyRefreshScheduled) return;
+
+        historyRefreshScheduled = true;
+        chatUpdatesHandler.removeCallbacks(historyRefreshTask);
+        chatUpdatesHandler.postDelayed(historyRefreshTask, delayMillis);
     }
 
     private MessageReply buildPendingReply(String replyId) {
@@ -1392,32 +1782,230 @@ public class ChatActivity extends Activity {
     }
 
     private PendingMessage findPendingMatch(Message serverMsg) {
-        PendingMessage errorFallback = null;
+        if (serverMsg == null || serverMsg.id <= 0) return null;
 
         for (int i = 0; i < pendingMessages.size(); i++) {
             PendingMessage entry = pendingMessages.get(i);
             Message local = entry.message;
 
             if (local.id > 0) continue;
-            if (local.text == null || !local.text.equals(serverMsg.text)) continue;
-
-            if (local.peer_id != null && serverMsg.peer_id != null
-                    && !local.peer_id.equals(serverMsg.peer_id)) continue;
-
-            long delta = serverMsg.date - local.date;
-            if (delta < -PENDING_MATCH_WINDOW_SECS || delta > PENDING_MATCH_WINDOW_SECS) {
-                continue;
-            }
-
-            if (local.messageState == Message.MessageState.MESSAGE_ERROR) {
-                if (errorFallback == null) errorFallback = entry;
-                continue;
-            }
+            if (local.messageState == Message.MessageState.MESSAGE_ERROR && !entry.uncertain) continue;
+            if (serverMsg.id <= entry.minServerId) continue;
+            if (!isSamePendingContent(local, serverMsg)) continue;
 
             return entry;
         }
 
-        return errorFallback;
+        return null;
+    }
+
+    private boolean isSamePendingContent(Message local, Message server) {
+        if (local.text != null && local.text.length() > 0) {
+            return local.text.equals(server.text);
+        }
+
+        if (local.media != null && server.media != null) {
+            return local.media.type != null && local.media.type.equals(server.media.type);
+        }
+
+        return false;
+    }
+
+    private void replacePendingWithServer(PendingMessage entry, Message server) {
+        Message local = entry.message;
+
+        if (server.reply == null) {
+            server.reply = local.reply;
+        } else if (local.reply != null) {
+            if (server.reply.replyId == null) server.reply.replyId = local.reply.replyId;
+            if (server.reply.peer == null) server.reply.peer = local.reply.peer;
+            if (server.reply.quote == null) server.reply.quote = local.reply.quote;
+            if (server.reply.msg == null) server.reply.msg = local.reply.msg;
+        }
+
+        if (historyResponse != null && historyResponse.messages != null) {
+            int index = historyResponse.messages.indexOf(local);
+
+            if (index >= 0) {
+                historyResponse.messages.set(index, server);
+            } else {
+                historyResponse.messages.add(server);
+            }
+
+            if (server.id > 0) {
+                for (int i = historyResponse.messages.size() - 1; i >= 0; i--) {
+                    if (i != index && historyResponse.messages.get(i).id == server.id) {
+                        historyResponse.messages.remove(i);
+                        Log.d(TAG, "Removed duplicate server message id=" + server.id + " at index " + i);
+                    }
+                }
+            }
+        }
+
+        pendingMessages.remove(entry);
+    }
+
+    private void retryPending(final PendingMessage entry) {
+        if (entry.message.id > 0 || pendingCheckInProgress || isLoading) {
+            chatSendButton.setEnabled(true);
+            return;
+        }
+
+        chatSendButton.setEnabled(false);
+        pendingCheckInProgress = true;
+
+        mpgService.getRecentMessages(peerId, userToken,
+                new MPGramService.ApiCallback<HistoryResponse>() {
+                    @Override
+                    public void onSuccess(final HistoryResponse result) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                pendingCheckInProgress = false;
+                                applyProbeResult(result);
+
+                                if (entry.message.id > 0 || !pendingMessages.contains(entry)) {
+                                    chatSendButton.setEnabled(true);
+                                    return;
+                                }
+
+                                historyResponse.messages.remove(entry.message);
+                                historyResponse.messages.add(entry.message);
+                                pendingMessages.remove(entry);
+                                pendingMessages.add(entry);
+
+                                entry.minServerId = getMaxServerMessageId();
+                                sendPending(entry);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(final Exception error) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                pendingCheckInProgress = false;
+                                chatSendButton.setEnabled(true);
+                                Toast.makeText(ChatActivity.this,
+                                        "Cannot verify message status",
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+                });
+    }
+
+    private void mergeInitialHistory(HistoryResponse result) {
+        if (result == null || result.messages == null) return;
+
+        if (historyResponse == null || historyResponse.messages == null) {
+            historyResponse = result;
+            recalculateFirstMessageId();
+            return;
+        }
+
+        ArrayList<Message> current = historyResponse.messages;
+        ArrayList<Message> incoming = result.messages;
+
+        for (int i = 0; i < pendingMessages.size(); i++) {
+            Message pending = pendingMessages.get(i).message;
+            if (!current.contains(pending)) {
+                current.add(pending);
+            }
+        }
+
+        if (!pendingMessages.isEmpty()) {
+            for (int i = 0; i < incoming.size(); i++) {
+                Message serverMsg = incoming.get(i);
+                if (serverMsg.id <= 0 || !serverMsg.out) continue;
+
+                PendingMessage match = findPendingMatch(serverMsg);
+                if (match != null) {
+                    if (isMessageInHistory(serverMsg.id)) {
+                        current.remove(match.message);
+                        pendingMessages.remove(match);
+                    } else {
+                        replacePendingWithServer(match, serverMsg);
+                    }
+                }
+            }
+        }
+
+        TreeMap<Integer, Message> byId = new TreeMap<Integer, Message>();
+        ArrayList<Message> localPending = new ArrayList<Message>();
+
+        for (int i = 0; i < current.size(); i++) {
+            Message m = current.get(i);
+            if (m.id > 0) {
+                byId.put(m.id, m);
+            } else {
+                localPending.add(m);
+            }
+        }
+
+        for (int i = 0; i < incoming.size(); i++) {
+            Message m = incoming.get(i);
+            if (m.id <= 0) continue;
+
+            Message existing = byId.get(m.id);
+            if (existing != null) {
+                if (existing != m) {
+                    applyServerMessage(existing, m);
+                }
+            } else {
+                byId.put(m.id, m);
+            }
+        }
+
+        current.clear();
+        current.addAll(byId.values());
+        current.addAll(localPending);
+
+        if (result.users != null) {
+            if (historyResponse.users == null) {
+                historyResponse.users = result.users;
+                messagesAdapter = null;
+            } else if (historyResponse.users != result.users) {
+                historyResponse.users.putAll(result.users);
+            }
+        }
+
+        if (result.chats != null) {
+            if (historyResponse.chats == null) {
+                historyResponse.chats = result.chats;
+                messagesAdapter = null;
+            } else if (historyResponse.chats != result.chats) {
+                historyResponse.chats.putAll(result.chats);
+            }
+        }
+
+        if (result.totalCount > historyResponse.totalCount) {
+            historyResponse.totalCount = result.totalCount;
+        }
+
+        historyResponse.offsetId = result.offsetId;
+        historyResponse.offsetDate = result.offsetDate;
+
+        recalculateFirstMessageId();
+
+        Log.d(TAG, "merged history: incoming=" + incoming.size()
+                + " messages=" + current.size()
+                + " pending=" + pendingMessages.size()
+                + " firstMessageId=" + firstMessageId);
+    }
+
+    private void recalculateFirstMessageId() {
+        int maxId = 0;
+
+        if (historyResponse != null && historyResponse.messages != null) {
+            for (int i = 0; i < historyResponse.messages.size(); i++) {
+                int id = historyResponse.messages.get(i).id;
+                if (id > maxId) maxId = id;
+            }
+        }
+
+        firstMessageId = String.valueOf(maxId);
     }
 
     private void applyServerMessage(Message local, Message server) {
@@ -1453,30 +2041,45 @@ public class ChatActivity extends Activity {
     }
 
     private void onNetworkLost() {
+        historyGap = true;
+        historyRefreshScheduled = false;
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        chatUpdatesHandler.removeCallbacks(historyRefreshTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
 
         if (networkStatusText != null) {
             networkStatusText.setVisibility(View.VISIBLE);
+            networkStatusText.setText("Network lost...");
             updateNetworkStatusPosition();
         }
     }
 
     private void onNetworkRestored() {
-        if (!isLoading) {
+        if (networkStatusText != null) hideNetworkStatus();
+        if (initialSyncInProgress || isLoading) {
+            scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS);
+            return;
+        }
+        if (historyResponse == null || !initialLoaded) {
             loadHistory(true, null, 0);
+        } else if (historyGap) {
+            refreshHistoryAfterGap();
+        } else {
+            tryStartPolling();
         }
 
-        if (networkStatusText != null) {
-            networkStatusText.setVisibility(View.GONE);
-        }
+        schedulePendingCheck(0);
+    }
 
-        isPolling = false;
-        tryStartPolling();
+    private void hideNetworkStatus() {
+        if (networkStatusText == null) return;
+        networkStatusText.setText("Network lost...");
+        networkStatusText.setVisibility(View.GONE);
     }
 
     private boolean isMessagePending(Message msg) {
-        return msg.messageState == Message.MessageState.MESSAGE_SENDING
+        return msg.id <= 0
+                || msg.messageState == Message.MessageState.MESSAGE_SENDING
                 || msg.messageState == Message.MessageState.MESSAGE_ERROR;
     }
 
