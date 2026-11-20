@@ -9,6 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
         <TextView
+            android:id="@+id/cacheSettingsGlobalText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
@@ -17,31 +18,42 @@
             android:textStyle="bold"
             android:layout_marginTop="24dp"/>
         <TextView
+            android:id="@+id/cacheSettingsAvatarsText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:text="Avatars: XX.XX MB"
             android:textSize="20dp"/>
         <TextView
+            android:id="@+id/cacheSettingsMediaText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:text="Media: XX.XX MB"
             android:textSize="20dp"/>
         <TextView
+            android:id="@+id/cacheSettingsChatsText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:text="Chats: XX.XX MB"
             android:textSize="20dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="18dp"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@android:color/darker_gray"
+            android:layout_marginBottom="6dp"/>
+
         <TextView
+            android:id="@+id/cacheSettingsStorageText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:text="Storage saved: XX.XX MB"
             android:textSize="20dp"
-            android:layout_marginBottom="24dp"/>
+            android:layout_marginBottom="6dp"/>
 
         <View
             android:layout_width="match_parent"
@@ -67,7 +79,7 @@
                 <Button
                     android:id="@+id/cacheSettingsAvatarClear"
                     android:layout_width="100dp"
-                    android:layout_height="40dp"
+                    android:layout_height="45dp"
                     android:text="Clear"/>
             </LinearLayout>
 
@@ -85,7 +97,7 @@
                 <Button
                     android:id="@+id/cacheSettingsMediaClear"
                     android:layout_width="100dp"
-                    android:layout_height="40dp"
+                    android:layout_height="45dp"
                     android:text="Clear"/>
             </LinearLayout>
 
@@ -103,7 +115,7 @@
                 <Button
                     android:id="@+id/cacheSettingsChatsClear"
                     android:layout_width="100dp"
-                    android:layout_height="40dp"
+                    android:layout_height="45dp"
                     android:text="Clear"/>
             </LinearLayout>
 
@@ -121,7 +133,7 @@
                 <Button
                     android:id="@+id/cacheSettingsStorageSavedClear"
                     android:layout_width="100dp"
-                    android:layout_height="40dp"
+                    android:layout_height="45dp"
                     android:text="Clear"/>
             </LinearLayout>
 
@@ -179,25 +191,6 @@
                     android:text="XX"/>
             </LinearLayout>
 
-            <CheckBox
-                android:id="@+id/cacheSettingsAvatarStoreCheckBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Store avatar cache"
-                android:checked="true"/>
-            <CheckBox
-                android:id="@+id/cacheSettingsMediaStoreCheckBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Store media cache"
-                android:checked="true"/>
-            <CheckBox
-                android:id="@+id/cacheSettingsChatsStoreCheckBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Store chats cache"
-                android:checked="true"/>
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -233,6 +226,28 @@
                     android:layout_height="wrap_content"
                     android:text="XX"/>
             </LinearLayout>
+
+            <CheckBox
+                android:id="@+id/cacheSettingsAvatarStoreCheckBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Store avatar cache"
+                android:checked="true"
+                android:layout_marginTop="4dp"/>
+            <CheckBox
+                android:id="@+id/cacheSettingsMediaStoreCheckBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Store media cache"
+                android:checked="true"
+                android:layout_marginTop="4dp"/>
+            <CheckBox
+                android:id="@+id/cacheSettingsChatsStoreCheckBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Store chats cache"
+                android:checked="true"
+                android:layout_marginTop="4dp"/>
         </LinearLayout>
     </LinearLayout>
 

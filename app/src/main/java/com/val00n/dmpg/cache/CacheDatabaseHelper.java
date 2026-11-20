@@ -7,6 +7,11 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import com.val00n.dmpg.model.cache.CacheFile;
 import com.val00n.dmpg.model.cache.CacheHistory;
+import com.val00n.dmpg.services.FileHelper;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CacheDatabaseHelper extends SQLiteOpenHelper {
 
@@ -34,6 +39,7 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
 
         db.execSQL(createFilesTable);
         db.execSQL("CREATE INDEX idx_files_lookup ON files(peer, isAvatar)");
+        db.execSQL("CREATE INDEX idx_files_message ON files(peer, messageId, isAvatar, preview)");
 
         String createChatsTable =
                 "CREATE TABLE chats (" +
@@ -161,12 +167,13 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         values.put("filename", filename);
         values.put("lastUsed", lastUsed);
 
+        File file = new File(FileHelper.getAppDataDirectoryPath(), filename);
+        values.put("size", file.exists() ? file.length() : 0);
+
         CacheHistory existing = findHistory(peer);
         if (existing != null) {
-
             String whereClause = "peer = ?";
-
-            String[] whereArgs = new String[] { String.valueOf(existing.peer) };
+            String[] whereArgs = new String[] { peer };
 
             db.update("chats", values, whereClause, whereArgs);
         } else {
@@ -269,14 +276,15 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         Cursor cursor = null;
         try {
             cursor = db.query("chats",
-                    new String[]{"_id", "filename"},
+                    new String[]{"_id", "peer", "filename", "size", "lastUsed"},
                     null, null, null, null, "lastUsed ASC", "1");
             if (cursor.moveToFirst()) {
                 CacheHistory cacheHistory = new CacheHistory();
-                cacheHistory.id = cursor.getLong(cursor.getColumnIndex("_id"));
-                cacheHistory.filename = cursor.getString(cursor.getColumnIndex("filename"));
-                cacheHistory.size = cursor.getLong(cursor.getColumnIndex("size"));
-                cacheHistory.lastUsed = cursor.getLong(cursor.getColumnIndex("lastUsed"));
+                cacheHistory.id = cursor.getLong(cursor.getColumnIndexOrThrow("_id"));
+                cacheHistory.peer = cursor.getString(cursor.getColumnIndexOrThrow("peer"));
+                cacheHistory.filename = cursor.getString(cursor.getColumnIndexOrThrow("filename"));
+                cacheHistory.size = cursor.getLong(cursor.getColumnIndexOrThrow("size"));
+                cacheHistory.lastUsed = cursor.getLong(cursor.getColumnIndexOrThrow("lastUsed"));
                 return cacheHistory;
             }
             return null;
@@ -309,6 +317,31 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    public List<String> getFileNames(boolean avatars) {
+        List<String> names = new ArrayList<String>();
+        Cursor cursor = null;
+        try {
+            cursor = getReadableDatabase().query(
+                    "files",
+                    new String[]{"filename"},
+                    "isAvatar = ?",
+                    new String[]{avatars ? "1" : "0"},
+                    null, null, null
+            );
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(cursor.getColumnIndex("filename"));
+                if (name != null) {
+                    names.add(name);
+                }
+            }
+            return names;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
     public void deleteFileById(long id) {
         getWritableDatabase().delete("files", "_id = ?", new String[]{String.valueOf(id)});
     }
@@ -317,8 +350,8 @@ public class CacheDatabaseHelper extends SQLiteOpenHelper {
         getWritableDatabase().delete("chats", "_id = ?", new String[]{String.valueOf(id)});
     }
 
-    public void clearFiles() {
-        getWritableDatabase().delete("files", null, null);
+    public void clearFiles(boolean avatars) {
+        getWritableDatabase().delete("files", "isAvatar = ?", new String[]{avatars ? "1" : "0"});
     }
 
     public void clearHistory() {

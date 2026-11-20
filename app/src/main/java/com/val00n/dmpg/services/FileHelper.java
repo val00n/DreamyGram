@@ -1,5 +1,7 @@
 package com.val00n.dmpg.services;
 
+import android.content.Context;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
@@ -345,6 +347,53 @@ public class FileHelper {
                 try {
                     out.close();
                 } catch (IOException ignored) { }
+            }
+        }
+    }
+
+    public static void scanFileForGallery(Context context, String filePath, String mimeType) {
+        MediaScannerConnection.scanFile(
+                context.getApplicationContext(),
+                new String[]{filePath},
+                new String[]{mimeType},
+                new MediaScannerConnection.OnScanCompletedListener() {
+                    @Override
+                    public void onScanCompleted(String path, Uri uri) {
+                        Log.d("MediaScanner", "Scanned: " + path + ", Uri: " + uri);
+                    }
+                }
+        );
+    }
+
+    public static String getMimeType(String fileName) {
+        if (fileName == null) return "application/octet-stream";
+        int dot = fileName.lastIndexOf('.');
+        if (dot < 0 || dot == fileName.length() - 1) return "application/octet-stream";
+        String ext = fileName.substring(dot + 1).toLowerCase();
+        if (ext.equals("jpg") || ext.equals("jpeg")) return "image/jpeg";
+        if (ext.equals("png")) return "image/png";
+        if (ext.equals("gif")) return "image/gif";
+        if (ext.equals("webp")) return "image/webp";
+        if (ext.equals("mp4")) return "video/mp4";
+        if (ext.equals("mov")) return "video/quicktime";
+        return "application/octet-stream";
+    }
+
+    public static void deleteDirectory(boolean isAppData) {
+        if (isAppData) {
+            deleteDirectory(new File(getAppDataDirectoryPath()));
+        } else {
+            deleteDirectory(new File(getMediaDirectoryPath()));
+        }
+    }
+
+    public static void deleteDirectory(File dir) {
+        if (dir == null || !dir.exists()) return;
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isDirectory()) deleteDirectory(f);
+                else f.delete();
             }
         }
     }

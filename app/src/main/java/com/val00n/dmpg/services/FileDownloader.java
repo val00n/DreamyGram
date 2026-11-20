@@ -115,6 +115,12 @@ public class FileDownloader {
                     public void onSuccess(File f) {
                         try {
                             File finalFile = fileHelper.finishDownload(tempFinal, finalSafeName, finalIsAppData);
+
+                            if (!finalIsAppData) {
+                                String mimeType = FileHelper.getMimeType(finalFile.getName());
+                                FileHelper.scanFileForGallery(App.get(), finalFile.getAbsolutePath(), mimeType);
+                            }
+
                             finishSuccess(req, finalFile);
                         } catch (IOException e) {
                             tempFinal.delete();

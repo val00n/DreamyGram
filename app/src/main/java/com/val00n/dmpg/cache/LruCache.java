@@ -5,9 +5,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public abstract class LruCache<K, V> {
+
+    private final int maxSize;
     private final LinkedHashMap<K, V> map;
     private int size;
-    private int maxSize;
 
     public LruCache(int maxSize) {
         if (maxSize > 0) {
@@ -82,5 +83,19 @@ public abstract class LruCache<K, V> {
 
     public final synchronized int entryCount() {
         return map.size();
+    }
+
+    public final synchronized void removeByPrefix(String prefix) {
+        if (prefix == null) return;
+
+        Iterator iterator = map.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry entry = (Map.Entry) iterator.next();
+            Object key = entry.getKey();
+            if (key instanceof String && ((String) key).startsWith(prefix)) {
+                size -= sizeOf((V) entry.getValue());
+                iterator.remove();
+            }
+        }
     }
 }

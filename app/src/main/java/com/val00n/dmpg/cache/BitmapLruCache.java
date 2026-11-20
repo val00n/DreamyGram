@@ -15,4 +15,12 @@ public class BitmapLruCache extends LruCache<String, Bitmap> {
         if (value == null) return 0;
         return value.getRowBytes() * value.getHeight();
     }
+
+    public void wipe(boolean avatars) {
+        if (avatars) {
+            removeByPrefix("ava");
+        } else {
+            removeByPrefix("img");
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package com.val00n.dmpg.cache;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,6 +26,7 @@ public class CacheManager {
     private CacheDatabaseHelper dbHelper;
     private MPGramService mpgService;
     private FileHelper fileHelper;
+    private SharedPreferences sharedPreferences;
 
     private final BitmapLruCache memoryCache = new BitmapLruCache();
     private final Map<String, ArrayList<ImageCallback>> imageInFlight = new HashMap<String, ArrayList<ImageCallback>>();
@@ -33,12 +35,20 @@ public class CacheManager {
     private final Object diskTrimLock = new Object();
     private final java.util.Set<String> failedImageKeys = java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
 
-    private static final long AVATAR_TTL_MILLIS = 10L * 24 * 60 * 60 * 1000; // TODO: unhardcode
-    private static final long FILES_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000; // TODO: unhardcode
+    private static final long DEFAULT_AVATAR_TTL_MILLIS = 10L * 24 * 60 * 60 * 1000;
+    private static final long DEFAULT_FILES_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000;
+    private static final long DEFAULT_AVATAR_LIMIT = 16L * 1024 * 1024;
+    private static final long DEFAULT_FILES_LIMIT = 32L * 1024 * 1024;
+    private static final long DEFAULT_CHATS_LIMIT = 16L * 1024 * 1024;
 
-    private static final long AVATAR_LIMIT = 16L * 1024 * 1024; // TODO: same
-    private static final long FILES_LIMIT = 32L * 1024 * 1024; // TODO: same
-    private static final long CHATS_LIMIT = 16L * 1024 * 1024; // TODO: same
+    private volatile long avatarTtlMillis = DEFAULT_AVATAR_TTL_MILLIS;
+    private volatile long filesTtlMillis = DEFAULT_FILES_TTL_MILLIS;
+    private volatile long avatarLimit = DEFAULT_AVATAR_LIMIT;
+    private volatile long filesLimit = DEFAULT_FILES_LIMIT;
+    private volatile long chatsLimit = DEFAULT_CHATS_LIMIT;
+    private volatile boolean storeAvatars = true;
+    private volatile boolean storeMedia = true;
+    private volatile boolean storeChats = true;
 
     public interface ImageCallback {
         void onLoaded(Bitmap bitmap);
@@ -59,12 +69,47 @@ public class CacheManager {
         dbHelper = new CacheDatabaseHelper(context.getApplicationContext());
         fileHelper = new FileHelper();
         mpgService = App.getMPGramService();
+        sharedPreferences = context.getSharedPreferences("cache", Context.MODE_PRIVATE);
+        loadSettingsFromPrefs();
     }
 
-    private void finishLoadedImage(final String peer, final Bitmap bitmap) {
+    private void loadSettingsFromPrefs() {
+        avatarTtlMillis = sharedPreferences.getLong("avatarsTTL", 10) * 24 * 60 * 60 * 1000;
+        filesTtlMillis = sharedPreferences.getLong("mediaTTL", 30) * 24 * 60 * 60 * 1000;
+        avatarLimit = sharedPreferences.getLong("avatarsLimit", 16) * 1024 * 1024;
+        filesLimit = sharedPreferences.getLong("mediaLimit", 32) * 1024 * 1024;
+        chatsLimit = sharedPreferences.getLong("chatsLimit", 16) * 1024 * 1024;
+        storeAvatars = sharedPreferences.getBoolean("storeAvatars", true);
+        storeMedia = sharedPreferences.getBoolean("storeMedia", true);
+        storeChats = sharedPreferences.getBoolean("storeChats", true);
+    }
+
+    public void refreshSettings() {
+        boolean oldStoreAvatars = storeAvatars;
+        boolean oldStoreMedia = storeMedia;
+        boolean oldStoreChats = storeChats;
+
+        loadSettingsFromPrefs();
+
+        trimFilesDiskCache(true);
+        trimFilesDiskCache(false);
+        trimChatsDiskCache();
+
+        if (oldStoreAvatars && !storeAvatars) {
+            wipeFilesCache(null, true);
+        }
+        if (oldStoreMedia && !storeMedia) {
+            wipeFilesCache(null, false);
+        }
+        if (oldStoreChats && !storeChats) {
+            wipeChatsCache(null);
+        }
+    }
+
+    private void finishLoadedImage(final String key, final Bitmap bitmap) {
         ArrayList<ImageCallback> callbacks;
         synchronized (imageInFlight) {
-            callbacks = imageInFlight.remove(peer);
+            callbacks = imageInFlight.remove(key);
         }
         if (callbacks == null) return;
 
@@ -96,7 +141,9 @@ public class CacheManager {
     }
 
     public void loadAvatar(final String peer, final ImageCallback callback) {
-        final Bitmap cached = memoryCache.get(peer);
+        final String key = "ava" + peer;
+
+        final Bitmap cached = memoryCache.get(key);
         if (cached != null) {
             deliverLoadedImage(callback, cached);
             return;
@@ -105,9 +152,9 @@ public class CacheManager {
         Bitmap cachedUnderLock;
         boolean owner = false;
         synchronized (imageInFlight) {
-            cachedUnderLock = memoryCache.get(peer);
+            cachedUnderLock = memoryCache.get(key);
             if (cachedUnderLock == null) {
-                ArrayList<ImageCallback> queue = imageInFlight.get(peer);
+                ArrayList<ImageCallback> queue = imageInFlight.get(key);
                 if (queue != null) {
                     queue.add(callback);
                     return;
@@ -115,7 +162,7 @@ public class CacheManager {
 
                 queue = new ArrayList<ImageCallback>();
                 queue.add(callback);
-                imageInFlight.put(peer, queue);
+                imageInFlight.put(key, queue);
                 owner = true;
             }
         }
@@ -132,7 +179,7 @@ public class CacheManager {
                     try {
                         final CacheFile cacheFile = dbHelper.findAvatar(peer);
                         final long now = System.currentTimeMillis();
-                        boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= AVATAR_TTL_MILLIS;
+                        boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= avatarTtlMillis;
 
                         if (cacheFile != null) {
                             Bitmap bitmap;
@@ -142,16 +189,16 @@ public class CacheManager {
                                         mpgService.AVATAR_SIZE, mpgService.AVATAR_SIZE, true);
                             } catch (OutOfMemoryError e) {
                                 e.printStackTrace();
-                                finishErrorImage(peer, new Exception("OOM"));
+                                finishErrorImage(key, new Exception("OOM"));
                                 return;
                             }
 
                             if (bitmap != null) {
-                                memoryCache.put(peer, bitmap);
+                                memoryCache.put(key, bitmap);
 
                                 if (fresh || !App.isNetworkAvailable()) {
                                     dbHelper.touch(cacheFile.id, now, false);
-                                    finishLoadedImage(peer, bitmap);
+                                    finishLoadedImage(key, bitmap);
                                     return;
                                 }
                             } else {
@@ -163,7 +210,7 @@ public class CacheManager {
                         String userToken = App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
 
                         if (!App.isNetworkAvailable()) {
-                            finishErrorImage(peer, new Exception("Offline"));
+                            finishErrorImage(key, new Exception("Offline"));
                             return;
                         }
 
@@ -171,7 +218,7 @@ public class CacheManager {
                             @Override
                             public void onSuccess(final byte[] imageBytes) {
                                 if (imageBytes == null || imageBytes.length == 0) {
-                                    finishErrorImage(peer, new Exception("Empty bitmap"));
+                                    finishErrorImage(key, new Exception("Empty bitmap"));
                                     return;
                                 }
 
@@ -180,26 +227,28 @@ public class CacheManager {
                                             imageBytes, mpgService.AVATAR_SIZE, mpgService.AVATAR_SIZE, true);
 
                                     if (bitmap != null) {
-                                        CacheFile freshAvatar = new CacheFile();
-                                        freshAvatar.createdAt = System.currentTimeMillis();
-                                        freshAvatar.lastUsed = freshAvatar.createdAt;
-                                        freshAvatar.isAvatar = true;
-                                        freshAvatar.peer = peer;
-                                        freshAvatar.filename = "ava_" + peer;
-                                        freshAvatar.size = imageBytes.length;
+                                        if (storeAvatars) {
+                                            CacheFile freshAvatar = new CacheFile();
+                                            freshAvatar.createdAt = System.currentTimeMillis();
+                                            freshAvatar.lastUsed = freshAvatar.createdAt;
+                                            freshAvatar.isAvatar = true;
+                                            freshAvatar.peer = peer;
+                                            freshAvatar.filename = key;
+                                            freshAvatar.size = imageBytes.length;
 
-                                        if (fileHelper.saveFileBytes(freshAvatar.filename, imageBytes, true)) {
-                                            dbHelper.saveFile(freshAvatar);
-                                            trimFilesDiskCache(true);
+                                            if (fileHelper.saveFileBytes(freshAvatar.filename, imageBytes, true)) {
+                                                dbHelper.saveFile(freshAvatar);
+                                                trimFilesDiskCache(true);
+                                            }
                                         }
 
-                                        memoryCache.put(peer, bitmap);
-                                        finishLoadedImage(peer, bitmap);
+                                        memoryCache.put(key, bitmap);
+                                        finishLoadedImage(key, bitmap);
                                     } else {
-                                        finishErrorImage(peer, new Exception("Fresh bitmap is null"));
+                                        finishErrorImage(key, new Exception("Fresh bitmap is null"));
                                     }
                                 } catch (Exception e) {
-                                    finishErrorImage(peer, e);
+                                    finishErrorImage(key, e);
                                     return;
                                 }
                             }
@@ -207,11 +256,11 @@ public class CacheManager {
                             @Override
                             public void onError(Exception error) {
                                 error.printStackTrace();
-                                finishErrorImage(peer, error);
+                                finishErrorImage(key, error);
                             }
                         });
                     } catch (Exception e) {
-                        finishErrorImage(peer, e);
+                        finishErrorImage(key, e);
                     }
                 }
             });
@@ -237,6 +286,7 @@ public class CacheManager {
             deliverLoadedImage(callback, cached);
             return;
         }
+
         Bitmap cachedUnderLock;
         boolean owner = false;
         synchronized (imageInFlight) {
@@ -265,7 +315,7 @@ public class CacheManager {
                     try {
                         final CacheFile cacheFile = dbHelper.findFile(peer, messageId, preview);
                         final long now = System.currentTimeMillis();
-                        final boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= FILES_TTL_MILLIS;
+                        final boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= filesTtlMillis;
 
                         if (cacheFile != null) {
                             Bitmap bitmap;
@@ -297,8 +347,14 @@ public class CacheManager {
                         String userToken = App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
 
                         if (!App.isNetworkAvailable()) {
-                            if (fallbackBitmap != null) finishLoadedImage(key, fallbackBitmap);
-                            else finishErrorImage(key, new Exception("Offline"));
+                            if (fallbackBitmap != null) {
+                                if (cacheFile != null) {
+                                    dbHelper.touch(cacheFile.id, now, false);
+                                }
+                                finishLoadedImage(key, fallbackBitmap);
+                            } else {
+                                finishErrorImage(key, new Exception("Offline"));
+                            }
                             return;
                         }
                         final Bitmap finalFallback = fallbackBitmap;
@@ -317,19 +373,21 @@ public class CacheManager {
                                             imageBytes, -1, -1, true);
 
                                     if (bitmap != null) {
-                                        CacheFile freshFile = new CacheFile();
-                                        freshFile.createdAt = System.currentTimeMillis();
-                                        freshFile.lastUsed = freshFile.createdAt;
-                                        freshFile.isAvatar = false;
-                                        freshFile.preview = preview;
-                                        freshFile.peer = peer;
-                                        freshFile.messageId = messageId;
-                                        freshFile.filename = preview ? "preview_" + UUID.randomUUID().toString() : UUID.randomUUID().toString();
-                                        freshFile.size = imageBytes.length;
+                                        if (storeMedia) {
+                                            CacheFile freshFile = new CacheFile();
+                                            freshFile.createdAt = System.currentTimeMillis();
+                                            freshFile.lastUsed = freshFile.createdAt;
+                                            freshFile.isAvatar = false;
+                                            freshFile.preview = preview;
+                                            freshFile.peer = peer;
+                                            freshFile.messageId = messageId;
+                                            freshFile.filename = preview ? "preview_" + UUID.randomUUID().toString() : UUID.randomUUID().toString();
+                                            freshFile.size = imageBytes.length;
 
-                                        if (fileHelper.saveFileBytes(freshFile.filename, imageBytes, true)) {
-                                            dbHelper.saveFile(freshFile);
-                                            trimFilesDiskCache(false);
+                                            if (fileHelper.saveFileBytes(freshFile.filename, imageBytes, true)) {
+                                                dbHelper.saveFile(freshFile);
+                                                trimFilesDiskCache(false);
+                                            }
                                         }
 
                                         memoryCache.put(key, bitmap);
@@ -372,7 +430,7 @@ public class CacheManager {
                 try {
                     final CacheFile cacheFile = dbHelper.findFile(peer, messageId, false);
                     final long now = System.currentTimeMillis();
-                    final boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= FILES_TTL_MILLIS;
+                    final boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= filesTtlMillis;
 
                     if (cacheFile != null) {
                         File file = new File(fileHelper.getFullAppdataPath(cacheFile.filename));
@@ -406,18 +464,20 @@ public class CacheManager {
                                         @Override
                                         public void run() {
                                             try {
-                                                CacheFile freshVideo = new CacheFile();
-                                                freshVideo.createdAt = System.currentTimeMillis();
-                                                freshVideo.lastUsed = freshVideo.createdAt;
-                                                freshVideo.isAvatar = false;
-                                                freshVideo.preview = false;
-                                                freshVideo.peer = peer;
-                                                freshVideo.messageId = messageId;
-                                                freshVideo.filename = safeName;
-                                                freshVideo.size = file.length();
+                                                if (storeMedia) {
+                                                    CacheFile freshVideo = new CacheFile();
+                                                    freshVideo.createdAt = System.currentTimeMillis();
+                                                    freshVideo.lastUsed = freshVideo.createdAt;
+                                                    freshVideo.isAvatar = false;
+                                                    freshVideo.preview = false;
+                                                    freshVideo.peer = peer;
+                                                    freshVideo.messageId = messageId;
+                                                    freshVideo.filename = safeName;
+                                                    freshVideo.size = file.length();
 
-                                                dbHelper.saveFile(freshVideo);
-                                                trimFilesDiskCache(false);
+                                                    dbHelper.saveFile(freshVideo);
+                                                    trimFilesDiskCache(false);
+                                                }
 
                                                 postVideoLoaded(callback, file);
                                             } catch (Exception e) {
@@ -446,7 +506,8 @@ public class CacheManager {
     }
 
     public void saveHistory(final String peer, final long lastUsed, final String jsonString) {
-        String filename = "hist_" + peer;
+        if (!storeChats) return;
+        String filename = "hist" + peer;
         fileHelper.saveFileText(filename, jsonString, true);
         dbHelper.saveHistory(peer, filename, lastUsed);
     }
@@ -520,6 +581,10 @@ public class CacheManager {
 
                     if (fileHelper.copyFile(src, dst)) {
                         dbHelper.touch(cacheFile.id, System.currentTimeMillis(), false);
+
+                        String mimeType = FileHelper.getMimeType(dst.getName());
+                        FileHelper.scanFileForGallery(App.get(), dst.getAbsolutePath(), mimeType);
+
                         mainHandler.post(new Runnable() {
                             @Override
                             public void run() {
@@ -582,16 +647,14 @@ public class CacheManager {
     private void trimFilesDiskCache(boolean avatars) {
         synchronized (diskTrimLock) {
             long currentSize = dbHelper.getFilesSize(avatars);
+            long limit = avatars ? avatarLimit : filesLimit;
 
-            while (currentSize > (avatars ? AVATAR_LIMIT : FILES_LIMIT)) {
+            while (currentSize > limit) {
                 CacheFile oldest = dbHelper.getOldestFile(avatars);
-                if (oldest == null) {
-                    break;
-                }
+                if (oldest == null) break;
 
                 dbHelper.deleteFileById(oldest.id);
                 fileHelper.deleteFile(oldest.filename, true);
-
                 currentSize -= oldest.size;
             }
         }
@@ -601,36 +664,74 @@ public class CacheManager {
         synchronized (diskTrimLock) {
             long currentSize = dbHelper.getHistorySize();
 
-            while (currentSize > CHATS_LIMIT) {
+            while (currentSize > chatsLimit) {
                 CacheHistory oldest = dbHelper.getOldestHistory();
-                if (oldest == null) {
-                    break;
-                }
+                if (oldest == null) break;
 
                 dbHelper.deleteHistoryById(oldest.id);
                 fileHelper.deleteFile(oldest.filename, true);
-
                 currentSize -= oldest.size;
             }
         }
     }
 
-    public void wipeCache(final Runnable onDone) {
-        memoryCache.trimToSize(0);
+    public void wipeFilesCache(final Runnable onDone, final boolean avatars) {
+        memoryCache.wipe(avatars);
 
+        final String removeKey = avatars ? "ava" : "img";
         synchronized (imageInFlight) {
-            imageInFlight.clear();
+            java.util.Iterator<java.util.Map.Entry<String, java.util.ArrayList<ImageCallback>>> it =
+                    imageInFlight.entrySet().iterator();
+
+            while (it.hasNext()) {
+                java.util.Map.Entry<String, java.util.ArrayList<ImageCallback>> entry = it.next();
+                String key = entry.getKey();
+                if (key != null && key.startsWith(removeKey)) {
+                    it.remove();
+                }
+            }
         }
 
-        failedImageKeys.clear();
+        if (!avatars) {
+            failedImageKeys.clear();
+        }
 
+        ioExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (diskTrimLock) {
+                    java.util.List<String> fileNames = null;
+                    try {
+                        fileNames = dbHelper.getFileNames(avatars);
+                        dbHelper.clearFiles(avatars);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    if (fileNames != null) {
+                        for (String name : fileNames) {
+                            try {
+                                fileHelper.deleteFile(name, true);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+
+                if (onDone != null) {
+                    mainHandler.post(onDone);
+                }
+            }
+        });
+    }
+
+    public void wipeChatsCache(final Runnable onDone) {
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    dbHelper.clearFiles();
                     dbHelper.clearHistory();
-                    dbHelper.clearPending();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -641,11 +742,13 @@ public class CacheManager {
 
                     if (files != null) {
                         for (File file : files) {
-                            if (file.isFile() && !"instances.json".equals(file.getName())) {
+                            if (file.isFile() && file.getName().startsWith("hist")) {
                                 file.delete();
                             }
                         }
                     }
+
+                    fileHelper.deleteFile("dialogs.json", true);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -655,5 +758,32 @@ public class CacheManager {
                 }
             }
         }, "cache-wipe").start();
+    }
+
+    public void wipeCache(final Runnable onDone) {
+        wipeFilesCache(null, true);
+        wipeFilesCache(null, false);
+        wipeChatsCache(onDone);
+    }
+
+    public long getAvatarsSize() { return dbHelper.getFilesSize(true); }
+    public long getMediaSize() { return dbHelper.getFilesSize(false); }
+    public long getChatsSize() { return dbHelper.getHistorySize(); }
+    public long getStorageSavedSize() {
+        File mediaDir = new File(FileHelper.getMediaDirectoryPath());
+        return getDirectorySize(mediaDir);
+    }
+
+    private long getDirectorySize(File dir) {
+        if (dir == null || !dir.exists()) return 0;
+        long size = 0;
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isFile()) size += f.length();
+                else size += getDirectorySize(f);
+            }
+        }
+        return size;
     }
 }
