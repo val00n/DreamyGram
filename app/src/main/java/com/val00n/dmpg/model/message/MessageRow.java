@@ -31,4 +31,5 @@ public class MessageRow {
     public String mediaType;
     public String mediaMime;
     public MediaGroup mediaGroup;
+    public boolean isGroupStart;
 }

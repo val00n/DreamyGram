@@ -2,9 +2,14 @@ package com.val00n.dmpg.ui.chat;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -14,6 +19,7 @@ import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
@@ -28,15 +34,25 @@ import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.model.User;
+import com.val00n.dmpg.model.message.MessageMedia;
 import com.val00n.dmpg.model.message.MessageReply;
 import com.val00n.dmpg.model.message.MessageRow;
 import com.val00n.dmpg.model.message.PendingMessage;
+import com.val00n.dmpg.services.FileHelper;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.MessageFileActions;
 import com.val00n.dmpg.ui.AvatarViewBinder;
 import com.val00n.dmpg.ui.ImageViewBinder;
 import com.val00n.dmpg.ui.main.MainActivity;
 import com.val00n.dmpg.ui.StartupActivity;
+import com.val00n.dmpg.utils.BitmapUtils;
+
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -63,6 +79,7 @@ public class ChatActivity extends Activity {
     private TextView tooltipText;
     private LinearLayout bottomContainerContent;
     private ImageButton tooltipClose;
+    private ImageView tooltipPreview;
     private ImageButton backToBottomButton;
     private TextView networkStatusText;
 
@@ -89,11 +106,11 @@ public class ChatActivity extends Activity {
     private boolean isTyping;
     private boolean isSavedMessages;
 
-    private volatile boolean cancelInProgress;
     private volatile long pollToken = 0;
     private volatile boolean hasUpdateOffset = false;
     private volatile boolean initialSyncInProgress = false;
     private volatile boolean historyGap = false;
+    private volatile boolean skipNextPauseHistoryGap = false;
     private volatile boolean historyRefreshInProgress = false;
     private volatile boolean historyRefreshScheduled = false;
 
@@ -116,19 +133,27 @@ public class ChatActivity extends Activity {
 
     private App.NetworkListener networkListener;
     private boolean hasCachedHistory = false;
-    private boolean sendingPending = false;
-    private boolean startedOnce = false;
     private volatile boolean pendingCheckScheduled = false;
     private volatile boolean pendingCheckInProgress = false;
+    private File pendingAttachmentFile;
+    private String pendingAttachmentName;
+    private String pendingAttachmentMime;
+    private boolean pendingAttachmentAsFile;
+    private boolean pendingAttachmentIsImage;
+    private boolean pendingAttachmentAsSpoiler;
+    private int pendingAttachmentWidth;
+    private int pendingAttachmentHeight;
 
     private static final int OFFLINE_CHECK_MILLIS = 6000;
     private static final int UPDATE_TIMEOUT_SECS = 30;
     private static final int UPDATE_POLL_MILLIS = 3000;
     private static final int STATUS_UPDATE_MILLIS = 5000;
-    private static final int REQUEST_FORWARD = 1;
     private static final int PENDING_CHECK_DELAY_MILLIS = 3000;
     private static final int PENDING_CHECK_RETRY_MILLIS = 7000;
     private static final int PENDING_UNCERTAIN_TIMEOUT_SECS = 20;
+    private static final int REQUEST_FORWARD = 1;
+    private static final int REQUEST_PICK_IMAGE = 2;
+    private static final int REQUEST_PICK_FILE = 3;
 
     private final Runnable pendingCheckTask = new Runnable() {
         @Override
@@ -203,6 +228,7 @@ public class ChatActivity extends Activity {
         tooltipLayout = (LinearLayout) findViewById(R.id.chatTooltip);
         tooltipClose = (ImageButton) findViewById(R.id.chatTooltipCloseButton);
         tooltipText = (TextView) findViewById(R.id.chatTooltipText);
+        tooltipPreview = (ImageView) findViewById(R.id.chatTooltipPreview);
         bottomContainerContent = (LinearLayout) findViewById(R.id.chatBottomContainerContent);
         backToBottomButton = (ImageButton) findViewById(R.id.chatBackToBottomButton);
         networkStatusText = (TextView) findViewById(R.id.chatNetworkStatusText);
@@ -430,7 +456,9 @@ public class ChatActivity extends Activity {
                         }
                         break;
                     default:
-                        if (text != null && text.length() > 0) {
+                        if (pendingAttachmentFile != null) {
+                            sendMediaMessage(text);
+                        } else if (text != null && text.length() > 0) {
                             sendMessage(text);
                         }
                         break;
@@ -438,6 +466,22 @@ public class ChatActivity extends Activity {
 
                 restoreActionMode();
                 chatInputEditText.setText("");
+            }
+        });
+
+        chatAttachButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showAttachMenu();
+            }
+        });
+
+        tooltipPreview.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (pendingAttachmentFile != null) {
+                    showMediaActionMenu();
+                }
             }
         });
 
@@ -466,6 +510,7 @@ public class ChatActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        skipNextPauseHistoryGap = false;
         Instance selected = App.getInstanceManager().getSelectedInstance();
         if (instance == null || !instance.equals(selected)) {
             navigateToStartup();
@@ -501,7 +546,11 @@ public class ChatActivity extends Activity {
         super.onPause();
         isPaused = true;
         isPolling = false;
-        historyGap = true;
+        if (skipNextPauseHistoryGap) {
+            skipNextPauseHistoryGap = false;
+        } else {
+            historyGap = true;
+        }
         historyRefreshScheduled = false;
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
         chatUpdatesHandler.removeCallbacks(historyRefreshTask);
@@ -523,9 +572,14 @@ public class ChatActivity extends Activity {
         super.onDestroy();
         isActivityDied = true;
         historyRefreshScheduled = false;
+
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
         chatUpdatesHandler.removeCallbacks(historyRefreshTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
+
+        if (pendingAttachmentFile != null) {
+            pendingAttachmentFile.delete();
+        }
     }
 
     private AlbumView.Listener albumListener = new AlbumView.Listener() {
@@ -548,6 +602,18 @@ public class ChatActivity extends Activity {
         }
     };
 
+    private final MessagesAdapter.MediaClickListener mediaClickListener = new MessagesAdapter.MediaClickListener() {
+        @Override
+        public void onImageClick(MessageRow item) {
+            openImageViewer(item);
+        }
+
+        @Override
+        public void onVideoClick(MessageRow item) {
+            openVideoViewer(item);
+        }
+    };
+
     private void openImageViewer(MessageRow item) {
         if (item == null) return;
 
@@ -556,7 +622,21 @@ public class ChatActivity extends Activity {
         Intent intent = new Intent(this, ImageViewerActivity.class);
         intent.putExtra("PEER", peer);
         intent.putExtra("MESSAGE_ID", item.messageId);
-        startActivity(intent);
+        if (item.mediaMime != null) {
+            intent.putExtra("MEDIA_MIME", item.mediaMime);
+        }
+        if (item.message != null && item.message.media != null) {
+            intent.putExtra("MEDIA_NAME", item.message.media.name);
+            intent.putExtra("MEDIA_SIZE", item.message.media.size);
+        }
+
+        skipNextPauseHistoryGap = true;
+        try {
+            startActivity(intent);
+        } catch (RuntimeException e) {
+            skipNextPauseHistoryGap = false;
+            throw e;
+        }
     }
 
     private void openVideoViewer(MessageRow item) {
@@ -569,7 +649,14 @@ public class ChatActivity extends Activity {
         intent.putExtra("MESSAGE_ID", item.messageId);
         intent.putExtra("FILENAME", item.message.media.name);
         intent.putExtra("MEDIA_MIME", item.message.media.mime);
-        startActivity(intent);
+
+        skipNextPauseHistoryGap = true;
+        try {
+            startActivity(intent);
+        } catch (RuntimeException e) {
+            skipNextPauseHistoryGap = false;
+            throw e;
+        }
     }
 
     private void tryStartPolling() {
@@ -666,7 +753,109 @@ public class ChatActivity extends Activity {
         historyResponse.messages.add(pending);
 
         sendPending(entry);
-        chatMessages.setSelection(chatMessages.getCount() - 1);
+        chatMessages.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!isActivityDied) {
+                    chatMessages.setSelection(chatMessages.getCount() - 1);
+                }
+            }
+        });
+    }
+
+    private void sendMediaMessage(String caption) {
+        if (historyResponse == null || messagesAdapter == null || pendingAttachmentFile == null) {
+            return;
+        }
+
+        if (messageAction == MessageAction.EDIT) {
+            Toast.makeText(this, "Finish editing first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        chatSendButton.setEnabled(false);
+
+        final String replyId = messageAction == MessageAction.REPLY && targetMessageId != null
+                ? targetMessageId : null;
+
+        Message pending = new Message(caption, nextLocalMessageId--, peerId);
+        pending.out = true;
+        pending.date = System.currentTimeMillis() / 1000;
+
+        if (replyId != null) {
+            pending.reply = buildPendingReply(replyId);
+        }
+
+        MessageMedia media = new MessageMedia();
+        media.type = (pendingAttachmentMime != null && pendingAttachmentMime.startsWith("image/") && !pendingAttachmentAsFile)
+                ? "photo" : "document";
+        media.mime = pendingAttachmentMime;
+        media.name = pendingAttachmentName;
+        media.size = pendingAttachmentFile.length();
+        media.width = pendingAttachmentWidth;
+        media.height = pendingAttachmentHeight;
+        pending.media = media;
+
+        int baseId = getMaxServerMessageId();
+        PendingMessage entry = new PendingMessage(pending, replyId, baseId);
+        entry.attachmentFile = pendingAttachmentFile;
+        entry.attachmentName = pendingAttachmentName;
+        entry.attachmentMime = pendingAttachmentMime;
+        entry.attachmentAsFile = pendingAttachmentAsFile;
+        entry.attachmentAsSpoiler = pendingAttachmentAsSpoiler;
+
+        pendingMessages.add(entry);
+        historyResponse.messages.add(pending);
+
+        pendingAttachmentFile = null;
+        pendingAttachmentName = null;
+        pendingAttachmentMime = null;
+        pendingAttachmentAsFile = false;
+        pendingAttachmentIsImage = false;
+        pendingAttachmentAsSpoiler = false;
+
+        sendPending(entry);
+        chatMessages.post(new Runnable() {
+           @Override
+            public void run() {
+               if (!isActivityDied) {
+                   chatMessages.setSelection(chatMessages.getCount() - 1);
+               }
+           }
+        });
+    }
+
+    private void showAttachMenu() {
+        if (messageAction == MessageAction.EDIT) {
+            Toast.makeText(this, "Finish editing first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Attach")
+                .setItems(new String[]{"Photo", "File"}, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (which == 0) {
+                            pickAttachment("image/*", REQUEST_PICK_IMAGE);
+                        } else {
+                            pickAttachment("*/*", REQUEST_PICK_FILE);
+                        }
+                    }
+                })
+                .show();
+    }
+
+    private void pickAttachment(String mime, int requestCode) {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType(mime);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        try {
+            startActivityForResult(Intent.createChooser(intent, "Select file"), requestCode);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, "No file picker found", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private int getMaxServerMessageId() {
@@ -695,63 +884,88 @@ public class ChatActivity extends Activity {
         pending.messageState = Message.MessageState.MESSAGE_SENDING;
         messagesAdapter.notifyDataSetChanged();
 
-        mpgService.sendMessage(userToken, peerId, pending.text, entry.replyId, null, null, null,
-                new MPGramService.ApiCallback<String>() {
+        MPGramService.ApiCallback<String> callback = new MPGramService.ApiCallback<String>() {
+            @Override
+            public void onSuccess(final String result) {
+                runOnUiThread(new Runnable() {
                     @Override
-                    public void onSuccess(final String result) {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (isActivityDied) return;
-
-                                if (pending.id > 0) {
-                                    chatSendButton.setEnabled(true);
-                                    return;
-                                }
-
-                                if ("1".equals(result)) {
-                                    entry.accepted = true;
-                                    pending.messageState = Message.MessageState.MESSAGE_SENT;
-                                } else {
-                                    entry.uncertain = true;
-                                    pending.messageState = Message.MessageState.MESSAGE_SENDING;
-                                }
-
-                                messagesAdapter.notifyDataSetChanged();
-                                schedulePendingCheck(PENDING_CHECK_DELAY_MILLIS);
-                                chatSendButton.setEnabled(true);
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onError(final Exception error) {
-                        error.printStackTrace();
-
+                    public void run() {
                         if (isActivityDied) return;
-                        if (App.isSessionDead(error.getMessage(), ChatActivity.this)) return;
 
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (isActivityDied) return;
+                        if (pending.id > 0) {
+                            chatSendButton.setEnabled(true);
+                            return;
+                        }
 
-                                if (pending.id > 0) {
-                                    chatSendButton.setEnabled(true);
-                                    return;
-                                }
+                        if ("1".equals(result)) {
+                            entry.accepted = true;
+                            pending.messageState = Message.MessageState.MESSAGE_SENT;
+                            deleteEntryAttachment(entry);
+                        } else {
+                            entry.uncertain = true;
+                            pending.messageState = Message.MessageState.MESSAGE_SENDING;
+                        }
 
-                                entry.uncertain = true;
-                                pending.messageState = Message.MessageState.MESSAGE_SENDING;
-                                messagesAdapter.notifyDataSetChanged();
-                                schedulePendingCheck(PENDING_CHECK_DELAY_MILLIS);
-                                chatSendButton.setEnabled(true);
-                            }
-                        });
+                        messagesAdapter.notifyDataSetChanged();
+                        schedulePendingCheck(PENDING_CHECK_DELAY_MILLIS);
+                        chatSendButton.setEnabled(true);
                     }
                 });
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                error.printStackTrace();
+
+                if (isActivityDied) return;
+                if (App.isSessionDead(error.getMessage(), ChatActivity.this)) return;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isActivityDied) return;
+
+                        if (pending.id > 0) {
+                            chatSendButton.setEnabled(true);
+                            return;
+                        }
+
+                        entry.uncertain = true;
+                        pending.messageState = Message.MessageState.MESSAGE_SENDING;
+                        messagesAdapter.notifyDataSetChanged();
+                        schedulePendingCheck(PENDING_CHECK_DELAY_MILLIS);
+                        chatSendButton.setEnabled(true);
+                    }
+                });
+            }
+        };
+
+        if (entry.attachmentFile != null) {
+            mpgService.sendMedia(
+                    userToken,
+                    peerId,
+                    entry.attachmentFile,
+                    entry.attachmentName,
+                    entry.attachmentMime,
+                    pending.text,
+                    entry.replyId,
+                    entry.attachmentAsFile,
+                    entry.attachmentAsSpoiler,
+                    false,
+                    callback
+            );
+        } else {
+            mpgService.sendMessage(userToken, peerId, pending.text, entry.replyId,
+                    null, null, null, callback);
+        }
     }
 
+    private void deleteEntryAttachment(PendingMessage entry) {
+        if (entry.attachmentFile != null) {
+            entry.attachmentFile.delete();
+            entry.attachmentFile = null;
+        }
+    }
 
     private void update(ArrayList<Update> u) {
         if (u == null || historyResponse == null || historyResponse.messages == null) return;
@@ -913,6 +1127,14 @@ public class ChatActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_PICK_IMAGE || requestCode == REQUEST_PICK_FILE) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                importPickedUri(data.getData(), requestCode == REQUEST_PICK_FILE);
+            }
+            return;
+        }
+
         if (requestCode == REQUEST_FORWARD && resultCode == RESULT_OK && data != null
                 && fwdMessageId != null && fwdPeerId != null) {
             String targetPeer = data.getStringExtra("ID");
@@ -923,6 +1145,174 @@ public class ChatActivity extends Activity {
                 fwdPeerId = null;
                 fwdMessageId = null;
             }
+        }
+    }
+
+    private void importPickedUri(final Uri uri, final boolean asFile) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                File outFile = null;
+                InputStream in = null;
+                OutputStream out = null;
+
+                try {
+                    final String name = getDisplayName(uri);
+                    String mime = getContentResolver().getType(uri);
+
+                    if (mime == null || mime.length() == 0) {
+                        mime = FileHelper.getMimeType(name);
+                    }
+
+                    final String finalMime = mime;
+
+                    outFile = new File(getCacheDir(),
+                            "upload_" + System.currentTimeMillis() + ".tmp");
+
+                    in = getContentResolver().openInputStream(uri);
+                    if (in == null) throw new IOException("Cannot open stream");
+
+                    out = new FileOutputStream(outFile);
+                    byte[] buffer = new byte[8192];
+                    int read;
+
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                    }
+
+                    out.flush();
+
+                    final File finalFile = outFile;
+
+                    int width = 0;
+                    int height = 0;
+
+                    if (!asFile && finalMime != null && finalMime.startsWith("image/")) {
+                        BitmapFactory.Options options = new BitmapFactory.Options();
+                        options.inJustDecodeBounds = true;
+                        BitmapFactory.decodeFile(outFile.getAbsolutePath(), options);
+
+                        if (options.outWidth > 0 && options.outHeight > 0) {
+                            width = options.outWidth;
+                            height = options.outHeight;
+                        }
+                    }
+
+                    final int imageWidth = width;
+                    final int imageHeight = height;
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isActivityDied) return;
+                            showAttachment(finalFile, name, finalMime, asFile, imageWidth, imageHeight);
+                        }
+                    });
+                } catch (final Exception e) {
+                    if (outFile != null) outFile.delete();
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isActivityDied) return;
+                            Toast.makeText(ChatActivity.this,
+                                    "Cannot read file: " + e.getMessage(),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } finally {
+                    closeQuietly(in);
+                    closeQuietly(out);
+                }
+            }
+        }).start();
+    }
+
+    private void showAttachment(File file, String name, String mime, boolean asFile, int width, int height) {
+        clearPendingAttachment(true);
+
+        pendingAttachmentFile = file;
+        pendingAttachmentName = name;
+        pendingAttachmentMime = mime;
+        pendingAttachmentAsFile = asFile;
+        pendingAttachmentIsImage = mime != null && mime.startsWith("image/");
+        pendingAttachmentWidth = width;
+        pendingAttachmentHeight = height;
+
+        tooltipLayout.setVisibility(View.VISIBLE);
+        if (messageAction == MessageAction.NONE) {
+            tooltipText.setText("Attach: " + name);
+        }
+
+        tooltipPreview.setVisibility(View.VISIBLE);
+
+        if (pendingAttachmentIsImage) {
+            Bitmap bitmap = BitmapUtils.decodeSampledBitmapFromFile(
+                    file.getAbsolutePath(), 96, 96, true);
+
+            if (bitmap != null) {
+                tooltipPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                tooltipPreview.setImageBitmap(bitmap);
+            } else {
+                tooltipPreview.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                tooltipPreview.setImageResource(android.R.drawable.ic_menu_report_image);
+            }
+        } else {
+            tooltipPreview.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            tooltipPreview.setImageResource(android.R.drawable.ic_menu_save);
+        }
+    }
+
+    private void clearPendingAttachment(boolean deleteFile) {
+        if (deleteFile && pendingAttachmentFile != null) {
+            pendingAttachmentFile.delete();
+        }
+
+        pendingAttachmentFile = null;
+        pendingAttachmentName = null;
+        pendingAttachmentMime = null;
+        pendingAttachmentAsFile = false;
+        pendingAttachmentIsImage = false;
+        pendingAttachmentAsSpoiler = false;
+        pendingAttachmentWidth = 0;
+        pendingAttachmentHeight = 0;
+
+        if (tooltipPreview != null) {
+            tooltipPreview.setImageDrawable(null);
+            tooltipPreview.setVisibility(View.GONE);
+        }
+    }
+
+    private String getDisplayName(Uri uri) {
+        String name = null;
+        Cursor cursor = null;
+
+        try {
+            cursor = getContentResolver().query(uri,
+                    new String[]{"_display_name"}, null, null, null);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                name = cursor.getString(0);
+            }
+        } catch (Exception ignored) {
+            // a
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+
+        if (name == null || name.length() == 0) {
+            name = uri.getLastPathSegment();
+        }
+
+        name = FileHelper.sanitizeFileName(name);
+        return name != null ? name : "file";
+    }
+
+    private static void closeQuietly(Closeable c) {
+        if (c != null) {
+            try {
+                c.close();
+            } catch (IOException ignored) { }
         }
     }
 
@@ -1016,6 +1406,8 @@ public class ChatActivity extends Activity {
 
     private void restoreActionMode() {
         tooltipLayout.setVisibility(View.GONE);
+        clearPendingAttachment(true);
+
         if (messageAction == MessageAction.EDIT) {
             chatInputEditText.setText(draftMessage);
         }
@@ -1072,6 +1464,7 @@ public class ChatActivity extends Activity {
                             PendingMessage entry = findPendingByMessage(msg);
 
                             if (entry != null) {
+                                deleteEntryAttachment(entry);
                                 pendingMessages.remove(entry);
                             }
 
@@ -1142,6 +1535,53 @@ public class ChatActivity extends Activity {
 
                     case INFO:
                         showMessageInfo(msg);
+                        break;
+                }
+            }
+        });
+
+        builder.create().show();
+    }
+
+    private void showMediaActionMenu() {
+        ArrayList<String> options = new ArrayList<String>();
+        final ArrayList<Integer> actions = new ArrayList<Integer>();
+
+        options.add("Remove");
+        actions.add(1);
+
+        options.add(pendingAttachmentAsSpoiler ? "Send without spoiler" : "Mark as spoiler");
+        actions.add(2);
+
+        options.add(pendingAttachmentAsFile ? "Send as usual" : "Send as file");
+        actions.add(3);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Choose action");
+
+        builder.setItems(options.toArray(new String[options.size()]), new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                int action = actions.get(which);
+
+                switch (action) {
+                    case 1:
+                        clearPendingAttachment(true);
+                        if (messageAction == MessageAction.REPLY) {
+                            Message target = findMessageById(targetMessageId);
+                            tooltipText.setText("Reply: " + (target != null && target.text != null ? target.text : ""));
+                            tooltipLayout.setVisibility(View.VISIBLE);
+                        } else {
+                            tooltipLayout.setVisibility(View.GONE);
+                        }
+                        break;
+
+                    case 2:
+                        pendingAttachmentAsSpoiler = !pendingAttachmentAsSpoiler;
+                        break;
+
+                    case 3:
+                        pendingAttachmentAsFile = !pendingAttachmentAsFile;
                         break;
                 }
             }
@@ -1265,9 +1705,11 @@ public class ChatActivity extends Activity {
                     new ImageViewBinder(App.getCacheManager()));
 
             messagesAdapter.setAlbumListener(albumListener);
+            messagesAdapter.setMediaClickListener(mediaClickListener);
             chatMessages.setAdapter(messagesAdapter);
         } else {
             messagesAdapter.setAlbumListener(albumListener);
+            messagesAdapter.setMediaClickListener(mediaClickListener);
 
             int headerCount = chatMessages.getHeaderViewsCount();
             int firstPos = chatMessages.getFirstVisiblePosition();

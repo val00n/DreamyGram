@@ -422,7 +422,11 @@ public class CacheManager {
     }
 
     public void loadVideo(final String peer, final String messageId, final String filename, final VideoCallback callback) {
-        final String safeName = "vid_" + peer + "_" + messageId + "_" + FileHelper.sanitizeFileName(filename);
+        String safe = FileHelper.sanitizeFileName(filename);
+        if (safe == null || safe.length() == 0) {
+            safe = "video.mp4";
+        }
+        final String safeName = "vid_" + peer + "_" + messageId + "_" + safe;
 
         ioExecutor.execute(new Runnable() {
             @Override

@@ -45,6 +45,7 @@ public class MessagesAdapter extends BaseAdapter {
     private LayoutInflater inflater;
     private boolean isSavedMessages;
     private AlbumView.Listener albumListener;
+    private MediaClickListener mediaClickListener;
 
     private final FrameLayout.LayoutParams photoLayoutParams;
 
@@ -55,6 +56,11 @@ public class MessagesAdapter extends BaseAdapter {
 
     private static final int MAX_MEDIA_GROUP_SIZE = 10;
     private static final int GROUP_INTERVAL_SECONDS = 6 * 60;
+
+    public interface MediaClickListener {
+        void onImageClick(MessageRow item);
+        void onVideoClick(MessageRow item);
+    }
 
     public MessagesAdapter(ArrayList<Message> items, Map<String, User> users, Map<String, Chat> chats, boolean isSavedMessages,
                            AvatarViewBinder avatarViewBinder, ImageViewBinder imageViewBinder) {
@@ -127,6 +133,10 @@ public class MessagesAdapter extends BaseAdapter {
 
     public void setAlbumListener(AlbumView.Listener listener) {
         this.albumListener = listener;
+    }
+
+    public void setMediaClickListener(MediaClickListener listener) {
+        this.mediaClickListener = listener;
     }
 
     @Override
@@ -210,7 +220,16 @@ public class MessagesAdapter extends BaseAdapter {
         }
 
         LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) holder.textLayout.getLayoutParams();
-        int vMargin = row.grouped ? 0 : rowMarginPx;
+        int vMargin;
+        if (row.grouped) {
+            vMargin = 0;
+        } else if (row.isGroupStart) {
+            vMargin = 0;
+        } else {
+            vMargin = rowMarginPx;
+        }
+
+
         if (lp.leftMargin != rowMarginPx || lp.rightMargin != rowMarginPx
                 || lp.topMargin != vMargin || lp.bottomMargin != vMargin) {
             lp.setMargins(rowMarginPx, vMargin, rowMarginPx, vMargin);
@@ -277,28 +296,39 @@ public class MessagesAdapter extends BaseAdapter {
                 holder.image.setSourceSize(row.mediaWidth, row.mediaHeight);
                 updateImageLayoutParams(holder.image, row.isSticker, viewType);
 
-                final String imagePeer = row.chatPeer != null ? row.chatPeer : row.peer;
+                if (row.message.id <= 0) {
+                    holder.image.setScaleType(ImageView.ScaleType.CENTER);
+                    holder.image.setOnClickListener(null);
+                    holder.image.setTag(null);
+                    holder.image.setImageResource(android.R.drawable.ic_menu_report_image);
+                } else {
+                    final String imagePeer = row.chatPeer != null ? row.chatPeer : row.peer;
 
-                holder.image.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        Intent intent = new Intent(v.getContext(), ImageViewerActivity.class);
-                        intent.putExtra("PEER", imagePeer);
-                        intent.putExtra("MESSAGE_ID", row.messageId);
-                        intent.putExtra("MEDIA_MIME", row.mediaMime);
-                        intent.putExtra("MEDIA_NAME", row.message.media.name);
-                        intent.putExtra("MEDIA_SIZE", row.message.media.size);
-                        v.getContext().startActivity(intent);
-                    }
-                });
+                    holder.image.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            if (mediaClickListener != null) {
+                                mediaClickListener.onImageClick(row);
+                            } else {
+                                Intent intent = new Intent(v.getContext(), ImageViewerActivity.class);
+                                intent.putExtra("PEER", imagePeer);
+                                intent.putExtra("MESSAGE_ID", row.messageId);
+                                intent.putExtra("MEDIA_MIME", row.mediaMime);
+                                intent.putExtra("MEDIA_NAME", row.message.media.name);
+                                intent.putExtra("MEDIA_SIZE", row.message.media.size);
+                                v.getContext().startActivity(intent);
+                            }
+                        }
+                    });
 
-                FileParams params = (row.isSticker
-                        && ("application/x-tgsticker".equals(row.mediaMime)
-                        || "video/webm".equals(row.mediaMime)))
-                        ? FileParams.fileThumb()
-                        : FileParams.preview();
+                    FileParams params = (row.isSticker
+                            && ("application/x-tgsticker".equals(row.mediaMime)
+                            || "video/webm".equals(row.mediaMime)))
+                            ? FileParams.fileThumb()
+                            : FileParams.preview();
 
-                imageViewBinder.bind(holder.image, imagePeer, row.messageId, row.thumb, params);
+                    imageViewBinder.bind(holder.image, imagePeer, row.messageId, row.thumb, params);
+                }
             } else if (row.isVideo) {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
@@ -321,11 +351,15 @@ public class MessagesAdapter extends BaseAdapter {
                 holder.image.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        Intent intent = new Intent(v.getContext(), VideoViewerActivity.class);
-                        intent.putExtra("PEER", imagePeer);
-                        intent.putExtra("MESSAGE_ID", row.messageId);
-                        intent.putExtra("FILENAME", row.message.media.name);
-                        v.getContext().startActivity(intent);
+                        if (mediaClickListener != null) {
+                            mediaClickListener.onVideoClick(row);
+                        } else {
+                            Intent intent = new Intent(v.getContext(), VideoViewerActivity.class);
+                            intent.putExtra("PEER", imagePeer);
+                            intent.putExtra("MESSAGE_ID", row.messageId);
+                            intent.putExtra("FILENAME", row.message.media.name);
+                            v.getContext().startActivity(intent);
+                        }
                     }
                 });
             } else if (row.isFile) {
@@ -374,11 +408,12 @@ public class MessagesAdapter extends BaseAdapter {
     }
 
     private boolean isGrouped(Message item, Message prev) {
-        return prev != null
-                && item.fwd == null
-                && prev.act == null
-                && item.date - prev.date < GROUP_INTERVAL_SECONDS
-                && isSameSender(item, prev);
+        if (prev == null || item.fwd != null || prev.act != null
+                || item.date - prev.date >= GROUP_INTERVAL_SECONDS
+                || !isSameSender(item, prev)) {
+            return false;
+        }
+        return true;
     }
 
     private void buildRows() {
@@ -423,6 +458,13 @@ public class MessagesAdapter extends BaseAdapter {
                         row.statusRes = getAlbumStatusRes(album);
                     }
 
+                    if (i + 1 < items.size()) {
+                        Message next = items.get(i + 1);
+                        if (!(next.act == null && !DateUtils.dayKey(next.date).equals(DateUtils.dayKey(item.date)))) {
+                            row.isGroupStart = isGrouped(next, item);
+                        }
+                    }
+
                     rows.add(row);
 
                     prev = album.get(album.size() - 1);
@@ -445,7 +487,9 @@ public class MessagesAdapter extends BaseAdapter {
 
         row.viewType = outgoing ? VIEW_TYPE_OUT : VIEW_TYPE_IN;
         row.message = item;
+
         row.grouped = !isNewDay && isGrouped(item, prev);
+
         row.content = item.text;
         row.title = getNameString(item);
         row.dateText = DateUtils.formatChatTime(item.date, false, 0);
@@ -453,12 +497,13 @@ public class MessagesAdapter extends BaseAdapter {
         row.chatPeer = item.peer_id;
         row.hasAvatar = hasAvatar(row.peer);
 
-        row.hasMedia = item.media != null && !item.media.hide && item.id > 0;
-
         row.isVideo = item.media != null && "video".equals(item.media.type);
         row.isPhoto = item.media != null && "photo".equals(item.media.type);
         row.isSticker = item.media != null && "sticker".equals(item.media.type);
         row.isFile = item.media != null && !row.isPhoto && !row.isVideo && !row.isSticker;
+
+        boolean localPhoto = item.out && item.id <= 0 && row.isPhoto;
+        row.hasMedia = item.media != null && !item.media.hide && (item.id > 0 || localPhoto);
 
         if (row.hasMedia) {
             row.messageId = Integer.toString(item.id);
@@ -533,6 +578,10 @@ public class MessagesAdapter extends BaseAdapter {
         return row;
     }
 
+    private static boolean hasText(Message message) {
+        return message != null && message.text != null && !message.text.trim().isEmpty();
+    }
+
     private boolean canBeAlbumFirst(Message message) {
         if (message == null || message.act != null || message.id <= 0) return false;
         if (message.media == null || message.media.hide) return false;
@@ -543,6 +592,7 @@ public class MessagesAdapter extends BaseAdapter {
     private boolean canBeAlbumChild(Message message) {
         if (message == null || message.act != null || message.id <= 0) return false;
         if (message.media == null || message.media.hide) return false;
+        if (hasText(message)) return false;
         String t = message.media.type;
         return "photo".equals(t) || "video".equals(t);
     }
@@ -636,9 +686,15 @@ public class MessagesAdapter extends BaseAdapter {
             child.hasMedia = true;
 
             if (message.media != null) {
+                child.isVideo = "video".equals(message.media.type);
+                child.isPhoto = "photo".equals(message.media.type);
+                child.isSticker = "sticker".equals(message.media.type);
+                child.isFile = !child.isPhoto && !child.isVideo && !child.isSticker;
+
                 child.mediaWidth = message.media.width;
                 child.mediaHeight = message.media.height;
                 child.mediaType = message.media.type;
+                child.mediaMime = message.media.mime;
                 child.thumb = message.media.thumb;
             }
 
@@ -803,7 +859,7 @@ public class MessagesAdapter extends BaseAdapter {
     }
 
     private static boolean isSameSender(Message item, Message prev) {
-        if (prev == null) return false;
+        if (prev == null || item.out != prev.out) return false;
         String id = item.from_id != null && item.from_id.length() > 0 ? item.from_id : item.peer_id;
         String prevId = prev.from_id != null && prev.from_id.length() > 0 ? prev.from_id : prev.peer_id;
         return id != null && id.equals(prevId);

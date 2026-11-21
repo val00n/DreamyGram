@@ -76,6 +76,23 @@ public class RestClient {
         throw new IOException("HTTP " + response.getStatusCode() + ": " + response.readAsString());
     }
 
+    public String postMultipart(String baseURL, String endpoint, Map<String, String> queryParams, Map<String, String> headers, MultipartBody body, boolean disableCertCheck) throws IOException {
+        return postMultipart(baseURL, endpoint, 0, queryParams, headers, body, disableCertCheck);
+    }
+
+    public String postMultipart(String baseURL, String endpoint, int timeout, Map<String, String> queryParams, Map<String, String> headers, MultipartBody body, boolean disableCertCheck) throws IOException {
+        HttpRequest request = new HttpRequest(baseURL, endpoint, "POST");
+        request = addQueryParams(queryParams, request);
+        request = addHeaders(headers, request);
+
+        int readTimeout = timeout > 0 ? (timeout + 15) * 1000 : FILE_READ_TIMEOUT;
+        HttpResponse response = HttpClient.send(request, body, CONNECT_TIMEOUT, readTimeout, disableCertCheck);
+        if (response.isSuccessfulCode()) {
+            return response.readAsString();
+        }
+        throw new IOException("HTTP " + response.getStatusCode() + ": " + response.readAsString());
+    }
+
     public byte[] postBytes(String baseURL, String endpoint, Map<String, String> queryParams, Map<String, String> headers, boolean disableCertCheck) throws IOException {
         return postBytes(baseURL, endpoint, queryParams, headers, null, null, disableCertCheck);
     }

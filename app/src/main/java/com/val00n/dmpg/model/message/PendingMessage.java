@@ -1,9 +1,17 @@
 package com.val00n.dmpg.model.message;
 
+import java.io.File;
+
 public class PendingMessage {
     public final Message message;
     public final String replyId;
     public final long createdAt;
+
+    public File attachmentFile;
+    public String attachmentName;
+    public String attachmentMime;
+    public boolean attachmentAsFile;
+    public boolean attachmentAsSpoiler;
 
     public int minServerId;
     public long lastAttemptAt;

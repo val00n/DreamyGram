@@ -14,6 +14,7 @@ import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.network.HttpClient;
+import com.val00n.dmpg.network.MultipartBody;
 import com.val00n.dmpg.network.RestClient;
 import java.io.File;
 import java.io.IOException;
@@ -663,6 +664,64 @@ public class MPGramService {
 
                     String response = parsedJson.getNullableString("res");
 
+                    if (callback != null) callback.onSuccess(response);
+                } catch (Exception e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
+    public void sendMedia(String userToken, String peer, final File file, final String fileName, final String mimeType, final String caption, String reply, boolean uncompressed, boolean spoiler, boolean voice, final ApiCallback<String> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "sendMedia");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("peer", peer);
+
+        if (reply != null && reply.length() > 0) {
+            queryParams.put("reply", reply);
+        }
+        if (uncompressed) {
+            queryParams.put("uncompressed", "1");
+        }
+        if (spoiler) {
+            queryParams.put("spoiler", "1");
+        }
+        if (voice) {
+            queryParams.put("voice", "1");
+        }
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    MultipartBody body = new MultipartBody();
+                    if (caption != null && caption.length() > 0) {
+                        body.addField("text", caption);
+                    }
+                    body.addFile("file", file, fileName, mimeType);
+
+                    String stringResponse = restClient.postMultipart(
+                            instance.baseURL,
+                            instance.apiEndpoint,
+                            queryParams,
+                            headers,
+                            body,
+                            instance.disableCertCheck
+                    );
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
+                    String response = parsedJson.getNullableString("res");
                     if (callback != null) callback.onSuccess(response);
                 } catch (Exception e) {
                     if (callback != null) callback.onError(e);

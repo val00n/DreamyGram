@@ -62,6 +62,14 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
         msg.media.type = "video";
         msg.media.mime = mime != null ? mime : "video/mp4";
 
+        if (filename == null || filename.trim().length() == 0) {
+            filename = MessageFileActions.getFileName(peer, msg, true);
+        }
+        if (filename == null || filename.trim().length() == 0) {
+            filename = "video_" + messageId + ".mp4";
+        }
+        msg.media.name = filename;
+
         Log.d(TAG, "onCreate: PEER: " + peer + ", MSG: " + messageId + ", FILE: " + filename);
 
         videoContainer = (FrameLayout) findViewById(R.id.videoContainer);
@@ -110,7 +118,6 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
 
         private void startVideoPlayback() {
         if (filename == null || filename.isEmpty()) {
-            Toast.makeText(this, "Invalid filename", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }

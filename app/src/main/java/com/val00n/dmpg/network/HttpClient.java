@@ -41,7 +41,24 @@ public class HttpClient {
     }
 
     public static HttpResponse send(HttpRequest request, int connectTimeout, int readTimeout, boolean disableCertCheck) throws IOException {
+        return sendInternal(request, null, connectTimeout, readTimeout, disableCertCheck);
+    }
+
+    public static HttpResponse send(HttpRequest request, MultipartBody body, boolean disableCertCheck) throws IOException {
+        return send(request, body, DEFAULT_TIMEOUT, DEFAULT_READ_TIMEOUT, disableCertCheck);
+    }
+
+    public static HttpResponse send(HttpRequest request, MultipartBody body, int connectTimeout, int readTimeout, boolean disableCertCheck) throws IOException {
+        if (body == null) {
+            throw new IOException("MultipartBody is null");
+        }
+        return sendInternal(request, body, connectTimeout, readTimeout, disableCertCheck);
+    }
+
+    private static HttpResponse sendInternal(HttpRequest request, MultipartBody multipartBody, int connectTimeout, int readTimeout, boolean disableCertCheck) throws IOException {
         HttpURLConnection connection = null;
+        InputStream is = null;
+        OutputStream os = null;
 
         try {
             URL url = new URL(request.buildUrl());
@@ -50,46 +67,68 @@ public class HttpClient {
             connection.setConnectTimeout(connectTimeout);
             connection.setReadTimeout(readTimeout);
             connection.setInstanceFollowRedirects(true);
+            connection.setUseCaches(false);
 
             if (disableCertCheck && connection instanceof HttpsURLConnection) {
                 configureTrustAll((HttpsURLConnection) connection);
             }
 
-            // headers
             connection.setRequestProperty("User-Agent", userAgent);
             connection.setRequestProperty("Accept", "*/*");
             for (Map.Entry<String, String> h : request.getHeaders().entrySet()) {
                 connection.setRequestProperty(h.getKey(), h.getValue());
             }
 
-            // body
-            if (request.getBody() != null) {
+            if (multipartBody != null) {
+                connection.setDoOutput(true);
+                connection.setRequestProperty("Content-Type", multipartBody.getContentType());
+
+                long contentLength = multipartBody.getContentLength();
+                if (contentLength <= Integer.MAX_VALUE) {
+                    connection.setFixedLengthStreamingMode((int) contentLength);
+                } else {
+                    connection.setChunkedStreamingMode(8192);
+                }
+
+                os = connection.getOutputStream();
+                multipartBody.writeTo(os);
+                os.flush();
+                os.close();
+                os = null;
+            } else if (request.getBody() != null) {
                 connection.setDoOutput(true);
                 if (request.getBodyContentType() != null) {
                     connection.setRequestProperty("Content-Type", request.getBodyContentType());
                 }
-                connection.setFixedLengthStreamingMode(request.getBody().length);
-                OutputStream os = connection.getOutputStream();
-                os.write(request.getBody());
+
+                byte[] reqBody = request.getBody();
+                connection.setFixedLengthStreamingMode(reqBody.length);
+
+                os = connection.getOutputStream();
+                os.write(reqBody);
                 os.flush();
                 os.close();
+                os = null;
             }
 
-            // read
             int code = connection.getResponseCode();
             String msg = connection.getResponseMessage();
             Map<String, List<String>> respHeaders = connection.getHeaderFields();
 
-            InputStream is = (code >= 200 && code < 300) ? connection.getInputStream() : connection.getErrorStream();
-            byte[] body = readStream(is);
-            if (is != null) is.close();
+            is = (code >= 200 && code < 300) ? connection.getInputStream() : connection.getErrorStream();
+            byte[] respBody = readStream(is);
 
-            return new HttpResponse(code, msg, respHeaders, body);
-
-        } catch (IOException e) {
-            throw e;
+            return new HttpResponse(code, msg, respHeaders, respBody);
         } finally {
-            if (connection != null) connection.disconnect();
+            if (os != null) {
+                try { os.close(); } catch (IOException ignored) {}
+            }
+            if (is != null) {
+                try { is.close(); } catch (IOException ignored) {}
+            }
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
     }
 
