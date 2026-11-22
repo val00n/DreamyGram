@@ -12,6 +12,8 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.FileParams;
 import com.val00n.dmpg.model.message.Act;
@@ -44,6 +46,7 @@ public class MessagesAdapter extends BaseAdapter {
 
     private LayoutInflater inflater;
     private boolean isSavedMessages;
+    private String topic;
     private AlbumView.Listener albumListener;
     private MediaClickListener mediaClickListener;
 
@@ -131,6 +134,14 @@ public class MessagesAdapter extends BaseAdapter {
         notifyDataSetChanged();
     }
 
+    public void setTopic(String topic) {
+        if ((this.topic == null && topic == null) || (this.topic != null && this.topic.equals(topic))) {
+            return;
+        }
+        this.topic = topic;
+        notifyDataSetChanged();
+    }
+
     public void setAlbumListener(AlbumView.Listener listener) {
         this.albumListener = listener;
     }
@@ -180,6 +191,10 @@ public class MessagesAdapter extends BaseAdapter {
             holder.divider = convertView.findViewById(R.id.messageDivider);
             holder.playOverlay = convertView.findViewById(R.id.messagePlayOverlay);
 
+            if (holder.image != null) {
+                holder.defaultImageScaleType = holder.image.getScaleType();
+            }
+
             if (viewType == VIEW_TYPE_OUT) {
                 holder.status = (ImageView) convertView.findViewById(R.id.messageStatus);
             }
@@ -219,20 +234,14 @@ public class MessagesAdapter extends BaseAdapter {
             holder.textLayout.setPadding(0, 0, 0, 0);
         }
 
+        boolean nextGrouped = (position + 1 < rows.size()) && rows.get(position + 1).grouped;
+        int topMargin = row.grouped ? 0 : rowMarginPx;
+        int bottomMargin = nextGrouped ? 0 : rowMarginPx;
+
         LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) holder.textLayout.getLayoutParams();
-        int vMargin;
-        if (row.grouped) {
-            vMargin = 0;
-        } else if (row.isGroupStart) {
-            vMargin = 0;
-        } else {
-            vMargin = rowMarginPx;
-        }
-
-
         if (lp.leftMargin != rowMarginPx || lp.rightMargin != rowMarginPx
-                || lp.topMargin != vMargin || lp.bottomMargin != vMargin) {
-            lp.setMargins(rowMarginPx, vMargin, rowMarginPx, vMargin);
+                || lp.topMargin != topMargin || lp.bottomMargin != bottomMargin) {
+            lp.setMargins(rowMarginPx, topMargin, rowMarginPx, bottomMargin);
             holder.textLayout.setLayoutParams(lp);
         }
 
@@ -302,6 +311,9 @@ public class MessagesAdapter extends BaseAdapter {
                     holder.image.setTag(null);
                     holder.image.setImageResource(android.R.drawable.ic_menu_report_image);
                 } else {
+                    if (holder.defaultImageScaleType != null) {
+                        holder.image.setScaleType(holder.defaultImageScaleType);
+                    }
                     final String imagePeer = row.chatPeer != null ? row.chatPeer : row.peer;
 
                     holder.image.setOnClickListener(new View.OnClickListener() {
@@ -338,6 +350,9 @@ public class MessagesAdapter extends BaseAdapter {
                 holder.image.square(true);
                 holder.image.setSourceSize(0, 0);
                 updateImageLayoutParams(holder.image, false, viewType);
+                if (holder.defaultImageScaleType != null) {
+                    holder.image.setScaleType(holder.defaultImageScaleType);
+                }
                 holder.file.setVisibility(View.GONE);
 
                 if (holder.playOverlay != null) {
@@ -458,13 +473,6 @@ public class MessagesAdapter extends BaseAdapter {
                         row.statusRes = getAlbumStatusRes(album);
                     }
 
-                    if (i + 1 < items.size()) {
-                        Message next = items.get(i + 1);
-                        if (!(next.act == null && !DateUtils.dayKey(next.date).equals(DateUtils.dayKey(item.date)))) {
-                            row.isGroupStart = isGrouped(next, item);
-                        }
-                    }
-
                     rows.add(row);
 
                     prev = album.get(album.size() - 1);
@@ -531,7 +539,13 @@ public class MessagesAdapter extends BaseAdapter {
             }
         }
 
-        if (item.reply != null) {
+        boolean isTopicRootReply = item.reply != null
+                && (item.reply.quote == null || item.reply.quote.length() == 0)
+                && ((topic != null && topic.equals(item.reply.replyId))
+                || (item.reply.msg != null && item.reply.msg.act != null
+                && "TopicCreate".equals(item.reply.msg.act.action)));
+
+        if (item.reply != null && !isTopicRootReply) {
             String replyAuthorId = null;
 
             if (item.reply.msg != null) {
@@ -583,14 +597,14 @@ public class MessagesAdapter extends BaseAdapter {
     }
 
     private boolean canBeAlbumFirst(Message message) {
-        if (message == null || message.act != null || message.id <= 0) return false;
+        if (message == null || message.act != null || message.id <= 0 || message.group <= 0) return false;
         if (message.media == null || message.media.hide) return false;
         String t = message.media.type;
         return "photo".equals(t) || "video".equals(t);
     }
 
     private boolean canBeAlbumChild(Message message) {
-        if (message == null || message.act != null || message.id <= 0) return false;
+        if (message == null || message.act != null || message.id <= 0 || message.group <= 0) return false;
         if (message.media == null || message.media.hide) return false;
         if (hasText(message)) return false;
         String t = message.media.type;
@@ -758,9 +772,13 @@ public class MessagesAdapter extends BaseAdapter {
     }
 
     private String getAvatarPeer(Message item) {
-        return item.from_id != null && item.from_id.length() > 0
-                ? item.from_id
-                : item.peer_id;
+        if (item.from_id != null && item.from_id.length() > 0) {
+            return item.from_id;
+        }
+        if (item.out && App.selfId != null && (item.id <= 0 || item.peer_id == null || !item.peer_id.startsWith("-"))) {
+            return App.selfId;
+        }
+        return item.peer_id;
     }
 
     private String getNameString(String id) {
@@ -918,6 +936,7 @@ public class MessagesAdapter extends BaseAdapter {
         ImageView avatar;
         TextView title;
         AspectImageView image;
+        ImageView.ScaleType defaultImageScaleType;
         AlbumView album;
         FileMessageView file;
         TextView date;

@@ -2,6 +2,7 @@ package com.val00n.dmpg.ui;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.util.Log;
@@ -35,6 +36,7 @@ public class StartupActivity extends Activity {
     private Button phoneLoginButton;
     private Button instanceSettingsButton;
 
+    private SharedPreferences prefs;
     private MPGramService mpgService;
     private CountDownTimer continueCountdownTimer;
     private Instance instance;
@@ -42,6 +44,9 @@ public class StartupActivity extends Activity {
     private boolean isMessagesSeen = false;
     private boolean isChecking = false;
     private volatile boolean isActivityDied = false;
+
+    private static final String PREFS_NAME = "startup_prefs";
+    private static final String KEY_MESSAGES_SEEN = "is_messages_seen";
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -61,6 +66,13 @@ public class StartupActivity extends Activity {
         phoneLoginButton = (Button) findViewById(R.id.startupPhoneLoginButton);
         instanceSettingsButton = (Button) findViewById(R.id.startupInstanceSettingsButton);
 
+        prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        isMessagesSeen = prefs.getBoolean(KEY_MESSAGES_SEEN, false);
+
+        if (getIntent().hasExtra("SKIP")) {
+            isMessagesSeen = true;
+        }
+
         welcomeNextButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -74,6 +86,9 @@ public class StartupActivity extends Activity {
             @Override
             public void onClick(View v) {
                 isMessagesSeen = true;
+
+                prefs.edit().putBoolean(KEY_MESSAGES_SEEN, true).commit();
+
                 hideEverything();
                 loginTypesLayout.setVisibility(View.VISIBLE);
             }
@@ -99,10 +114,6 @@ public class StartupActivity extends Activity {
                 navigateToInstanceSettings();
             }
         });
-
-        if (getIntent().hasExtra("SKIP")) {
-            isMessagesSeen = true;
-        }
 
         if (!App.isNetworkAvailable()) {
             Toast.makeText(this, "Network unavailable", Toast.LENGTH_SHORT).show();
@@ -162,13 +173,7 @@ public class StartupActivity extends Activity {
                 navigateToMain(false);
             } else {
                 Toast.makeText(this, "No network or known session", Toast.LENGTH_LONG).show();
-
-                hideEverything();
-
-                if (!isMessagesSeen)
-                    welcomeLayout.setVisibility(View.VISIBLE);
-                else
-                    loginTypesLayout.setVisibility(View.VISIBLE);
+                showAuthOrWelcomeScreen();
             }
 
             return;
@@ -199,12 +204,7 @@ public class StartupActivity extends Activity {
                             App.getSessionManager().clearSession(instance.baseURL);
                             App.getCacheManager().wipeCache(null);
 
-                            hideEverything();
-
-                            if (!isMessagesSeen)
-                                welcomeLayout.setVisibility(View.VISIBLE);
-                            else
-                                loginTypesLayout.setVisibility(View.VISIBLE);
+                            showAuthOrWelcomeScreen();
                         }
                     }
                 });
@@ -235,12 +235,15 @@ public class StartupActivity extends Activity {
                             return;
                         }
 
-                        if (savedToken != null && savedToken.length() > 0 && App.getCacheManager().hasCachedDialogs()) {
-                            Toast.makeText(StartupActivity.this, "Server unavailable, showing cached data", Toast.LENGTH_LONG).show();
+                        if (savedToken != null && savedToken.length() > 0) {
+                            if (App.getCacheManager().hasCachedDialogs()) {
+                                Toast.makeText(StartupActivity.this, "Server unavailable, showing cached data", Toast.LENGTH_LONG).show();
+                            } else {
+                                Toast.makeText(StartupActivity.this, "Server unavailable", Toast.LENGTH_LONG).show();
+                            }
                             navigateToMain(true);
                             return;
                         }
-
 
                         if (error.getMessage() != null) {
                             Toast.makeText(StartupActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
@@ -248,16 +251,23 @@ public class StartupActivity extends Activity {
                             Toast.makeText(StartupActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
                         }
 
-                        hideEverything();
-
-                        if (!isMessagesSeen)
-                            welcomeLayout.setVisibility(View.VISIBLE);
-                        else
-                            loginTypesLayout.setVisibility(View.VISIBLE);
+                        showAuthOrWelcomeScreen();
                     }
                 });
             }
         });
+    }
+
+    private void showAuthOrWelcomeScreen() {
+        if (warningLayout.getVisibility() == View.VISIBLE || loginTypesLayout.getVisibility() == View.VISIBLE) {
+            return;
+        }
+        hideEverything();
+        if (!isMessagesSeen) {
+            welcomeLayout.setVisibility(View.VISIBLE);
+        } else {
+            loginTypesLayout.setVisibility(View.VISIBLE);
+        }
     }
 
     private void continueCooldown() {

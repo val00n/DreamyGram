@@ -6,6 +6,7 @@ import android.os.Looper;
 import android.util.Log;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.BuildConfig;
+import com.val00n.dmpg.model.ForumTopicResponse;
 import com.val00n.dmpg.model.dialog.DialogResponse;
 import com.val00n.dmpg.model.FileParams;
 import com.val00n.dmpg.model.message.HistoryResponse;
@@ -47,6 +48,7 @@ public class MPGramService {
     private static final int GET_HISTORY_LIMIT = 30; // TODO change this in settings
     private static final int CHECK_AUTH_TIMEOUT = 10;
     private static final int PROBE_HISTORY_LIMIT = 5;
+    private static final int TOPIC_LIMIT = 50;
 
     public static final int AVATAR_SIZE = 48; // TODO change this in settings
     public static final String FILE_PREVIEW_SIZE = "256"; // TODO change this in settings
@@ -535,9 +537,16 @@ public class MPGramService {
         });
     }
 
-    public void getHistory(final String peer, String offset_id, long offset_date, String userToken, final boolean cache, final ApiCallback<HistoryResponse> callback) {
+    public void getHistory(final String peer, String offset_id, long offset_date, String userToken, final boolean cache, final String topMsgId, final ApiCallback<HistoryResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
-        queryParams.put("method", "getHistory");
+        if (topMsgId != null && !topMsgId.isEmpty()) {
+            queryParams.put("method", "searchMessages");
+            queryParams.put("top_msg_id", topMsgId);
+            queryParams.put("q", "");
+            queryParams.put("filter", "Empty");
+        } else {
+            queryParams.put("method", "getHistory");
+        }
         queryParams.put("v", instance.apiVersion);
         queryParams.put("limit", Integer.toString(GET_HISTORY_LIMIT));
         queryParams.put("peer", peer);
@@ -551,7 +560,7 @@ public class MPGramService {
         }
 
         queryParams.put("media", "1");
-        queryParams.put("read", "1"); // FIXME: always read every loaded ones
+        queryParams.put("read", "1");
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
 
@@ -571,7 +580,7 @@ public class MPGramService {
                     }
 
                     if (cache && parsedJson.has("messages") && !parsedJson.has("error")) {
-                        App.getCacheManager().saveHistory(peer, System.currentTimeMillis(), stringResponse);
+                        App.getCacheManager().saveHistory(peer, topMsgId, System.currentTimeMillis(), stringResponse);
                     }
 
                     HistoryResponse response = new HistoryResponse(parsedJson);
@@ -584,10 +593,20 @@ public class MPGramService {
         });
     }
 
-    public void getRecentMessages(String peer, String userToken,
-                                  final ApiCallback<HistoryResponse> callback) {
+    public void getRecentMessages(String peer, String userToken, final ApiCallback<HistoryResponse> callback) {
+        getRecentMessages(peer, null, userToken, callback);
+    }
+
+    public void getRecentMessages(String peer, String topMsgId, String userToken, final ApiCallback<HistoryResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
-        queryParams.put("method", "getHistory");
+        if (topMsgId != null && topMsgId.length() > 0) {
+            queryParams.put("method", "searchMessages");
+            queryParams.put("top_msg_id", topMsgId);
+            queryParams.put("q", "");
+            queryParams.put("filter", "Empty");
+        } else {
+            queryParams.put("method", "getHistory");
+        }
         queryParams.put("v", instance.apiVersion);
         queryParams.put("peer", peer);
         queryParams.put("limit", Integer.toString(PROBE_HISTORY_LIMIT));
@@ -629,8 +648,15 @@ public class MPGramService {
             queryParams.put("text", text);
         }
 
-        if (reply != null) {
-            queryParams.put("reply", reply);
+        String effectiveReply = reply;
+        if ((effectiveReply == null || effectiveReply.length() == 0)
+                && fwdFrom == null && top != null
+                && top.length() > 0 && !"1".equals(top)) {
+            effectiveReply = top;
+        }
+
+        if (effectiveReply != null && effectiveReply.length() > 0) {
+            queryParams.put("reply", effectiveReply);
         }
 
         if (fwdFrom != null) {
@@ -672,23 +698,36 @@ public class MPGramService {
         });
     }
 
-    public void sendMedia(String userToken, String peer, final File file, final String fileName, final String mimeType, final String caption, String reply, boolean uncompressed, boolean spoiler, boolean voice, final ApiCallback<String> callback) {
+    public void sendMedia(String userToken, String peer, final File file, final String fileName, final String mimeType, final String caption, String reply, boolean uncompressed, boolean spoiler, boolean voice, String top, final ApiCallback<String> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "sendMedia");
         queryParams.put("v", instance.apiVersion);
         queryParams.put("peer", peer);
 
-        if (reply != null && reply.length() > 0) {
-            queryParams.put("reply", reply);
+        String effectiveReply = reply;
+        if ((effectiveReply == null || effectiveReply.length() == 0)
+                && top != null && top.length() > 0 && !"1".equals(top)) {
+            effectiveReply = top;
         }
+
+        if (effectiveReply != null && effectiveReply.length() > 0) {
+            queryParams.put("reply", effectiveReply);
+        }
+
         if (uncompressed) {
             queryParams.put("uncompressed", "1");
         }
+
         if (spoiler) {
             queryParams.put("spoiler", "1");
         }
+
         if (voice) {
             queryParams.put("voice", "1");
+        }
+
+        if (top != null) {
+            queryParams.put("top", top);
         }
 
         final Map<String, String> headers = buildHeaders(userToken, false, false);
@@ -804,10 +843,10 @@ public class MPGramService {
     }
 
     public void getUpdates(String[] filter, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, String userToken, final ApiCallback<ArrayList<Update>> callback) {
-        getUpdates(null, filter, limit, offset, messageId, read, timeoutSeconds, userToken, callback);
+        getUpdates(null, filter, limit, offset, messageId, read, timeoutSeconds, null, userToken, callback);
     }
 
-    public void getUpdates(String peer, String[] filter, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, String userToken, final ApiCallback<ArrayList<Update>> callback) {
+    public void getUpdates(String peer, String[] filter, String limit, String offset, String messageId, boolean read, final int timeoutSeconds, final String topMsgId, String userToken, final ApiCallback<ArrayList<Update>> callback) {
         final long enqueuedToken = activePollToken;
 
         final Map<String, String> queryParams = new HashMap<String, String>();
@@ -822,6 +861,10 @@ public class MPGramService {
         queryParams.put("media", "1");
         if (read) {
             queryParams.put("read", "1");
+        }
+
+        if (topMsgId != null) {
+            queryParams.put("top_msg", topMsgId);
         }
 
         if (filter != null && filter.length > 0) {
@@ -987,6 +1030,39 @@ public class MPGramService {
                     User response = new User(parsedJson);
 
                     if (callback != null) callback.onSuccess(response);
+                } catch (Exception e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
+    public void getForumTopics(final String peer, String userToken, final ApiCallback<ForumTopicResponse> callback) {
+        final Map<String, String> queryParams = new HashMap<>();
+        queryParams.put("method", "getForumTopics");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("peer", peer);
+        queryParams.put("limit", String.valueOf(TOPIC_LIMIT));
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
+
+                    JSONObject parsedJson = (JSONObject) JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        callback.onError(jsonError);
+                        return;
+                    }
+
+                    ForumTopicResponse result = new ForumTopicResponse(parsedJson);
+                    result.peer = peer;
+
+                    if (callback != null) callback.onSuccess(result);
                 } catch (Exception e) {
                     if (callback != null) callback.onError(e);
                 }

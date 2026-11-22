@@ -4,6 +4,7 @@
              android:layout_height="match_parent">
 
     <LinearLayout
+        android:id="@+id/mainDialogsRoot"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -41,6 +42,56 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
 
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/mainTopicsRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:padding="4dp">
+
+            <ImageView
+                android:id="@+id/mainTopicChatAvatar"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/avatar_placeholder"/>
+
+            <TextView
+                android:id="@+id/mainTopicTitleText"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Loading..."
+                android:textColor="@android:color/primary_text_dark"
+                android:textSize="24sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:layout_marginLeft="4dp"/>
+
+            <ImageButton
+                android:id="@+id/mainTopicBackButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@android:drawable/ic_menu_revert"/>
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            style="@style/HorizontalDivider" />
+
+        <ListView
+            android:id="@+id/mainTopicsListView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
     </LinearLayout>
 
     <ProgressBar

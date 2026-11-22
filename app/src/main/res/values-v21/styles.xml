@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:Theme.Material">
+        <item name="android:colorPrimary">#212121</item>
+        <item name="android:colorPrimaryDark">#000000</item>
+        <item name="android:colorAccent">#80CBC4</item>
+
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+
+        <item name="android:alertDialogTheme">@style/AppTheme.Dialog.Alert</item>
+        <item name="android:dialogTheme">@style/AppTheme.Dialog</item>
+    </style>
+
+    <style name="AppTheme.Dialog" parent="android:Theme.Material.Dialog">
+        <item name="android:colorAccent">#80CBC4</item>
+    </style>
+
+    <style name="AppTheme.Dialog.Alert" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">#80CBC4</item>
+    </style>
+
+    <style name="AppTheme.Fullscreen" parent="AppTheme">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="AppTheme">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+    </style>
+
+    <style name="HorizontalDivider">
+        <item name="android:background">#1FFFFFFF</item>
+    </style>
+</resources>

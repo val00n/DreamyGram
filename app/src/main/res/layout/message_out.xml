@@ -10,7 +10,7 @@
         android:id="@+id/messageDivider"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#40E0E0E0" />
+        style="@style/HorizontalDivider" />
 
     <LinearLayout
         android:id="@+id/messageCaptionLayout"

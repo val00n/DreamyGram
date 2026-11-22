@@ -45,7 +45,8 @@
             android:layout_height="wrap_content"
             android:text="Next"
             android:layout_alignParentBottom="true"
-            android:layout_marginTop="72dp"/>
+            android:layout_marginTop="72dp"
+            android:layout_marginBottom="16dp"/>
     </RelativeLayout>
 
     <RelativeLayout
@@ -70,9 +71,9 @@
             android:layout_height="0dp"
             android:layout_above="@+id/startupWarningNextButton">
             <TextView
-                android:padding="3dp"
+                android:padding="6dp"
                 android:gravity="center"
-                android:layout_width="300dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="17sp"
                 android:textColor="@android:color/primary_text_dark"
@@ -83,10 +84,11 @@
             android:id="@+id/startupWarningNextButton"
             android:layout_alignParentBottom="true"
             android:layout_centerHorizontal="true"
-            android:layout_width="128dp"
+            android:layout_width="148dp"
             android:layout_height="wrap_content"
-            android:text="Agree"
-            android:layout_marginTop="8dp"/>
+            android:text="Continue"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"/>
     </RelativeLayout>
 
     <RelativeLayout

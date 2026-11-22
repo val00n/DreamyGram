@@ -1,6 +1,7 @@
 package com.val00n.dmpg.ui.chat;
 
 import android.app.Activity;
+import android.content.res.Configuration;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
@@ -12,6 +13,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.MediaController;
 import android.widget.ProgressBar;
@@ -44,6 +46,11 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
     private File videoFile;
     private SurfaceHolder currentHolder;
     private boolean isSurfaceReady = false;
+
+    private int videoWidth = 0;
+    private int videoHeight = 0;
+    private int lastContainerWidth = 0;
+    private int lastContainerHeight = 0;
 
     private static final int MENU_SAVE = 1;
 
@@ -89,10 +96,30 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
                 }
             }
         });
+
+        videoContainer.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            public void onGlobalLayout() {
+                int w = videoContainer.getWidth();
+                int h = videoContainer.getHeight();
+                if (w > 0 && h > 0 && (w != lastContainerWidth || h != lastContainerHeight)) {
+                    lastContainerWidth = w;
+                    lastContainerHeight = h;
+                    updateVideoSize(w, h);
+                }
+            }
+        });
+
         videoContainer.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
 
-
         startVideoPlayback();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (videoContainer != null) {
+            videoContainer.requestLayout();
+        }
     }
 
     @Override
@@ -163,11 +190,13 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
 
     private void tryInitPlayer() {
         boolean hasFile = (videoFile != null && videoFile.exists());
-        boolean noPlayer = (mediaPlayer == null);
 
-
-        if (isSurfaceReady && hasFile && noPlayer) {
-            initMediaPlayer(currentHolder);
+        if (isSurfaceReady && hasFile) {
+            if (mediaPlayer == null) {
+                initMediaPlayer(currentHolder);
+            } else {
+                mediaPlayer.setDisplay(currentHolder);
+            }
         }
     }
 
@@ -175,6 +204,7 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
         if (videoFile == null || !videoFile.exists()) {
             return;
         }
+
         try {
             if (mediaPlayer != null) {
                 mediaPlayer.release();
@@ -226,32 +256,46 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
         Log.d(TAG, "onPrepared: SUCCESS!");
         progressBar.setVisibility(View.GONE);
 
-        int videoWidth = mp.getVideoWidth();
-        int videoHeight = mp.getVideoHeight();
+        videoWidth = mp.getVideoWidth();
+        videoHeight = mp.getVideoHeight();
 
-        if (videoWidth > 0 && videoHeight > 0) {
+        int containerWidth = videoContainer.getWidth();
+        int containerHeight = videoContainer.getHeight();
+        if (containerWidth <= 0 || containerHeight <= 0) {
             DisplayMetrics metrics = new DisplayMetrics();
             getWindowManager().getDefaultDisplay().getMetrics(metrics);
-            int screenWidth = metrics.widthPixels;
-            int screenHeight = metrics.heightPixels;
-
-            float scaleWidth = (float) screenWidth / videoWidth;
-            float scaleHeight = (float) screenHeight / videoHeight;
-
-            float scale = Math.min(scaleWidth, scaleHeight);
-
-            int targetWidth = (int) (videoWidth * scale);
-            int targetHeight = (int) (videoHeight * scale);
-
-            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(targetWidth, targetHeight);
-            params.gravity = Gravity.CENTER;
-            surfaceView.setLayoutParams(params);
+            containerWidth = metrics.widthPixels;
+            containerHeight = metrics.heightPixels;
         }
+        lastContainerWidth = containerWidth;
+        lastContainerHeight = containerHeight;
+        updateVideoSize(containerWidth, containerHeight);
 
         mediaController.setMediaPlayer(new MediaPlayerControlWrapper(mp));
         mediaController.setAnchorView(surfaceView);
         mediaController.show();
         mp.start();
+    }
+
+    private void updateVideoSize(int containerWidth, int containerHeight) {
+        if (videoWidth <= 0 || videoHeight <= 0 || containerWidth <= 0 || containerHeight <= 0) {
+            return;
+        }
+
+        float scaleWidth = (float) containerWidth / videoWidth;
+        float scaleHeight = (float) containerHeight / videoHeight;
+        float scale = Math.min(scaleWidth, scaleHeight);
+
+        int targetWidth = (int) (videoWidth * scale);
+        int targetHeight = (int) (videoHeight * scale);
+
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(targetWidth, targetHeight);
+        params.gravity = Gravity.CENTER;
+        surfaceView.setLayoutParams(params);
+
+        if (mediaController != null && mediaController.isShowing()) {
+            mediaController.show();
+        }
     }
 
     @Override

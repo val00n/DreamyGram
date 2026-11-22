@@ -13,6 +13,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
@@ -93,6 +95,7 @@ public class ChatActivity extends Activity {
     private String userToken;
     private String peerId;
     private String displayName;
+    private String topic;
     private String draftMessage;
     private String firstMessageId = "0";
     private int readOut;
@@ -123,7 +126,6 @@ public class ChatActivity extends Activity {
     private String fwdMessageId;
     private String targetMessageId;
 
-    private ArrayList<Update> updates;
     private String updateLimit = "200";
     private String updateOffset = "-1";
     private int updateFails = 0;
@@ -143,6 +145,8 @@ public class ChatActivity extends Activity {
     private boolean pendingAttachmentAsSpoiler;
     private int pendingAttachmentWidth;
     private int pendingAttachmentHeight;
+
+    private static final int MENU_REFRESH = 1;
 
     private static final int OFFLINE_CHECK_MILLIS = 6000;
     private static final int UPDATE_TIMEOUT_SECS = 30;
@@ -190,6 +194,9 @@ public class ChatActivity extends Activity {
         peerId = getIntent().getStringExtra("ID");
         displayName = getIntent().getStringExtra("NAME");
         readOut = getIntent().getIntExtra("READ_OUT", 0);
+
+        int t = getIntent().getIntExtra("TOPIC", -1);
+        topic = t > 0 ? String.valueOf(t) : null;
 
         if (App.selfId == null && userToken != null && instance != null) {
             final String reqBase = instance.baseURL;
@@ -250,7 +257,7 @@ public class ChatActivity extends Activity {
                 }
 
                 isPolling = true;
-                mpgService.getUpdates(peerId, null, updateLimit, updateOffset, firstMessageId, true, UPDATE_TIMEOUT_SECS, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
+                mpgService.getUpdates(peerId, null, updateLimit, updateOffset, firstMessageId, true, UPDATE_TIMEOUT_SECS, topic, userToken, new MPGramService.ApiCallback<ArrayList<Update>>() {
                     @Override
                     public void onSuccess(ArrayList<Update> result) {
                         isPolling = false;
@@ -582,6 +589,26 @@ public class ChatActivity extends Activity {
         }
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        super.onCreateOptionsMenu(menu);
+
+        MenuItem refresh = menu.add(0, MENU_REFRESH, 0, "Refresh");
+        refresh.setIcon(android.R.drawable.ic_menu_rotate);
+
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem menuItem) {
+        switch (menuItem.getItemId()) {
+            case MENU_REFRESH:
+                loadHistory(true, null, 0);
+            default:
+                return super.onOptionsItemSelected(menuItem);
+        }
+    }
+
     private AlbumView.Listener albumListener = new AlbumView.Listener() {
         @Override
         public void onMediaClick(MessageRow item, int index) {
@@ -701,7 +728,6 @@ public class ChatActivity extends Activity {
                         + " offset=" + updateOffset);
 
                 hasUpdateOffset = true;
-                updates = new ArrayList<Update>();
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -742,6 +768,7 @@ public class ChatActivity extends Activity {
         Message pending = new Message(text, nextLocalMessageId--, peerId);
         pending.out = true;
         pending.date = System.currentTimeMillis() / 1000;
+        pending.from_id = App.selfId;
 
         if (replyId != null) {
             pending.reply = buildPendingReply(replyId);
@@ -952,11 +979,12 @@ public class ChatActivity extends Activity {
                     entry.attachmentAsFile,
                     entry.attachmentAsSpoiler,
                     false,
+                    topic,
                     callback
             );
         } else {
             mpgService.sendMessage(userToken, peerId, pending.text, entry.replyId,
-                    null, null, null, callback);
+                    null, null, topic, callback);
         }
     }
 
@@ -1704,6 +1732,7 @@ public class ChatActivity extends Activity {
                     new AvatarViewBinder(App.getCacheManager()),
                     new ImageViewBinder(App.getCacheManager()));
 
+            messagesAdapter.setTopic(topic);
             messagesAdapter.setAlbumListener(albumListener);
             messagesAdapter.setMediaClickListener(mediaClickListener);
             chatMessages.setAdapter(messagesAdapter);
@@ -1786,7 +1815,7 @@ public class ChatActivity extends Activity {
             loadedHistory = 0;
             hasCachedHistory = false;
 
-            String cachedJsonString = App.getCacheManager().loadHistory(peerId);
+            String cachedJsonString = App.getCacheManager().loadHistory(peerId, topic);
 
             if (cachedJsonString != null) {
                 try {
@@ -1873,7 +1902,7 @@ public class ChatActivity extends Activity {
 
         isLoading = true;
 
-        mpgService.getHistory(peerId, offsetId, offsetDate, userToken, initial, new MPGramService.ApiCallback<HistoryResponse>() {
+        mpgService.getHistory(peerId, offsetId, offsetDate, userToken, initial, topic, new MPGramService.ApiCallback<HistoryResponse>() {
             @Override
             public void onSuccess(final HistoryResponse result) {
                runOnUiThread(new Runnable() {
@@ -2016,8 +2045,7 @@ public class ChatActivity extends Activity {
         final long currentToken = pollToken;
         pendingCheckInProgress = true;
 
-        mpgService.getRecentMessages(peerId, userToken,
-                new MPGramService.ApiCallback<HistoryResponse>() {
+        mpgService.getRecentMessages(peerId, topic, userToken, new MPGramService.ApiCallback<HistoryResponse>() {
                     @Override
                     public void onSuccess(final HistoryResponse result) {
                         runOnUiThread(new Runnable() {
@@ -2142,7 +2170,7 @@ public class ChatActivity extends Activity {
 
         Log.d(TAG, "refreshing history after gap");
 
-        mpgService.getHistory(peerId, null, 0, userToken, false, new MPGramService.ApiCallback<HistoryResponse>() {
+        mpgService.getHistory(peerId, null, 0, userToken, false, topic, new MPGramService.ApiCallback<HistoryResponse>() {
             @Override
             public void onSuccess(final HistoryResponse result) {
                 runOnUiThread(new Runnable() {
@@ -2296,8 +2324,7 @@ public class ChatActivity extends Activity {
         chatSendButton.setEnabled(false);
         pendingCheckInProgress = true;
 
-        mpgService.getRecentMessages(peerId, userToken,
-                new MPGramService.ApiCallback<HistoryResponse>() {
+        mpgService.getRecentMessages(peerId, topic, userToken, new MPGramService.ApiCallback<HistoryResponse>() {
                     @Override
                     public void onSuccess(final HistoryResponse result) {
                         runOnUiThread(new Runnable() {

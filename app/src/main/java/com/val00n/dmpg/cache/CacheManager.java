@@ -615,6 +615,21 @@ public class CacheManager {
         });
     }
 
+    private static String buildHistoryKey(String peer, String topic) {
+        if (topic != null && topic.length() > 0) {
+            return peer + "_" + topic;
+        }
+        return peer;
+    }
+
+    public void saveHistory(final String peer, final String topic, final long lastUsed, final String jsonString) {
+        saveHistory(buildHistoryKey(peer, topic), lastUsed, jsonString);
+    }
+
+    public String loadHistory(final String peer, final String topic) {
+        return loadHistory(buildHistoryKey(peer, topic));
+    }
+
     private void postVideoLoaded(final VideoCallback callback, final File file) {
         if (callback == null) return;
         mainHandler.post(new Runnable() {

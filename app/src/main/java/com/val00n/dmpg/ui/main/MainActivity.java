@@ -1,20 +1,30 @@
 package com.val00n.dmpg.ui.main;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.val00n.dmpg.App;
+import com.val00n.dmpg.BuildConfig;
 import com.val00n.dmpg.R;
+import com.val00n.dmpg.model.ForumTopic;
+import com.val00n.dmpg.model.ForumTopicResponse;
 import com.val00n.dmpg.model.dialog.Dialog;
 import com.val00n.dmpg.model.dialog.DialogResponse;
 import com.val00n.dmpg.model.dialog.DialogRow;
@@ -30,44 +40,55 @@ import com.val00n.dmpg.ui.AvatarViewBinder;
 import com.val00n.dmpg.utils.SortUtils;
 import java.util.ArrayList;
 import java.util.Collections;
-
 import cc.nnproject.json.JSONObject;
-
 import static android.content.ContentValues.TAG;
 
 public class MainActivity extends Activity {
 
+    private LinearLayout dialogsRoot;
+    private LinearLayout topicsRoot;
     private ProgressBar progressBar;
     private ListView dialogsListView;
+    private ListView topicListView;
+    private ArrayAdapter<String> topicsAdapter;
     private DialogsAdapter dialogsAdapter;
     private ImageButton searchButton;
     private ImageButton settingsButton;
+    private ImageButton topicBackButton;
     private Button loadMoreButton;
     private View footerView;
     private TextView networkStatusText;
+    private TextView topicTitleText;
+    private ImageView topicChatAvatar;
 
     private MPGramService mpgService;
     private DialogResponse dialogResponse;
+    private ForumTopicResponse forumTopicResponse;
     private Instance instance;
     private String userToken;
     private Handler dialogsUpdatesHandler;
     private Handler statusUpdateHandler;
     private Runnable statusUpdateTask;
     private Runnable dialogsUpdateTask;
+    private AvatarViewBinder avatarViewBinder;
     private String[] updatesFilter;
     private int loadedDialogs;
     private final ArrayList<String> dialogsRefreshPeers = new ArrayList<String>();
     private boolean dialogsRefreshPending = false;
     private boolean forwardMode;
+    private String displayedTopicsPeer;
+
     volatile private boolean isLoading;
     volatile private boolean isPaused;
     volatile private boolean isPolling;
     volatile private boolean isActivityDied;
 
-    private volatile boolean cancelInProgress = false;
-    private volatile long pollToken = 0;
-    private volatile boolean hasUpdateOffset = false;
-    private volatile boolean initialSyncInProgress = false;
+    volatile private long pollToken = 0;
+    volatile private boolean hasUpdateOffset = false;
+    volatile private boolean initialSyncInProgress = false;
+
+    private static final int MENU_REFRESH = 1;
+    private static final int MENU_ABOUT = 2;
 
     private ArrayList<Update> updates;
     private String updateLimit = "200";
@@ -123,11 +144,19 @@ public class MainActivity extends Activity {
             }
         }
 
+        dialogsRoot = (LinearLayout) findViewById(R.id.mainDialogsRoot);
+        topicsRoot = (LinearLayout) findViewById(R.id.mainTopicsRoot);
         progressBar = (ProgressBar) findViewById(R.id.mainProgressBar);
         dialogsListView = (ListView) findViewById(R.id.mainDialogsListView);
+        topicListView = (ListView) findViewById(R.id.mainTopicsListView);
         searchButton = (ImageButton) findViewById(R.id.mainSearchButton);
         settingsButton = (ImageButton) findViewById(R.id.mainSettingsButton);
+        topicBackButton = (ImageButton) findViewById(R.id.mainTopicBackButton);
         networkStatusText = (TextView) findViewById(R.id.mainNetworkStatusText);
+        topicTitleText = (TextView) findViewById(R.id.mainTopicTitleText);
+        topicChatAvatar = (ImageView) findViewById(R.id.mainTopicChatAvatar);
+
+        avatarViewBinder = new AvatarViewBinder(App.getCacheManager());
 
         if (getIntent().getBooleanExtra("SERVER_UNAVAILABLE", false)) {
             showServerUnavailable();
@@ -147,6 +176,16 @@ public class MainActivity extends Activity {
                                        "updateUserTyping", "updateChatUserTyping", "updateChannelUserTyping",
                                        "updateReadHistoryOutbox", "updateReadChannelOutbox"};
 
+        topicListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                ForumTopic topic = forumTopicResponse.topics.get(position);
+                if (topic != null) {
+                    navigateToChat(forumTopicResponse.peer, topic.title, forumTopicResponse.readOut, topic.id);
+                }
+            }
+        });
+
         dialogsListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -157,6 +196,18 @@ public class MainActivity extends Activity {
                 }
 
                 Dialog dialog = ((DialogRow) item).dialog;
+
+                if (dialog.chat != null && dialog.chat.f) {
+                    dialogsRoot.setVisibility(View.GONE);
+                    topicsRoot.setVisibility(View.VISIBLE);
+
+                    topicTitleText.setText(dialog.getDisplayName(App.selfId));
+
+                    getTopics(dialog.peerId);
+
+                    avatarViewBinder.bind(topicChatAvatar, dialog.peerId, dialog.hasAvatar());
+                    return;
+                }
 
                 if (forwardMode) {
                     Intent intent = new Intent();
@@ -179,6 +230,14 @@ public class MainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 navigateToSettings();
+            }
+        });
+
+        topicBackButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                dialogsRoot.setVisibility(View.VISIBLE);
+                topicsRoot.setVisibility(View.GONE);
             }
         });
 
@@ -353,6 +412,52 @@ public class MainActivity extends Activity {
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
         mpgService.endPollSession(pollToken, userToken);
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        super.onCreateOptionsMenu(menu);
+
+        MenuItem refresh = menu.add(0, MENU_REFRESH, 0, "Refresh");
+        refresh.setIcon(android.R.drawable.ic_menu_rotate);
+        MenuItem about = menu.add(0, MENU_ABOUT, 1, "About");
+        about.setIcon(android.R.drawable.ic_menu_info_details);
+
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem menuItem) {
+        switch (menuItem.getItemId()) {
+            case MENU_REFRESH:
+                refreshDialogs(loadedDialogs);
+                break;
+            case MENU_ABOUT:
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("About")
+                        .setMessage("DreamyGram " + BuildConfig.VERSION_NAME + "\n\nAndroid 1.0+ lightweight Telegram client. Powered by MPGram WEB API.\n\nval00n ;3")
+                        .setNeutralButton("Ok", null)
+                        .show();
+                return true;
+            default:
+                return super.onOptionsItemSelected(menuItem);
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0) {
+            if (topicsRoot.getVisibility() == View.VISIBLE) {
+                topicsRoot.setVisibility(View.GONE);
+                dialogsRoot.setVisibility(View.VISIBLE);
+            }
+
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
 
     private void tryStartPolling() {
         dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
@@ -820,6 +925,62 @@ public class MainActivity extends Activity {
         refreshDialogs(limit);
     }
 
+    private void getTopics(final String peer) {
+        if (forumTopicResponse != null && peer.equals(forumTopicResponse.peer)) {
+            setTopics(peer);
+            return;
+        }
+
+        if (topicsAdapter != null && !peer.equals(displayedTopicsPeer)) {
+            topicsAdapter.clear();
+            topicsAdapter.notifyDataSetChanged();
+        }
+
+        mpgService.getForumTopics(peer, userToken, new MPGramService.ApiCallback<ForumTopicResponse>() {
+            @Override
+            public void onSuccess(final ForumTopicResponse result) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isActivityDied) return;
+                        forumTopicResponse = result;
+                        setTopics(peer);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(Exception error) {
+                error.printStackTrace();
+            }
+        });
+    }
+
+    private void setTopics(String peer) {
+        if (topicsAdapter == null) {
+            topicsAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
+            topicListView.setAdapter(topicsAdapter);
+        } else if (peer.equals(displayedTopicsPeer)) {
+            return;
+        } else {
+            topicsAdapter.clear();
+        }
+
+        for (int i = 0; i < forumTopicResponse.topics.size(); i++) {
+            ForumTopic t = forumTopicResponse.topics.get(i);
+            if (t != null) {
+                if (t.title != null && t.title.length() > 0) {
+                    topicsAdapter.add(t.title);
+                } else {
+                    topicsAdapter.add(String.valueOf(t.id));
+                }
+            }
+        }
+
+        displayedTopicsPeer = peer;
+        topicsAdapter.notifyDataSetChanged();
+    }
+
     private void removeMissingRefreshPeers() {
         if (dialogsRefreshPeers.isEmpty()) return;
 
@@ -910,13 +1071,17 @@ public class MainActivity extends Activity {
         footerView.setVisibility(allLoaded ? View.GONE : View.VISIBLE);
         loadMoreButton.setEnabled(!isLoading);
     }
-
     private void navigateToChat(String id, String name, int readOut) {
+        navigateToChat(id, name, readOut, -1);
+    }
+
+    private void navigateToChat(String id, String name, int readOut, int topic) {
         Intent intent = new Intent(this, ChatActivity.class);
 
         intent.putExtra("ID", id);
         intent.putExtra("NAME", name);
         intent.putExtra("READ_OUT", readOut);
+        intent.putExtra("TOPIC", topic);
 
         startActivity(intent);
     }

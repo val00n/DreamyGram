@@ -13,6 +13,7 @@ public class Message {
     public MessageMedia media;
     public Act act;
     public MessageReply reply;
+    public int topicId;
     //  public Markup markup; // TODO
     public long group;
     public long edit; // TODO
@@ -65,7 +66,11 @@ public class Message {
             }
 
             if (json.has("reply")) {
-                reply = new MessageReply(json.getObject("reply"));
+                JSONObject replyJson = json.getObject("reply");
+                if (replyJson.has("top")) {
+                    topicId = replyJson.getInt("top");
+                }
+                reply = new MessageReply(replyJson);
             }
 
             if (json.has("media")) {

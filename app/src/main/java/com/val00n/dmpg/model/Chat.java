@@ -9,6 +9,7 @@ public class Chat {
     public boolean p; // has avatar
     public boolean c; // if broadcast channel
     public boolean l; // is left
+    public boolean f; // is forum
 
     public Chat(JSONObject json) {
         if (json == null) return;
@@ -30,6 +31,10 @@ public class Chat {
 
         if (json.has("l")) {
             l = json.getBoolean("l");
+        }
+
+        if (json.has("f")) {
+            f = json.getBoolean("f");
         }
     }
 }
