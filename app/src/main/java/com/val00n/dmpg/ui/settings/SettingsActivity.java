@@ -5,20 +5,96 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
+import com.val00n.dmpg.services.SettingsManager;
+import com.val00n.dmpg.ui.SimpleTextWatcher;
 import com.val00n.dmpg.ui.settings.instances.InstanceSettingsActivity;
 
 public class SettingsActivity extends Activity {
 
     private Button instancesButton;
     private Button cacheButton;
+    private EditText dialogsCountEditText;
+    private EditText messagesCountEditText;
+    private EditText dialogPollEditText;
+    private EditText messagesPollEditText;
+    private CheckBox loadAvatarsCheckBox;
+    private CheckBox loadMediaCheckBox;
+    private CheckBox dialogPollCheckBox;
+    private CheckBox chatPollCheckBox;
+
+    private SettingsManager settingsManager;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings);
 
+        settingsManager = App.getSettingsManager();
+
         instancesButton = (Button) findViewById(R.id.settingsInstancesButton);
         cacheButton = (Button) findViewById(R.id.settingsCacheButton);
+        dialogsCountEditText = (EditText) findViewById(R.id.settingsDialogsCountEditText);
+        messagesCountEditText = (EditText) findViewById(R.id.settingsMessagesCountEditText);
+        dialogPollEditText = (EditText) findViewById(R.id.settingsDialogPollEditText);
+        messagesPollEditText = (EditText) findViewById(R.id.settingsMessagesPollEditText);
+        loadAvatarsCheckBox = (CheckBox) findViewById(R.id.settingsLoadAvatarsCheckBox);
+        loadMediaCheckBox = (CheckBox) findViewById(R.id.settingsLoadMediaCheckBox);
+        dialogPollCheckBox = (CheckBox) findViewById(R.id.settingsDialogPollCheckBox);
+        chatPollCheckBox = (CheckBox) findViewById(R.id.settingsChatPollCheckBox);
+
+        loadValues();
+
+        dialogsCountEditText.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void onTextChanged(String s) {
+                try { settingsManager.setDialogsCount(Integer.parseInt(s)); } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        messagesCountEditText.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void onTextChanged(String s) {
+                try { settingsManager.setMessagesCount(Integer.parseInt(s)); } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        dialogPollEditText.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void onTextChanged(String s) {
+                try { settingsManager.setDialogPollSecs(Integer.parseInt(s)); } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        messagesPollEditText.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void onTextChanged(String s) {
+                try { settingsManager.setMessagesPollSecs(Integer.parseInt(s)); } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        loadAvatarsCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                settingsManager.setLoadAvatars(isChecked);
+            }
+        });
+
+        loadMediaCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                settingsManager.setLoadMedia(isChecked);
+            }
+        });
+
+        dialogPollCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                settingsManager.setDialogPollEnabled(isChecked);
+            }
+        });
+
+        chatPollCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                settingsManager.setChatPollEnabled(isChecked);
+            }
+        });
 
         instancesButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -33,6 +109,17 @@ public class SettingsActivity extends Activity {
                 navigateTo(CacheSettingsActivity.class);
             }
         });
+    }
+
+    private void loadValues() {
+        dialogsCountEditText.setText(String.valueOf(settingsManager.getDialogsCount()));
+        messagesCountEditText.setText(String.valueOf(settingsManager.getMessagesCount()));
+        dialogPollEditText.setText(String.valueOf(settingsManager.getDialogPollMillis() / 1000));
+        messagesPollEditText.setText(String.valueOf(settingsManager.getMessagesPollMillis() / 1000));
+        loadAvatarsCheckBox.setChecked(settingsManager.getLoadAvatars());
+        loadMediaCheckBox.setChecked(settingsManager.getLoadMedia());
+        dialogPollCheckBox.setChecked(settingsManager.isDialogPollEnabled());
+        chatPollCheckBox.setChecked(settingsManager.isChatPollEnabled());
     }
 
     private void navigateTo(Class<?> cls) {

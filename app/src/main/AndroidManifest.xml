@@ -33,7 +33,7 @@
         <activity android:name="com.val00n.dmpg.ui.settings.instances.InstanceSettingsActivity" android:configChanges="orientation|keyboardHidden|screenSize" android:label="Instances"/>
         <activity android:name="com.val00n.dmpg.ui.settings.instances.InstanceEditActivity" android:configChanges="orientation|keyboardHidden|screenSize" android:label="Edit instance"/>
         <activity android:name=".ui.settings.CacheSettingsActivity" android:windowSoftInputMode="stateHidden" android:configChanges="orientation|keyboardHidden|screenSize" android:label="Cache management"/>
-        <activity android:name=".ui.settings.SettingsActivity" android:configChanges="orientation|keyboardHidden|screenSize" android:label="Settings"/>
+        <activity android:name=".ui.settings.SettingsActivity" android:windowSoftInputMode="stateHidden" android:configChanges="orientation|keyboardHidden|screenSize" android:label="Settings"/>
         <activity android:name=".ui.chat.ImageViewerActivity" android:theme="@style/AppTheme.Fullscreen" android:configChanges="orientation|keyboardHidden|screenSize" />
         <activity android:name=".ui.chat.VideoViewerActivity" android:theme="@style/AppTheme.Fullscreen" android:configChanges="orientation|keyboardHidden|screenSize" />
 

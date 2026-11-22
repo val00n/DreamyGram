@@ -43,6 +43,7 @@ import com.val00n.dmpg.model.message.PendingMessage;
 import com.val00n.dmpg.services.FileHelper;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.MessageFileActions;
+import com.val00n.dmpg.services.SettingsManager;
 import com.val00n.dmpg.ui.AvatarViewBinder;
 import com.val00n.dmpg.ui.ImageViewBinder;
 import com.val00n.dmpg.ui.main.MainActivity;
@@ -86,6 +87,7 @@ public class ChatActivity extends Activity {
     private TextView networkStatusText;
 
     private MPGramService mpgService;
+    private SettingsManager settingsManager;
     private HistoryResponse historyResponse;
     private Instance instance;
     private Handler chatUpdatesHandler;
@@ -108,6 +110,8 @@ public class ChatActivity extends Activity {
     private boolean canType;
     private boolean isTyping;
     private boolean isSavedMessages;
+    private int messagesPollMillis;
+    private boolean chatPollEnabled;
 
     private volatile long pollToken = 0;
     private volatile boolean hasUpdateOffset = false;
@@ -150,7 +154,6 @@ public class ChatActivity extends Activity {
 
     private static final int OFFLINE_CHECK_MILLIS = 6000;
     private static final int UPDATE_TIMEOUT_SECS = 30;
-    private static final int UPDATE_POLL_MILLIS = 3000;
     private static final int STATUS_UPDATE_MILLIS = 5000;
     private static final int PENDING_CHECK_DELAY_MILLIS = 3000;
     private static final int PENDING_CHECK_RETRY_MILLIS = 7000;
@@ -189,6 +192,7 @@ public class ChatActivity extends Activity {
 
         mpgService = App.getMPGramService(); // TODO prioritize
         instance = App.getInstanceManager().getSelectedInstance();
+        settingsManager = App.getSettingsManager();
         userToken = App.getSessionManager().loadSession(instance.baseURL);
 
         peerId = getIntent().getStringExtra("ID");
@@ -292,7 +296,7 @@ public class ChatActivity extends Activity {
                         if (!mpgService.isPollTokenActive(currentToken) || !App.isNetworkAvailable()) return;
 
                         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-                        chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                        chatUpdatesHandler.postDelayed(chatUpdateTask, messagesPollMillis);
                     }
 
                     @Override
@@ -308,7 +312,7 @@ public class ChatActivity extends Activity {
                             if (errMsg != null && errMsg.contains("Concurrent getUpdates")) {
                                 if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
                                     chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-                                    chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                                    chatUpdatesHandler.postDelayed(chatUpdateTask, messagesPollMillis);
                                 }
                                 return;
                             }
@@ -320,13 +324,13 @@ public class ChatActivity extends Activity {
                                 refreshHistoryAfterGap();
                             } else {
                                 updateFails++;
-                                scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS * 3);
+                                scheduleHistoryRefreshRetry(messagesPollMillis * 3);
                             }
 
                             if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
                                 chatUpdatesHandler.removeCallbacks(chatUpdateTask);
                                 chatUpdatesHandler.postDelayed(chatUpdateTask,
-                                        Math.min(UPDATE_POLL_MILLIS * Math.max(updateFails, 1), 20000));
+                                        Math.min(messagesPollMillis * Math.max(updateFails, 1), 20000));
                             }
                         }
                     }
@@ -533,6 +537,10 @@ public class ChatActivity extends Activity {
 
         isPaused = false;
         isPolling = false;
+
+        messagesPollMillis = settingsManager.getMessagesPollMillis();
+        chatPollEnabled = settingsManager.isChatPollEnabled();
+
         pollToken = mpgService.beginPollSession(userToken);
 
         if (App.isNetworkAvailable()) {
@@ -688,6 +696,7 @@ public class ChatActivity extends Activity {
 
     private void tryStartPolling() {
         chatUpdatesHandler.removeCallbacks(chatUpdateTask);
+        if (!chatPollEnabled) return;
         if (isPaused || isPolling || initialSyncInProgress || historyResponse == null
                 || !App.isNetworkAvailable() || !mpgService.isPollTokenActive(pollToken)) {
             return;
@@ -696,7 +705,7 @@ public class ChatActivity extends Activity {
             syncLastUpdateAndStartPolling(pollToken);
             return;
         }
-        chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+        chatUpdatesHandler.postDelayed(chatUpdateTask, messagesPollMillis);
     }
 
     private void syncLastUpdateAndStartPolling(final long currentToken) {
@@ -731,9 +740,9 @@ public class ChatActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                        if (chatPollEnabled && !isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
                             chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-                            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                            chatUpdatesHandler.postDelayed(chatUpdateTask, messagesPollMillis);
                         }
                     }
                 });
@@ -748,9 +757,9 @@ public class ChatActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                        if (chatPollEnabled && !isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
                             chatUpdatesHandler.removeCallbacks(chatUpdateTask);
-                            chatUpdatesHandler.postDelayed(chatUpdateTask, UPDATE_POLL_MILLIS);
+                            chatUpdatesHandler.postDelayed(chatUpdateTask, messagesPollMillis);
                         }
                     }
                 });
@@ -2159,7 +2168,7 @@ public class ChatActivity extends Activity {
 
         if (historyRefreshInProgress || isLoading || initialSyncInProgress
                 || !App.isNetworkAvailable() || !mpgService.isPollTokenActive(pollToken)) {
-            scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS);
+            scheduleHistoryRefreshRetry(messagesPollMillis);
             return;
         }
 
@@ -2218,7 +2227,7 @@ public class ChatActivity extends Activity {
 
                         if (isPaused || !App.isNetworkAvailable()) return;
 
-                        scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS * 3);
+                        scheduleHistoryRefreshRetry(messagesPollMillis * 3);
 
                         if (!isPolling) tryStartPolling();
                     }
@@ -2526,7 +2535,7 @@ public class ChatActivity extends Activity {
     private void onNetworkRestored() {
         if (networkStatusText != null) hideNetworkStatus();
         if (initialSyncInProgress || isLoading) {
-            scheduleHistoryRefreshRetry(UPDATE_POLL_MILLIS);
+            scheduleHistoryRefreshRetry(messagesPollMillis);
             return;
         }
         if (historyResponse == null || !initialLoaded) {

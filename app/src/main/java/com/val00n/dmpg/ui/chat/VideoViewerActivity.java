@@ -151,7 +151,7 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
 
         progressBar.setVisibility(View.VISIBLE);
 
-        App.getCacheManager().loadVideo(peer, messageId, filename, new CacheManager.VideoCallback() {
+        App.getCacheManager().loadVideo(peer, messageId, filename, true, new CacheManager.VideoCallback() {
             @Override
             public void onLoaded(final File file) {
                 runOnUiThread(new Runnable() {

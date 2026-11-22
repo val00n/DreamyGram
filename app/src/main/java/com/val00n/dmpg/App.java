@@ -17,6 +17,7 @@ import com.val00n.dmpg.services.FileDownloader;
 import com.val00n.dmpg.services.InstanceManager;
 import com.val00n.dmpg.services.MPGramService;
 import com.val00n.dmpg.services.SessionManager;
+import com.val00n.dmpg.services.SettingsManager;
 import com.val00n.dmpg.ui.StartupActivity;
 
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ public class App extends Application {
     private static FileDownloader fileDownloader;
     private static MPGramService mpgService;
     private static ConnectivityManager cm;
+    private static SettingsManager settingsManager;
     private static String[] sessionDeathMarkers;
     private static boolean lastNetworkState = false;
 
@@ -72,6 +74,11 @@ public class App extends Application {
             mpgService = new MPGramService(4); // FIXME: 4 is just random number
         }
         return mpgService;
+    }
+
+    public static SettingsManager getSettingsManager() {
+        if (settingsManager == null) settingsManager = new SettingsManager(app);
+        return settingsManager;
     }
 
     @Override

@@ -1,17 +1,137 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:orientation="vertical"
               android:layout_width="match_parent"
               android:layout_height="match_parent">
-    <Button
-        android:id="@+id/settingsInstancesButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Instance settings"/>
-    <Button
-        android:id="@+id/settingsCacheButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Cache management"/>
 
-</LinearLayout>
+   <LinearLayout
+       android:layout_margin="6dp"
+       android:orientation="vertical"
+       android:layout_width="match_parent"
+       android:layout_height="wrap_content">
+       <TextView
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:text="Settings"
+           android:gravity="center"
+           android:textSize="48sp"
+           android:textStyle="bold"
+           android:layout_gravity="center"
+           android:layout_marginBottom="18dp"/>
+
+       <LinearLayout
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:layout_marginTop="2dp"
+           android:gravity="center">
+           <TextView
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="Dialogs count at one time"
+               android:textSize="16dp"/>
+           <EditText
+               android:id="@+id/settingsDialogsCountEditText"
+               android:layout_width="100dp"
+               android:layout_height="wrap_content"
+               android:hint="number..."/>
+       </LinearLayout>
+
+       <LinearLayout
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:layout_marginTop="2dp"
+           android:gravity="center">
+           <TextView
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="Messages count at one time"
+               android:textSize="16dp"/>
+           <EditText
+               android:id="@+id/settingsMessagesCountEditText"
+               android:layout_width="100dp"
+               android:layout_height="wrap_content"
+               android:hint="number..."/>
+       </LinearLayout>
+
+       <LinearLayout
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:layout_marginTop="2dp"
+           android:gravity="center">
+           <TextView
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="Dialogs poll time (sec)"
+               android:textSize="16dp"/>
+           <EditText
+               android:id="@+id/settingsDialogPollEditText"
+               android:layout_width="100dp"
+               android:layout_height="wrap_content"
+               android:hint="number..."/>
+       </LinearLayout>
+
+       <LinearLayout
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:layout_marginTop="2dp"
+           android:gravity="center">
+           <TextView
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="Messages poll time (sec)"
+               android:textSize="16dp"/>
+           <EditText
+               android:id="@+id/settingsMessagesPollEditText"
+               android:layout_width="100dp"
+               android:layout_height="wrap_content"
+               android:hint="number..."/>
+       </LinearLayout>
+
+       <CheckBox
+           android:id="@+id/settingsLoadAvatarsCheckBox"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="Load avatars"
+           android:checked="true"
+           android:layout_marginTop="4dp"/>
+       <CheckBox
+           android:id="@+id/settingsLoadMediaCheckBox"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="Load media"
+           android:checked="true"
+           android:layout_marginTop="4dp"/>
+       <CheckBox
+           android:id="@+id/settingsDialogPollCheckBox"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="Dialogs polling"
+           android:checked="true"
+           android:layout_marginTop="4dp"/>
+
+       <CheckBox
+           android:id="@+id/settingsChatPollCheckBox"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="Chats polling"
+           android:checked="true"
+           android:layout_marginTop="4dp"/>
+
+       <Button
+           android:id="@+id/settingsInstancesButton"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="Instance settings"/>
+       <Button
+           android:id="@+id/settingsCacheButton"
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content"
+           android:text="Cache management"
+           android:layout_marginBottom="12dp"/>
+   </LinearLayout>
+
+</ScrollView>

@@ -33,6 +33,7 @@ import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.services.MPGramService;
+import com.val00n.dmpg.services.SettingsManager;
 import com.val00n.dmpg.ui.chat.ChatActivity;
 import com.val00n.dmpg.ui.settings.SettingsActivity;
 import com.val00n.dmpg.ui.StartupActivity;
@@ -62,6 +63,7 @@ public class MainActivity extends Activity {
     private ImageView topicChatAvatar;
 
     private MPGramService mpgService;
+    private SettingsManager settingsManager;
     private DialogResponse dialogResponse;
     private ForumTopicResponse forumTopicResponse;
     private Instance instance;
@@ -77,6 +79,9 @@ public class MainActivity extends Activity {
     private boolean dialogsRefreshPending = false;
     private boolean forwardMode;
     private String displayedTopicsPeer;
+    private int dialogsLimit;
+    private int updatePollMillis;
+    private boolean dialogPollEnabled;
 
     volatile private boolean isLoading;
     volatile private boolean isPaused;
@@ -99,10 +104,8 @@ public class MainActivity extends Activity {
     private boolean hasCachedDialogs = false;
 
     private static final int OFFLINE_CHECK_MILLIS = 5000;
-    private static final int GET_DIALOG_LIMIT = 25; // TODO change this in settings
-    private static final int UPDATE_TIMEOUT_SECS = 30;
-    private static final int UPDATE_POLL_MILLIS = 3000; // TODO change this in settings
     private static final int STATUS_UPDATE_MILLIS = 5000;
+    private static final int UPDATE_TIMEOUT_SECS = 30;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -110,6 +113,8 @@ public class MainActivity extends Activity {
 
         mpgService = App.getMPGramService();
         instance = App.getInstanceManager().getSelectedInstance();
+        settingsManager = App.getSettingsManager();
+
         mpgService.refreshInstance();
 
         if (instance.baseURL != null) {
@@ -282,7 +287,7 @@ public class MainActivity extends Activity {
                         updateFails = 0;
                         if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
                             dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
-                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, updatePollMillis);
                         }
                     }
 
@@ -301,7 +306,7 @@ public class MainActivity extends Activity {
                                 updateFails++;
                                 if (!isPaused && mpgService.isPollTokenActive(currentToken)) {
                                     dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
-                                    dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, Math.min(UPDATE_POLL_MILLIS * updateFails, 20000));
+                                    dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, Math.min(updatePollMillis * updateFails, 20000));
                                 }
                             }
                         }
@@ -347,7 +352,7 @@ public class MainActivity extends Activity {
         };
 
         addFooter();
-        loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
+        loadDialogs(true, dialogsLimit, null, null, 0);
     }
 
     protected void onResume() {
@@ -368,6 +373,11 @@ public class MainActivity extends Activity {
 
         isPaused = false;
         isPolling = false;
+
+        dialogsLimit = settingsManager.getDialogsCount();
+        updatePollMillis = settingsManager.getDialogPollMillis();
+        dialogPollEnabled = settingsManager.isDialogPollEnabled();
+
         pollToken = mpgService.beginPollSession(userToken);
 
         dialogsRefreshPeers.clear();
@@ -375,7 +385,7 @@ public class MainActivity extends Activity {
 
         if (App.isNetworkAvailable()) {
             if ((dialogResponse == null || dialogResponse.dialogs == null || dialogResponse.dialogs.isEmpty()) && !isLoading) {
-                loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
+                loadDialogs(true, dialogsLimit, null, null, 0);
             } else {
                 tryStartPolling();
             }
@@ -461,6 +471,7 @@ public class MainActivity extends Activity {
 
     private void tryStartPolling() {
         dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
+        if (!dialogPollEnabled) return;
         if (isPaused || isPolling || initialSyncInProgress || dialogResponse == null
                 || !App.isNetworkAvailable() || !mpgService.isPollTokenActive(pollToken)) {
             return;
@@ -469,7 +480,7 @@ public class MainActivity extends Activity {
             syncLastUpdateAndStartPolling(pollToken);
             return;
         }
-        dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+        dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, updatePollMillis);
     }
 
     private void syncLastUpdateAndStartPolling(final long currentToken) {
@@ -486,9 +497,9 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                        if (dialogPollEnabled && !isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
                             dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
-                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, updatePollMillis);
                         }
                     }
                 });
@@ -503,9 +514,9 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (!isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
+                        if (dialogPollEnabled && !isPaused && !isPolling && mpgService.isPollTokenActive(currentToken)) {
                             dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
-                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, UPDATE_POLL_MILLIS);
+                            dialogsUpdatesHandler.postDelayed(dialogsUpdateTask, updatePollMillis);
                         }
                     }
                 });
@@ -895,7 +906,7 @@ public class MainActivity extends Activity {
         loadMoreButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                loadDialogs(false, GET_DIALOG_LIMIT, dialogResponse.offsetPeer, dialogResponse.offsetId, dialogResponse.offsetDate);
+                loadDialogs(false, dialogsLimit, dialogResponse.offsetPeer, dialogResponse.offsetId, dialogResponse.offsetDate);
             }
         });
     }
@@ -920,7 +931,7 @@ public class MainActivity extends Activity {
 
         dialogsRefreshPending = false;
 
-        int limit = loadedDialogs > 0 ? loadedDialogs : GET_DIALOG_LIMIT;
+        int limit = loadedDialogs > 0 ? loadedDialogs : dialogsLimit;
 
         refreshDialogs(limit);
     }
@@ -1111,9 +1122,9 @@ public class MainActivity extends Activity {
         hideNetworkStatus();
         if (initialSyncInProgress || isLoading) return;
         if (dialogResponse == null || dialogResponse.dialogs == null || dialogResponse.dialogs.isEmpty()) {
-            loadDialogs(true, GET_DIALOG_LIMIT, null, null, 0);
+            loadDialogs(true, dialogsLimit, null, null, 0);
         } else {
-            refreshDialogs(loadedDialogs > 0 ? loadedDialogs : GET_DIALOG_LIMIT);
+            refreshDialogs(loadedDialogs > 0 ? loadedDialogs : dialogsLimit);
             tryStartPolling();
         }
     }

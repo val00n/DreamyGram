@@ -181,6 +181,8 @@ public class CacheManager {
                         final long now = System.currentTimeMillis();
                         boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= avatarTtlMillis;
 
+                        final boolean allowNetwork = App.isNetworkAvailable() && App.getSettingsManager().getLoadAvatars();
+
                         if (cacheFile != null) {
                             Bitmap bitmap;
                             try {
@@ -196,7 +198,7 @@ public class CacheManager {
                             if (bitmap != null) {
                                 memoryCache.put(key, bitmap);
 
-                                if (fresh || !App.isNetworkAvailable()) {
+                                if (fresh || !allowNetwork) {
                                     dbHelper.touch(cacheFile.id, now, false);
                                     finishLoadedImage(key, bitmap);
                                     return;
@@ -205,6 +207,12 @@ public class CacheManager {
                                 dbHelper.deleteAvatar(peer);
                                 fileHelper.deleteFile(cacheFile.filename, true);
                             }
+                        }
+
+                        if (!allowNetwork) {
+                            finishErrorImage(key, new Exception(
+                                    App.isNetworkAvailable() ? "Avatars disabled in settings" : "Offline"));
+                            return;
                         }
 
                         String userToken = App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
@@ -268,6 +276,10 @@ public class CacheManager {
     }
 
     public void loadImage(final String peer, final String messageId, final FileParams fileParams, final ImageCallback callback) {
+        loadImage(peer, messageId, fileParams, false, callback);
+    }
+
+    public void loadImage(final String peer, final String messageId, final FileParams fileParams, final boolean forceNetwork, final ImageCallback callback) {
         final boolean preview = fileParams != null && !fileParams.equals(FileParams.original());
         final String key = "img_" + peer + "_" + messageId + (preview ? "_p" : "");
 
@@ -303,10 +315,17 @@ public class CacheManager {
                 owner = true;
             }
         }
+
         if (cachedUnderLock != null) {
             deliverLoadedImage(callback, cachedUnderLock);
             return;
         }
+
+        if (!App.getSettingsManager().getLoadMedia()) {
+            callback.onError(new Exception("Media disabled in settings"));
+            return;
+        }
+
         if (owner) {
             ioExecutor.execute(new Runnable() {
                 @Override
@@ -316,6 +335,9 @@ public class CacheManager {
                         final CacheFile cacheFile = dbHelper.findFile(peer, messageId, preview);
                         final long now = System.currentTimeMillis();
                         final boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= filesTtlMillis;
+
+                        final boolean allowNetwork = App.isNetworkAvailable()
+                                && (forceNetwork || App.getSettingsManager().getLoadMedia());
 
                         if (cacheFile != null) {
                             Bitmap bitmap;
@@ -333,7 +355,7 @@ public class CacheManager {
                                 fallbackBitmap = bitmap;
                                 memoryCache.put(key, bitmap);
 
-                                if (fresh || !App.isNetworkAvailable()) {
+                                if (fresh || !allowNetwork) {
                                     dbHelper.touch(cacheFile.id, now, false);
                                     finishLoadedImage(key, bitmap);
                                     return;
@@ -342,6 +364,18 @@ public class CacheManager {
                                 dbHelper.deleteFileById(cacheFile.id);
                                 fileHelper.deleteFile(cacheFile.filename, true);
                             }
+                        }
+
+                        if (!allowNetwork) {
+                            if (fallbackBitmap != null) {
+                                if (cacheFile != null) {
+                                    dbHelper.touch(cacheFile.id, now, false);
+                                }
+                                finishLoadedImage(key, fallbackBitmap);
+                            } else {
+                                finishErrorImage(key, new Exception(App.isNetworkAvailable() ? "Media disabled in settings" : "Offline"));
+                            }
+                            return;
                         }
 
                         String userToken = App.getSessionManager().loadSession(App.getInstanceManager().getSelectedInstanceBaseUrl());
@@ -422,11 +456,20 @@ public class CacheManager {
     }
 
     public void loadVideo(final String peer, final String messageId, final String filename, final VideoCallback callback) {
+        loadVideo(peer, messageId, filename, false, callback);
+    }
+
+    public void loadVideo(final String peer, final String messageId, final String filename, final boolean forceNetwork, final VideoCallback callback) {
         String safe = FileHelper.sanitizeFileName(filename);
         if (safe == null || safe.length() == 0) {
             safe = "video.mp4";
         }
         final String safeName = "vid_" + peer + "_" + messageId + "_" + safe;
+
+        if (!App.getSettingsManager().getLoadMedia()) {
+            callback.onError(new Exception("Media disabled in settings"));
+            return;
+        }
 
         ioExecutor.execute(new Runnable() {
             @Override
@@ -436,11 +479,14 @@ public class CacheManager {
                     final long now = System.currentTimeMillis();
                     final boolean fresh = cacheFile != null && (now - cacheFile.createdAt) <= filesTtlMillis;
 
+                    final boolean allowNetwork = App.isNetworkAvailable()
+                            && (forceNetwork || App.getSettingsManager().getLoadMedia());
+
                     if (cacheFile != null) {
                         File file = new File(fileHelper.getFullAppdataPath(cacheFile.filename));
 
                         if (file.exists() && file.length() > 0) {
-                            if (fresh || !App.isNetworkAvailable()) {
+                            if (fresh || !allowNetwork) {
                                 dbHelper.touch(cacheFile.id, now, false);
                                 postVideoLoaded(callback, file);
                                 return;
@@ -449,6 +495,11 @@ public class CacheManager {
                                 fileHelper.deleteFile(cacheFile.filename, true);
                             }
                         }
+                    }
+
+                    if (!allowNetwork) {
+                        postVideoError(callback, new Exception(App.isNetworkAvailable() ? "Media disabled in settings" : "Offline"));
+                        return;
                     }
 
                     if (!App.isNetworkAvailable()) {

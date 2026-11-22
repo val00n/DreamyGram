@@ -69,7 +69,7 @@ public class ImageViewerActivity extends Activity {
         }
 
         progressBar.setVisibility(View.VISIBLE);
-        App.getCacheManager().loadImage(peer, messageId, FileParams.preview(), new CacheManager.ImageCallback() {
+        App.getCacheManager().loadImage(peer, messageId, FileParams.preview(), true, new CacheManager.ImageCallback() {
             @Override
             public void onLoaded(Bitmap bitmap) {
                 progressBar.setVisibility(View.GONE);

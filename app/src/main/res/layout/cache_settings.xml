@@ -152,7 +152,7 @@
                     android:id="@+id/cacheSettingsAvatarEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:text="XX"/>
+                    android:hint="number..."/>
             </LinearLayout>
 
             <LinearLayout
@@ -170,7 +170,7 @@
                     android:id="@+id/cacheSettingsMediaEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:text="XX"/>
+                    android:hint="number..."/>
             </LinearLayout>
 
             <LinearLayout
@@ -188,7 +188,7 @@
                     android:id="@+id/cacheSettingsChatsEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:text="XX"/>
+                    android:hint="number..."/>
             </LinearLayout>
 
             <LinearLayout
@@ -206,7 +206,7 @@
                     android:id="@+id/cacheSettingsAvatarTTLEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:text="XX"/>
+                    android:hint="number..."/>
             </LinearLayout>
 
             <LinearLayout
@@ -224,7 +224,7 @@
                     android:id="@+id/cacheSettingsMediaTTLEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:text="XX"/>
+                    android:hint="number..."/>
             </LinearLayout>
 
             <CheckBox
