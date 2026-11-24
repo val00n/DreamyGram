@@ -1,36 +1,36 @@
 # DreamyGram
-DreamyGram is lightweight Telegram messenger client, for retro android devices (1.0+), powered on MPGram WEB API. App is using instance system for maximum reliability.
+DreamyGram is a lightweight Telegram client for retro Android devices (1.0+), powered by the MPGram WEB API. The app uses an instance system for greater reliability and flexibility.
 
+![logo](img/logo.png "DreamyGram")
 
-> [!WARNING]  
-> Using this app, may lead to some risk about your telegram account.
-> * If your account is younger than 6 months, and you never used third party clients, your account may very likely be banned. If it's not, anyway account safety cannot be guaranteed.
-> * Using this client, instance owner may have access to your data (phone number, chats, media, etc). So very it's highly desirable to use your own hosted instance instead of public ones.
-> 
-> The developers are not responsible for your account or data anyhow. It is just MPGram Client.
+> [!WARNING]
+> Using this app carries risks for your Telegram account.
+> * If your account is less than 6 months old and has never been used with third-party clients, the risk of a ban is significantly higher. Even for older accounts, safety cannot be guaranteed.
+> * When using a third-party instance, its owner may have access to your data (such as phone number, chats, and media). Hosting your own instance is strongly recommended over using public ones.
+>
+> The developers are not responsible for your account or data in any way. This is an unofficial client built on MPGram.
 
 ## Download
 * [GitHub Releases](https://github.com/val00n/DreamyGram/releases)
 
 ## Features
-* Show your dialogs and chats
-* Sending messages
-* Sending and download media
-* App cache management
-* Chat UI styles
-* Automatic updates of the list of instances from a URL
-* Instance manager
+* View dialogs and chats
+* Send messages
+* Send and download media
+* Manage app cache
+* Switch chat UI styles
+* Manage instances
 
 ## Build
-The project is developed under the following build environment.
+The project is set up for:
 * Android Studio 2.3.2
-* Android SDK of any version *(25 recommended)*
+* Android SDK (API 25 recommended)
 * Android 1.0 emulator
 
-It is recommended to use AS while contributing; however, you may use another IDE as long as you make the project still usable in AS.
+Using Android Studio is recommended when contributing, though another IDE is fine as long as project compatibility with Android Studio is preserved.
 
 ## Acknowledgments
 * [NNJSON](https://github.com/shinovon/NNJSON) library by nnproject
 * AppData174 for testing
-* Brewmasters for app name and testing
-* **Special thanks to all [MPGram](https://github.com/shinovon/mpgram-web/graphs/contributors?all=1) contributors for making this awesome API possible**
+* Brewmasters for the app name and testing
+* **Special thanks to all [MPGram](https://github.com/shinovon/mpgram-web/graphs/contributors?all=1) contributors for making this API possible**
