@@ -21,6 +21,7 @@ import com.val00n.dmpg.model.Chat;
 import com.val00n.dmpg.model.message.Message;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.model.message.MessageRow;
+import com.val00n.dmpg.services.SettingsManager;
 import com.val00n.dmpg.ui.AspectImageView;
 import com.val00n.dmpg.ui.AvatarViewBinder;
 import com.val00n.dmpg.ui.ImageViewBinder;
@@ -46,9 +47,12 @@ public class MessagesAdapter extends BaseAdapter {
 
     private LayoutInflater inflater;
     private boolean isSavedMessages;
+    private boolean isChat;
     private String topic;
     private AlbumView.Listener albumListener;
     private MediaClickListener mediaClickListener;
+
+    private String chatStyle = SettingsManager.CHAT_STYLE_DEFAULT;
 
     private final FrameLayout.LayoutParams photoLayoutParams;
 
@@ -65,7 +69,8 @@ public class MessagesAdapter extends BaseAdapter {
         void onVideoClick(MessageRow item);
     }
 
-    public MessagesAdapter(ArrayList<Message> items, Map<String, User> users, Map<String, Chat> chats, boolean isSavedMessages,
+    public MessagesAdapter(ArrayList<Message> items, Map<String, User> users, Map<String, Chat> chats,
+                           boolean isSavedMessages, boolean isChat,
                            AvatarViewBinder avatarViewBinder, ImageViewBinder imageViewBinder) {
         this.items = items;
         this.users = users;
@@ -73,6 +78,7 @@ public class MessagesAdapter extends BaseAdapter {
         this.avatarViewBinder = avatarViewBinder;
         this.imageViewBinder = imageViewBinder;
         this.isSavedMessages = isSavedMessages;
+        this.isChat = isChat;
 
         this.photoLayoutParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -168,16 +174,23 @@ public class MessagesAdapter extends BaseAdapter {
 
         final ViewHolder holder;
 
+        if (convertView != null) {
+            ViewHolder existing = (ViewHolder) convertView.getTag();
+            if (existing == null || !chatStyle.equals(existing.style)) {
+                convertView = null;
+            }
+        }
+
         if (convertView == null) {
-            int layout = viewType == VIEW_TYPE_OUT
-                    ? R.layout.message_out
-                    : R.layout.message;
+            int layout = getMessageLayout(viewType);
             convertView = inflater.inflate(layout, parent, false);
             holder = new ViewHolder();
+            holder.style = chatStyle;
 
             holder.avatar = (ImageView) convertView.findViewById(R.id.messageAvatar);
             holder.title = (TextView) convertView.findViewById(R.id.messageTitle);
             holder.image = (AspectImageView) convertView.findViewById(R.id.messageImage);
+            holder.imageContainer = convertView.findViewById(R.id.messageImageContainer);
             holder.album = (AlbumView) convertView.findViewById(R.id.messageAlbum);
             holder.file = (FileMessageView) convertView.findViewById(R.id.messageFile);
             holder.date = (TextView) convertView.findViewById(R.id.messageDate);
@@ -190,6 +203,13 @@ public class MessagesAdapter extends BaseAdapter {
             holder.captionText = (TextView) convertView.findViewById(R.id.messageCaptionText);
             holder.divider = convertView.findViewById(R.id.messageDivider);
             holder.playOverlay = convertView.findViewById(R.id.messagePlayOverlay);
+
+            if (holder.textLayout != null) {
+                holder.defaultPaddingLeft = holder.textLayout.getPaddingLeft();
+                holder.defaultPaddingTop = holder.textLayout.getPaddingTop();
+                holder.defaultPaddingRight = holder.textLayout.getPaddingRight();
+                holder.defaultPaddingBottom = holder.textLayout.getPaddingBottom();
+            }
 
             if (holder.image != null) {
                 holder.defaultImageScaleType = holder.image.getScaleType();
@@ -206,32 +226,89 @@ public class MessagesAdapter extends BaseAdapter {
 
         final ViewGroup root = (ViewGroup) convertView;
 
-        if (row.content != null && !row.content.isEmpty()) {
+        if (row.content != null && row.content.length() > 0) {
             holder.text.setVisibility(View.VISIBLE);
             holder.text.setText(row.content);
         } else {
             holder.text.setVisibility(View.GONE);
         }
 
-        if (row.grouped) {
-            holder.avatar.setVisibility(View.GONE);
-            holder.titleRow.setVisibility(View.GONE);
-            holder.divider.setVisibility(View.GONE);
+        final boolean isModern = SettingsManager.CHAT_STYLE_MODERN.equals(chatStyle);
+        final boolean hasNextInGroup =
+                position + 1 < rows.size() && rows.get(position + 1).grouped;
 
-            if (viewType == VIEW_TYPE_OUT) {
-                holder.textLayout.setPadding(0, 0, avatarWidthPx, 0);
+        if (isModern) {
+            if (hasNextInGroup) {
+                holder.date.setVisibility(View.GONE);
             } else {
-                holder.textLayout.setPadding(avatarWidthPx, 0, 0, 0);
+                holder.date.setText(row.dateText);
+                holder.date.setVisibility(View.VISIBLE);
+            }
+
+            if (holder.title != null) {
+                if (!isChat || row.grouped) {
+                    holder.title.setVisibility(View.GONE);
+                } else {
+                    holder.title.setVisibility(View.VISIBLE);
+                    holder.title.setText(row.title);
+                }
             }
         } else {
-            if (holder.title != null) holder.title.setText(row.title);
-            holder.date.setText(row.dateText);
+            if (row.grouped) {
+                if (holder.avatar != null) {
+                    holder.avatar.setVisibility(View.GONE);
+                }
+                if (holder.titleRow != null) {
+                    holder.titleRow.setVisibility(View.GONE);
+                }
+                if (holder.divider != null) {
+                    holder.divider.setVisibility(View.GONE);
+                }
 
-            holder.avatar.setVisibility(View.VISIBLE);
-            holder.titleRow.setVisibility(View.VISIBLE);
-            holder.divider.setVisibility(View.VISIBLE);
+                if (holder.avatar != null) {
+                    if (viewType == VIEW_TYPE_OUT) {
+                        holder.textLayout.setPadding(
+                                holder.defaultPaddingLeft,
+                                holder.defaultPaddingTop,
+                                avatarWidthPx,
+                                holder.defaultPaddingBottom);
+                    } else {
+                        holder.textLayout.setPadding(
+                                avatarWidthPx,
+                                holder.defaultPaddingTop,
+                                holder.defaultPaddingRight,
+                                holder.defaultPaddingBottom);
+                    }
+                } else {
+                    holder.textLayout.setPadding(
+                            holder.defaultPaddingLeft,
+                            holder.defaultPaddingTop,
+                            holder.defaultPaddingRight,
+                            holder.defaultPaddingBottom);
+                }
+            } else {
+                if (holder.title != null) {
+                    holder.title.setVisibility(View.VISIBLE);
+                    holder.title.setText(row.title);
+                }
+                holder.date.setText(row.dateText);
 
-            holder.textLayout.setPadding(0, 0, 0, 0);
+                if (holder.avatar != null) {
+                    holder.avatar.setVisibility(View.VISIBLE);
+                }
+                if (holder.titleRow != null) {
+                    holder.titleRow.setVisibility(View.VISIBLE);
+                }
+                if (holder.divider != null) {
+                    holder.divider.setVisibility(View.VISIBLE);
+                }
+
+                holder.textLayout.setPadding(
+                        holder.defaultPaddingLeft,
+                        holder.defaultPaddingTop,
+                        holder.defaultPaddingRight,
+                        holder.defaultPaddingBottom);
+            }
         }
 
         boolean nextGrouped = (position + 1 < rows.size()) && rows.get(position + 1).grouped;
@@ -252,15 +329,26 @@ public class MessagesAdapter extends BaseAdapter {
             holder.quoteLayout.setVisibility(View.GONE);
         }
 
-        if (row.forwardCaption != null) {
-            holder.captionLayout.setVisibility(View.VISIBLE);
-            holder.captionText.setText(row.forwardCaption);
-        } else {
-            holder.captionLayout.setVisibility(View.GONE);
+        if (holder.captionLayout != null) {
+            if (row.forwardCaption != null) {
+                holder.captionLayout.setVisibility(View.VISIBLE);
+                holder.captionText.setText(row.forwardCaption);
+            } else {
+                holder.captionLayout.setVisibility(View.GONE);
+            }
+        } else if (holder.captionText != null) {
+            if (row.forwardCaption != null) {
+                holder.captionText.setVisibility(View.VISIBLE);
+                holder.captionText.setText(row.forwardCaption);
+            } else {
+                holder.captionText.setVisibility(View.GONE);
+            }
         }
 
-        if (viewType == VIEW_TYPE_OUT) {
-            if (row.statusRes != 0) {
+        if (viewType == VIEW_TYPE_OUT && holder.status != null) {
+            boolean showStatus = row.statusRes != 0 && !(isModern && hasNextInGroup);
+
+            if (showStatus) {
                 holder.status.setVisibility(View.VISIBLE);
                 holder.status.setImageResource(row.statusRes);
             } else {
@@ -281,6 +369,9 @@ public class MessagesAdapter extends BaseAdapter {
                 holder.album.setSpacingPx(albumSpacingPx);
                 holder.album.bind(row.mediaGroup, imageViewBinder, albumListener);
 
+                if (holder.imageContainer != null) {
+                    holder.imageContainer.setVisibility(View.GONE);
+                }
                 holder.image.setVisibility(View.GONE);
                 holder.image.setOnClickListener(null);
                 holder.image.setTag(null);
@@ -294,6 +385,9 @@ public class MessagesAdapter extends BaseAdapter {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
                     holder.album.unbind();
+                }
+                if (holder.imageContainer != null) {
+                    holder.imageContainer.setVisibility(View.VISIBLE);
                 }
                 holder.image.setVisibility(View.VISIBLE);
                 holder.image.square(false);
@@ -346,6 +440,9 @@ public class MessagesAdapter extends BaseAdapter {
                     holder.album.setVisibility(View.GONE);
                     holder.album.unbind();
                 }
+                if (holder.imageContainer != null) {
+                    holder.imageContainer.setVisibility(View.VISIBLE);
+                }
                 holder.image.setVisibility(View.VISIBLE);
                 holder.image.square(true);
                 holder.image.setSourceSize(0, 0);
@@ -382,6 +479,9 @@ public class MessagesAdapter extends BaseAdapter {
                     holder.album.setVisibility(View.GONE);
                     holder.album.unbind();
                 }
+                if (holder.imageContainer != null) {
+                    holder.imageContainer.setVisibility(View.GONE);
+                }
                 holder.image.setVisibility(View.GONE);
                 holder.image.setTag(null);
                 holder.image.setImageDrawable(null);
@@ -394,6 +494,9 @@ public class MessagesAdapter extends BaseAdapter {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
                     holder.album.unbind();
+                }
+                if (holder.imageContainer != null) {
+                    holder.imageContainer.setVisibility(View.GONE);
                 }
                 holder.image.setVisibility(View.GONE);
                 holder.image.setTag(null);
@@ -408,6 +511,9 @@ public class MessagesAdapter extends BaseAdapter {
                 holder.album.setVisibility(View.GONE);
                 holder.album.unbind();
             }
+            if (holder.imageContainer != null) {
+                holder.imageContainer.setVisibility(View.GONE);
+            }
             holder.image.setVisibility(View.GONE);
             holder.image.setTag(null);
             holder.image.setImageDrawable(null);
@@ -417,7 +523,9 @@ public class MessagesAdapter extends BaseAdapter {
             holder.file.setVisibility(View.GONE);
         }
 
-        avatarViewBinder.bind(holder.avatar, row.peer, row.hasAvatar);
+        if (holder.avatar != null) {
+            avatarViewBinder.bind(holder.avatar, row.peer, row.hasAvatar);
+        }
 
         return convertView;
     }
@@ -593,7 +701,7 @@ public class MessagesAdapter extends BaseAdapter {
     }
 
     private static boolean hasText(Message message) {
-        return message != null && message.text != null && !message.text.trim().isEmpty();
+        return message != null && message.text != null && message.text.trim().length() > 0;
     }
 
     private boolean canBeAlbumFirst(Message message) {
@@ -932,10 +1040,39 @@ public class MessagesAdapter extends BaseAdapter {
         }
     }
 
+    public void setChatStyle(String chatStyle) {
+        if (chatStyle == null) {
+            chatStyle = SettingsManager.CHAT_STYLE_DEFAULT;
+        }
+        if (this.chatStyle.equals(chatStyle)) {
+            return;
+        }
+        this.chatStyle = chatStyle;
+        super.notifyDataSetChanged();
+    }
+
+    private int getMessageLayout(int viewType) {
+        if (SettingsManager.CHAT_STYLE_MODERN.equals(chatStyle)) {
+            return viewType == VIEW_TYPE_OUT
+                    ? R.layout.m_message_out
+                    : R.layout.m_message;
+        }
+        if (SettingsManager.CHAT_STYLE_COMPACT.equals(chatStyle)) {
+            return viewType == VIEW_TYPE_OUT
+                    ? R.layout.c_message_out
+                    : R.layout.c_message;
+        }
+        return viewType == VIEW_TYPE_OUT
+                ? R.layout.message_out
+                : R.layout.message;
+    }
+
     static class ViewHolder {
+        String style;
         ImageView avatar;
         TextView title;
         AspectImageView image;
+        View imageContainer;
         ImageView.ScaleType defaultImageScaleType;
         AlbumView album;
         FileMessageView file;
@@ -950,5 +1087,9 @@ public class MessagesAdapter extends BaseAdapter {
         ImageView status;
         View playOverlay;
         View divider;
+        int defaultPaddingLeft;
+        int defaultPaddingTop;
+        int defaultPaddingRight;
+        int defaultPaddingBottom;
     }
 }

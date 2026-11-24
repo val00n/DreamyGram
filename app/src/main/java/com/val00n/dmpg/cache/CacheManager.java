@@ -638,7 +638,7 @@ public class CacheManager {
                         dbHelper.touch(cacheFile.id, System.currentTimeMillis(), false);
 
                         String mimeType = FileHelper.getMimeType(dst.getName());
-                        FileHelper.scanFileForGallery(App.get(), dst.getAbsolutePath(), mimeType);
+                        //FileHelper.scanFileForGallery(App.get(), dst.getAbsolutePath(), mimeType);
 
                         mainHandler.post(new Runnable() {
                             @Override

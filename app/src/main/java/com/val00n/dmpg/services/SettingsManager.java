@@ -15,6 +15,11 @@ public class SettingsManager {
     private static final String KEY_LOAD_MEDIA = "load_media";
     private static final String KEY_DIALOG_POLL_ENABLED = "dialog_poll_enabled";
     private static final String KEY_CHAT_POLL_ENABLED = "chat_poll_enabled";
+    private static final String KEY_CHAT_STYLE = "chat_style";
+
+    public static final String CHAT_STYLE_DEFAULT = "d";
+    public static final String CHAT_STYLE_COMPACT = "c";
+    public static final String CHAT_STYLE_MODERN = "m";
 
     private static final int DEFAULT_DIALOGS_COUNT = 25;
     private static final int DEFAULT_MESSAGES_COUNT = 50;
@@ -100,5 +105,19 @@ public class SettingsManager {
 
     public void setChatPollEnabled(boolean value) {
         prefs.edit().putBoolean(KEY_CHAT_POLL_ENABLED, value).commit();
+    }
+
+    public String getChatStyle() {
+        String style = prefs.getString(KEY_CHAT_STYLE, CHAT_STYLE_DEFAULT);
+        if (!CHAT_STYLE_DEFAULT.equals(style)
+                && !CHAT_STYLE_COMPACT.equals(style)
+                && !CHAT_STYLE_MODERN.equals(style)) {
+            return CHAT_STYLE_DEFAULT;
+        }
+        return style;
+    }
+
+    public void setChatStyle(String style) {
+        prefs.edit().putString(KEY_CHAT_STYLE, style).commit();
     }
 }

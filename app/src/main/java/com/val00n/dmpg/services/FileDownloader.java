@@ -118,7 +118,7 @@ public class FileDownloader {
 
                             if (!finalIsAppData) {
                                 String mimeType = FileHelper.getMimeType(finalFile.getName());
-                                FileHelper.scanFileForGallery(App.get(), finalFile.getAbsolutePath(), mimeType);
+                                //FileHelper.scanFileForGallery(App.get(), finalFile.getAbsolutePath(), mimeType);
                             }
 
                             finishSuccess(req, finalFile);

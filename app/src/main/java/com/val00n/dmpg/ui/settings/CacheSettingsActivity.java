@@ -89,21 +89,21 @@ public class CacheSettingsActivity extends Activity {
         avatarStoreCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                sharedPreferences.edit().putBoolean("storeAvatars", isChecked).apply();
+                sharedPreferences.edit().putBoolean("storeAvatars", isChecked).commit();
             }
         });
 
         mediaStoreCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                sharedPreferences.edit().putBoolean("storeMedia", isChecked).apply();
+                sharedPreferences.edit().putBoolean("storeMedia", isChecked).commit();
             }
         });
 
         chatsStoreCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                sharedPreferences.edit().putBoolean("storeChats", isChecked).apply();
+                sharedPreferences.edit().putBoolean("storeChats", isChecked).commit();
             }
         });
 
@@ -242,7 +242,7 @@ public class CacheSettingsActivity extends Activity {
                     long val = Long.parseLong(s);
                     avatarsLimitMb = val;
                     avatarsLimit = val * 1024 * 1024;
-                    sharedPreferences.edit().putLong("avatarsLimit", val).apply();
+                    sharedPreferences.edit().putLong("avatarsLimit", val).commit();
                     App.getCacheManager().refreshSettings();
                 } catch (NumberFormatException ignored) {}
             }
@@ -255,7 +255,7 @@ public class CacheSettingsActivity extends Activity {
                     long val = Long.parseLong(s);
                     mediaLimitMb = val;
                     mediaLimit = val * 1024 * 1024;
-                    sharedPreferences.edit().putLong("mediaLimit", val).apply();
+                    sharedPreferences.edit().putLong("mediaLimit", val).commit();
                     App.getCacheManager().refreshSettings();
                 } catch (NumberFormatException ignored) {}
             }
@@ -268,7 +268,7 @@ public class CacheSettingsActivity extends Activity {
                     long val = Long.parseLong(s);
                     chatsLimitMb = val;
                     chatsLimit = val * 1024 * 1024;
-                    sharedPreferences.edit().putLong("chatsLimit", val).apply();
+                    sharedPreferences.edit().putLong("chatsLimit", val).commit();
                     App.getCacheManager().refreshSettings();
                 } catch (NumberFormatException ignored) {}
             }
@@ -280,7 +280,7 @@ public class CacheSettingsActivity extends Activity {
                 try {
                     long days = Long.parseLong(s);
                     avatarsTTL = days * 24 * 60 * 60 * 1000;
-                    sharedPreferences.edit().putLong("avatarsTTL", days).apply();
+                    sharedPreferences.edit().putLong("avatarsTTL", days).commit();
                     App.getCacheManager().refreshSettings();
                 } catch (NumberFormatException ignored) {}
             }
@@ -291,7 +291,7 @@ public class CacheSettingsActivity extends Activity {
                 try {
                     long days = Long.parseLong(s);
                     mediaTTL = days * 24 * 60 * 60 * 1000;
-                    sharedPreferences.edit().putLong("mediaTTL", days).apply();
+                    sharedPreferences.edit().putLong("mediaTTL", days).commit();
                     App.getCacheManager().refreshSettings();
                 } catch (NumberFormatException ignored) {}
             }

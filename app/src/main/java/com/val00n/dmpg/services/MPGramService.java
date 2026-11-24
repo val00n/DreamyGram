@@ -539,7 +539,7 @@ public class MPGramService {
 
     public void getHistory(final String peer, String offset_id, long offset_date, String userToken, final boolean cache, final String topMsgId, final ApiCallback<HistoryResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
-        if (topMsgId != null && !topMsgId.isEmpty()) {
+        if (topMsgId != null && topMsgId.length() > 0) {
             queryParams.put("method", "searchMessages");
             queryParams.put("top_msg_id", topMsgId);
             queryParams.put("q", "");

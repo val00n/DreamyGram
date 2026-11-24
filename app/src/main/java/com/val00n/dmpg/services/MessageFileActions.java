@@ -243,7 +243,9 @@ public class MessageFileActions {
             return;
         }
 
-        file.setReadable(true, false);
+        if (Integer.parseInt(android.os.Build.VERSION.SDK) >= 9) {
+            Api9Helper.setReadable(file);
+        }
 
         Intent intent = new Intent(Intent.ACTION_VIEW);
         Uri uri = Uri.fromFile(file);
@@ -294,8 +296,7 @@ public class MessageFileActions {
         dialog.setCancelable(true);
         dialog.setMax(100);
 
-        dialog.setButton(
-                DialogInterface.BUTTON_NEGATIVE,
+        dialog.setButton2(
                 "Cancel",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int which) {

@@ -68,6 +68,11 @@ public class ChatActivity extends Activity {
     private ProgressBar progressBar;
     private TextView chatTitleText;
     private TextView chatStatusText;
+    private ImageView chatAvatar;
+    private AvatarViewBinder headerAvatarViewBinder;
+    private boolean headerAvatarBound;
+    private boolean headerAvatarHasPhoto;
+    private String headerAvatarPeer;
     private EditText chatInputEditText;
     private ImageButton chatAttachButton;
     private ImageButton chatSendButton;
@@ -243,6 +248,9 @@ public class ChatActivity extends Activity {
         bottomContainerContent = (LinearLayout) findViewById(R.id.chatBottomContainerContent);
         backToBottomButton = (ImageButton) findViewById(R.id.chatBackToBottomButton);
         networkStatusText = (TextView) findViewById(R.id.chatNetworkStatusText);
+        chatAvatar = (ImageView) findViewById(R.id.chatAvatar);
+
+        headerAvatarViewBinder = new AvatarViewBinder(App.getCacheManager());
 
         chatUpdatesHandler = new Handler();
         statusUpdateHandler = new Handler();
@@ -553,6 +561,10 @@ public class ChatActivity extends Activity {
             }
         } else {
             onNetworkLost();
+        }
+
+        if (messagesAdapter != null) {
+            messagesAdapter.setChatStyle(settingsManager.getChatStyle());
         }
     }
 
@@ -1422,7 +1434,7 @@ public class ChatActivity extends Activity {
     }
 
     private void clearDeleted(ArrayList<String> messages) {
-        if (messages == null || messages.isEmpty()) return;
+        if (messages == null || messages.size() == 0) return;
         if (historyResponse == null || historyResponse.messages == null) return;
 
         boolean isChanged = false;
@@ -1738,9 +1750,11 @@ public class ChatActivity extends Activity {
                     historyResponse.users,
                     historyResponse.chats,
                     isSavedMessages,
+                    peerId != null && peerId.startsWith("-"),
                     new AvatarViewBinder(App.getCacheManager()),
                     new ImageViewBinder(App.getCacheManager()));
 
+            messagesAdapter.setChatStyle(settingsManager.getChatStyle());
             messagesAdapter.setTopic(topic);
             messagesAdapter.setAlbumListener(albumListener);
             messagesAdapter.setMediaClickListener(mediaClickListener);
@@ -1784,6 +1798,7 @@ public class ChatActivity extends Activity {
 
         progressBar.setVisibility(View.GONE);
         showStatus();
+        updateChatAvatar();
     }
 
     private void showStatus() {
@@ -2582,6 +2597,41 @@ public class ChatActivity extends Activity {
             if (entry.message == message) return entry;
         }
         return null;
+    }
+
+    private void updateChatAvatar() {
+        if (chatAvatar == null || headerAvatarViewBinder == null || peerId == null) {
+            return;
+        }
+
+        boolean modern = SettingsManager.CHAT_STYLE_MODERN.equals(settingsManager.getChatStyle());
+
+        if (!modern) {
+            chatAvatar.setVisibility(View.GONE);
+            headerAvatarBound = false;
+            return;
+        }
+
+        chatAvatar.setVisibility(View.VISIBLE);
+
+        boolean hasAvatar = false;
+
+        if (historyResponse != null) {
+            if (peerId.startsWith("-")) {
+                Chat chat = historyResponse.chats != null ? historyResponse.chats.get(peerId) : null;
+                hasAvatar = chat != null && chat.p;
+            } else {
+                User user = historyResponse.users != null ? historyResponse.users.get(peerId) : null;
+                hasAvatar = user != null && user.p;
+            }
+        }
+
+        if (!headerAvatarBound || headerAvatarHasPhoto != hasAvatar || !peerId.equals(headerAvatarPeer)) {
+            headerAvatarViewBinder.bind(chatAvatar, peerId, hasAvatar);
+            headerAvatarBound = true;
+            headerAvatarHasPhoto = hasAvatar;
+            headerAvatarPeer = peerId;
+        }
     }
 
     private void addHeader() {

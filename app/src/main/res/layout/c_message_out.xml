@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:minHeight="1dp"
+              android:descendantFocusability="blocksDescendants"
+              android:layout_marginBottom="2dp">
+
+    <View
+        android:id="@+id/messageDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        style="@style/HorizontalDivider" />
+
+    <LinearLayout
+        android:id="@+id/messageCaptionLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/messageCaptionText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="right"
+            android:text="Forwarded from @null"
+            android:maxLines="1"
+            android:textColor="@android:color/secondary_text_dark"
+            android:textStyle="italic"
+            android:textSize="15sp"
+            android:paddingTop="2dp"
+            android:layout_marginLeft="3dp"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#20E0E0E0" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/messageRoot"
+        android:orientation="horizontal"
+        android:padding="1dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:id="@+id/messageTextLayout"
+            android:layout_marginRight="4dp"
+            android:layout_marginLeft="4dp"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="right">
+
+            <LinearLayout
+                android:id="@+id/messageTitleRow"
+                android:layout_alignParentBottom="true"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/messageDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="right"
+                    android:text="XX:XX"
+                    android:textColor="@android:color/secondary_text_dark"
+                    android:textSize="16sp"
+                    android:paddingRight="4dp"/>
+                <ImageView
+                    android:id="@+id/messageStatus"
+                    android:src="@drawable/ic_wait"
+                    android:layout_gravity="center"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"/>
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Me"
+                    android:textColor="@android:color/primary_text_dark"
+                    android:textSize="17sp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_alignParentTop="true"
+                    android:gravity="right"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/messageQuoteLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#10E0E0E0"
+                android:orientation="horizontal"
+                android:gravity="right">
+
+                <TextView
+                    android:id="@+id/messageQuoteText"
+                    android:padding="1dp"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Quote text"
+                    android:maxLines="2"
+                    android:linksClickable="true"
+                    android:textColor="@android:color/secondary_text_dark"
+                    android:textSize="16sp"
+                    android:gravity="right"/>
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginLeft="4dp"
+                    android:background="#75E0E0E0"/>
+            </LinearLayout>
+
+            <com.val00n.dmpg.ui.chat.AlbumView
+                android:id="@+id/messageAlbum"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right">
+
+                <com.val00n.dmpg.ui.AspectImageView
+                    android:id="@+id/messageImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#000000"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/messagePlayOverlay"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:src="@android:drawable/ic_media_play"
+                    android:background="#80000000"
+                    android:padding="8dp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <com.val00n.dmpg.ui.chat.FileMessageView
+                android:id="@+id/messageFile"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/messageText"
+                android:layout_width="match_parent"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:linksClickable="true"
+                android:text="Bottom text"
+                android:textColor="@android:color/secondary_text_dark"
+                android:textSize="16sp"
+                android:gravity="right"/>
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

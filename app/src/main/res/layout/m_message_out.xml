@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/messageRoot"
+              android:layout_width="fill_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal"
+              android:gravity="right"
+              android:layout_marginTop="4dp"
+              android:descendantFocusability="blocksDescendants">
+
+    <LinearLayout
+        android:id="@+id/messageTextLayout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:background="@drawable/msg_out">
+
+        <LinearLayout
+            android:layout_marginRight="11dp"
+            android:orientation="vertical"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+            <TextView
+                android:id="@+id/messageCaptionText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="250dp"
+                android:text="Forwarded from @null"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textStyle="italic"
+                android:textColor="@android:color/secondary_text_dark"
+                android:textSize="13sp"
+                android:layout_marginRight="2dp"
+                android:layout_marginBottom="1dp" />
+
+            <LinearLayout
+                android:id="@+id/messageQuoteLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="#16000000"
+                android:paddingLeft="6dp"
+                android:paddingRight="8dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp">
+
+                <View
+                    android:layout_width="2dp"
+                    android:layout_height="fill_parent"
+                    android:layout_marginRight="6dp"
+                    android:background="#CC000000" />
+
+                <TextView
+                    android:id="@+id/messageQuoteText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="230dp"
+                    android:text="Quote text"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:linksClickable="true"
+                    android:textColor="@android:color/primary_text_light"
+                    android:textSize="13sp"
+                    android:gravity="left" />
+            </LinearLayout>
+
+            <com.val00n.dmpg.ui.chat.AlbumView
+                android:id="@+id/messageAlbum"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:id="@+id/messageImageContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone">
+
+                <com.val00n.dmpg.ui.AspectImageView
+                    android:id="@+id/messageImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="#000000"
+                    android:scaleType="centerCrop" />
+
+                <ImageView
+                    android:id="@+id/messagePlayOverlay"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center"
+                    android:src="@android:drawable/ic_media_play"
+                    android:background="#80000000"
+                    android:padding="8dp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <com.val00n.dmpg.ui.chat.FileMessageView
+                android:id="@+id/messageFile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/messageText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Bottom text"
+                android:linksClickable="true"
+                android:textColor="@android:color/primary_text_light"
+                android:textSize="16dp"
+                android:gravity="left" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="2dp">
+
+                <ImageView
+                    android:id="@+id/messageStatus"
+                    android:src="@drawable/ic_wait"
+                    android:tint="#80000000"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:paddingRight="4dp"/>
+
+                <TextView
+                    android:id="@+id/messageDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="XX:XX"
+                    android:textColor="@android:color/secondary_text_dark"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

@@ -351,7 +351,7 @@ public class FileHelper {
         }
     }
 
-    public static void scanFileForGallery(Context context, String filePath, String mimeType) {
+    /*public static void scanFileForGallery(Context context, String filePath, String mimeType) {
         MediaScannerConnection.scanFile(
                 context.getApplicationContext(),
                 new String[]{filePath},
@@ -363,7 +363,7 @@ public class FileHelper {
                     }
                 }
         );
-    }
+    } */
 
     public static String getMimeType(String fileName) {
         if (fileName == null) return "application/octet-stream";

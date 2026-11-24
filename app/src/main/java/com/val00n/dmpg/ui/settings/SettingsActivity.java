@@ -4,10 +4,14 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.Spinner;
+
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.services.SettingsManager;
@@ -26,8 +30,12 @@ public class SettingsActivity extends Activity {
     private CheckBox loadMediaCheckBox;
     private CheckBox dialogPollCheckBox;
     private CheckBox chatPollCheckBox;
+    private Spinner chatStyleSpinner;
+    private ArrayAdapter<String> chatStyleSpinnerAdapter;
 
     private SettingsManager settingsManager;
+    private String[] chatStyles;
+    private String[] chatStyleValues;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -45,6 +53,7 @@ public class SettingsActivity extends Activity {
         loadMediaCheckBox = (CheckBox) findViewById(R.id.settingsLoadMediaCheckBox);
         dialogPollCheckBox = (CheckBox) findViewById(R.id.settingsDialogPollCheckBox);
         chatPollCheckBox = (CheckBox) findViewById(R.id.settingsChatPollCheckBox);
+        chatStyleSpinner = (Spinner) findViewById(R.id.settingsChatStyleSpinner);
 
         loadValues();
 
@@ -109,9 +118,39 @@ public class SettingsActivity extends Activity {
                 navigateTo(CacheSettingsActivity.class);
             }
         });
+
+        chatStyleSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                settingsManager.setChatStyle(chatStyleValues[position]);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
 
     private void loadValues() {
+        chatStyles = new String[]{"Classic", "Modern", "Compact"};
+        chatStyleValues = new String[]{
+                SettingsManager.CHAT_STYLE_DEFAULT,
+                SettingsManager.CHAT_STYLE_MODERN,
+                SettingsManager.CHAT_STYLE_COMPACT
+        };
+
+        chatStyleSpinnerAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, chatStyles);
+        chatStyleSpinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        chatStyleSpinner.setAdapter(chatStyleSpinnerAdapter);
+
+        int chatStyle = 0;
+        final String currentType = settingsManager.getChatStyle();
+        for (int i = 0; i < chatStyleValues.length; i++) {
+            if (chatStyleValues[i].equals(currentType)) {
+                chatStyle = i;
+                break;
+            }
+        }
+        chatStyleSpinner.setSelection(chatStyle);
+
         dialogsCountEditText.setText(String.valueOf(settingsManager.getDialogsCount()));
         messagesCountEditText.setText(String.valueOf(settingsManager.getMessagesCount()));
         dialogPollEditText.setText(String.valueOf(settingsManager.getDialogPollMillis() / 1000));
