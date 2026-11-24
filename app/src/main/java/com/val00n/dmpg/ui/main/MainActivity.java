@@ -13,6 +13,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -28,6 +29,8 @@ import com.val00n.dmpg.model.ForumTopicResponse;
 import com.val00n.dmpg.model.dialog.Dialog;
 import com.val00n.dmpg.model.dialog.DialogResponse;
 import com.val00n.dmpg.model.dialog.DialogRow;
+import com.val00n.dmpg.model.search.SearchResult;
+import com.val00n.dmpg.model.search.SearchRow;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.Update;
 import com.val00n.dmpg.model.User;
@@ -38,6 +41,7 @@ import com.val00n.dmpg.ui.chat.ChatActivity;
 import com.val00n.dmpg.ui.settings.SettingsActivity;
 import com.val00n.dmpg.ui.StartupActivity;
 import com.val00n.dmpg.ui.AvatarViewBinder;
+import com.val00n.dmpg.ui.SimpleTextWatcher;
 import com.val00n.dmpg.utils.SortUtils;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -53,7 +57,8 @@ public class MainActivity extends Activity {
     private ListView topicListView;
     private ArrayAdapter<String> topicsAdapter;
     private DialogsAdapter dialogsAdapter;
-    private ImageButton searchButton;
+    private SearchAdapter searchAdapter;
+    private EditText searchEditText;
     private ImageButton settingsButton;
     private ImageButton topicBackButton;
     private Button loadMoreButton;
@@ -106,6 +111,15 @@ public class MainActivity extends Activity {
     private static final int OFFLINE_CHECK_MILLIS = 5000;
     private static final int STATUS_UPDATE_MILLIS = 5000;
     private static final int UPDATE_TIMEOUT_SECS = 30;
+    private static final int SEARCH_DEBOUNCE_MILLIS = 300;
+    private static final int GLOBAL_SEARCH_MIN_LENGTH = 3;
+    private static final int SEARCH_RESULTS_LIMIT = 20;
+
+    private boolean isSearchMode = false;
+    private String currentSearchQuery = "";
+    private int searchSeq = 0;
+    private Handler searchHandler;
+    private Runnable searchDebounceTask;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -154,7 +168,7 @@ public class MainActivity extends Activity {
         progressBar = (ProgressBar) findViewById(R.id.mainProgressBar);
         dialogsListView = (ListView) findViewById(R.id.mainDialogsListView);
         topicListView = (ListView) findViewById(R.id.mainTopicsListView);
-        searchButton = (ImageButton) findViewById(R.id.mainSearchButton);
+        searchEditText = (EditText) findViewById(R.id.mainSearchEditText);
         settingsButton = (ImageButton) findViewById(R.id.mainSettingsButton);
         topicBackButton = (ImageButton) findViewById(R.id.mainTopicBackButton);
         networkStatusText = (TextView) findViewById(R.id.mainNetworkStatusText);
@@ -169,12 +183,19 @@ public class MainActivity extends Activity {
 
         forwardMode = getIntent().getBooleanExtra("FORWARD_MODE", false); //TODO: meh
         if (forwardMode) {
-            searchButton.setVisibility(View.GONE);
             settingsButton.setVisibility(View.GONE);
         }
 
         dialogsUpdatesHandler = new Handler();
         statusUpdateHandler = new Handler();
+        searchHandler = new Handler();
+
+        searchEditText.addTextChangedListener(new SimpleTextWatcher() {
+            @Override
+            public void onTextChanged(String s) {
+                onSearchQueryChanged(s);
+            }
+        });
 
         updatesFilter = new String[] { "updateNewChannelMessage",  "updateNewMessage", "updateEditChannelMessage",
                                        "updateEditMessage", "updateDeleteChannelMessages", "updateDeleteMessages",
@@ -196,6 +217,36 @@ public class MainActivity extends Activity {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 Object item = parent.getItemAtPosition(position);
 
+                if (item instanceof SearchRow) {
+                    SearchResult result = ((SearchRow) item).result;
+                    if (result == null) {
+                        return;
+                    }
+
+                    if (result.dialog != null && result.dialog.chat != null && result.dialog.chat.f) {
+                        openForumTopics(result.dialog);
+                        return;
+                    }
+
+                    if (forwardMode) {
+                        Intent intent = new Intent();
+                        intent.putExtra("ID", result.peerId);
+                        intent.putExtra("NAME", result.title);
+                        setResult(RESULT_OK, intent);
+                        finish();
+                    } else {
+                        if (result.dialog != null) {
+                            result.dialog.unread = 0;
+                            result.dialog.mentions = 0;
+                        }
+                        if (searchAdapter != null) {
+                            searchAdapter.notifyDataSetChanged();
+                        }
+                        navigateToChat(result.peerId, result.title, result.readOut);
+                    }
+                    return;
+                }
+
                 if (!(item instanceof DialogRow)) {
                     return;
                 }
@@ -203,14 +254,7 @@ public class MainActivity extends Activity {
                 Dialog dialog = ((DialogRow) item).dialog;
 
                 if (dialog.chat != null && dialog.chat.f) {
-                    dialogsRoot.setVisibility(View.GONE);
-                    topicsRoot.setVisibility(View.VISIBLE);
-
-                    topicTitleText.setText(dialog.getDisplayName(App.selfId));
-
-                    getTopics(dialog.peerId);
-
-                    avatarViewBinder.bind(topicChatAvatar, dialog.peerId, dialog.hasAvatar());
+                    openForumTopics(dialog);
                     return;
                 }
 
@@ -351,6 +395,8 @@ public class MainActivity extends Activity {
             }
         };
 
+        dialogsLimit = settingsManager.getDialogsCount();
+
         addFooter();
         loadDialogs(true, dialogsLimit, null, null, 0);
     }
@@ -374,7 +420,10 @@ public class MainActivity extends Activity {
         isPaused = false;
         isPolling = false;
 
+        int previousDialogsLimit = dialogsLimit;
         dialogsLimit = settingsManager.getDialogsCount();
+        boolean dialogsLimitChanged = previousDialogsLimit != dialogsLimit;
+
         updatePollMillis = settingsManager.getDialogPollMillis();
         dialogPollEnabled = settingsManager.isDialogPollEnabled();
 
@@ -387,6 +436,9 @@ public class MainActivity extends Activity {
             if ((dialogResponse == null || dialogResponse.dialogs == null || dialogResponse.dialogs.isEmpty()) && !isLoading) {
                 loadDialogs(true, dialogsLimit, null, null, 0);
             } else {
+                if (dialogsLimitChanged && !isLoading) {
+                    refreshDialogs(dialogsLimit);
+                }
                 tryStartPolling();
             }
         } else {
@@ -399,6 +451,9 @@ public class MainActivity extends Activity {
         isActivityDied = true;
         dialogsUpdatesHandler.removeCallbacks(dialogsUpdateTask);
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
+        if (searchDebounceTask != null) {
+            searchHandler.removeCallbacks(searchDebounceTask);
+        }
     }
 
     @Override
@@ -461,6 +516,8 @@ public class MainActivity extends Activity {
             if (topicsRoot.getVisibility() == View.VISIBLE) {
                 topicsRoot.setVisibility(View.GONE);
                 dialogsRoot.setVisibility(View.VISIBLE);
+            } else if (isSearchMode) {
+                searchEditText.setText("");
             }
 
             return true;
@@ -916,7 +973,9 @@ public class MainActivity extends Activity {
 
         if (dialogsAdapter == null) {
             dialogsAdapter = new DialogsAdapter(dialogResponse.dialogs, App.selfId, new AvatarViewBinder(App.getCacheManager()));
-            dialogsListView.setAdapter(dialogsAdapter);
+            if (!isSearchMode) {
+                dialogsListView.setAdapter(dialogsAdapter);
+            }
         }
 
         dialogsAdapter.notifyDataSetChanged();
@@ -934,6 +993,205 @@ public class MainActivity extends Activity {
         int limit = loadedDialogs > 0 ? loadedDialogs : dialogsLimit;
 
         refreshDialogs(limit);
+    }
+
+    private void onSearchQueryChanged(String rawQuery) {
+        if (isActivityDied) return;
+
+        final String query = rawQuery.trim();
+        currentSearchQuery = query;
+        searchSeq++;
+
+        if (searchDebounceTask != null) {
+            searchHandler.removeCallbacks(searchDebounceTask);
+            searchDebounceTask = null;
+        }
+
+        if (query.length() == 0) {
+            exitSearchMode();
+            return;
+        }
+
+        enterSearchMode();
+
+        final int seq = searchSeq;
+        ArrayList<SearchResult> local = searchLocalDialogs(query);
+        boolean globalPossible = query.length() >= GLOBAL_SEARCH_MIN_LENGTH && App.isNetworkAvailable();
+
+        showSearchResults(null, local, !globalPossible);
+
+        if (!globalPossible) {
+            return;
+        }
+
+        searchDebounceTask = new Runnable() {
+            @Override
+            public void run() {
+                searchGlobally(query, seq);
+            }
+        };
+        searchHandler.postDelayed(searchDebounceTask, SEARCH_DEBOUNCE_MILLIS);
+    }
+
+    private void searchGlobally(final String query, final int seq) {
+        mpgService.searchChats(userToken, query, new MPGramService.ApiCallback<ArrayList<SearchResult>>() {
+            @Override
+            public void onSuccess(final ArrayList<SearchResult> result) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isActivityDied || isPaused) return;
+                        if (seq != searchSeq || !query.equals(currentSearchQuery)) return;
+
+                        showSearchResults(result, searchLocalDialogs(currentSearchQuery), true);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(final Exception error) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isActivityDied || isPaused) return;
+                        if (seq != searchSeq || !query.equals(currentSearchQuery)) return;
+
+                        Toast.makeText(MainActivity.this, "Search failed: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        showSearchResults(null, searchLocalDialogs(currentSearchQuery), true);
+                    }
+                });
+            }
+        });
+    }
+
+    private ArrayList<SearchResult> searchLocalDialogs(String query) {
+        ArrayList<SearchResult> results = new ArrayList<SearchResult>();
+
+        if (dialogResponse == null || dialogResponse.dialogs == null) return results;
+
+        String q = query.toLowerCase();
+        if (q.startsWith("@")) {
+            q = q.substring(1);
+        }
+
+        if (q.length() == 0) return results;
+
+        for (int i = 0; i < dialogResponse.dialogs.size() && results.size() < SEARCH_RESULTS_LIMIT; i++) {
+            Dialog dialog = dialogResponse.dialogs.get(i);
+            if (dialog == null) continue;
+
+            if (matchesQuery(q, dialog.getDisplayName(App.selfId))) {
+                results.add(new SearchResult(dialog, App.selfId));
+                continue;
+            }
+
+            String username = dialog.chat != null
+                    ? dialog.chat.name
+                    : (dialog.user != null ? dialog.user.name : null);
+
+            if (matchesQuery(q, username)) {
+                results.add(new SearchResult(dialog, App.selfId));
+            }
+        }
+
+        return results;
+    }
+
+    private boolean matchesQuery(String lowerQuery, String value) {
+        if (value == null) return false;
+
+        return value.toLowerCase().indexOf(lowerQuery) >= 0;
+    }
+
+    private void showSearchResults(ArrayList<SearchResult> global, ArrayList<SearchResult> local, boolean globalDone) {
+        enterSearchMode();
+
+        ArrayList<SearchResult> localOnly = new ArrayList<SearchResult>();
+
+        if (local != null) {
+            for (int i = 0; i < local.size(); i++) {
+                SearchResult result = local.get(i);
+                if (result == null) continue;
+                if (global != null && containsPeer(global, result.peerId)) continue;
+                localOnly.add(result);
+            }
+        }
+
+        boolean empty = globalDone
+                && (global == null || global.isEmpty())
+                && localOnly.isEmpty();
+
+        if (searchAdapter != null) {
+            searchAdapter.setResults(global, localOnly, empty);
+        }
+
+        dialogsListView.setSelection(0);
+    }
+
+    private boolean containsPeer(ArrayList<SearchResult> results, String peerId) {
+        if (results == null || peerId == null) return false;
+
+        for (int i = 0; i < results.size(); i++) {
+            SearchResult result = results.get(i);
+            if (result != null && peerId.equals(result.peerId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void enterSearchMode() {
+        if (isSearchMode) return;
+
+        isSearchMode = true;
+
+        if (footerView != null) {
+            footerView.setVisibility(View.GONE);
+        }
+
+        if (searchAdapter == null) {
+            searchAdapter = new SearchAdapter(avatarViewBinder);
+        }
+
+        dialogsListView.setAdapter(searchAdapter);
+    }
+
+    private void exitSearchMode() {
+        currentSearchQuery = "";
+        searchSeq++;
+
+        if (searchDebounceTask != null) {
+            searchHandler.removeCallbacks(searchDebounceTask);
+            searchDebounceTask = null;
+        }
+
+        if (!isSearchMode) return;
+
+        isSearchMode = false;
+
+        if (dialogResponse != null && dialogResponse.dialogs != null) {
+            if (dialogsAdapter == null) {
+                dialogsAdapter = new DialogsAdapter(dialogResponse.dialogs, App.selfId, new AvatarViewBinder(App.getCacheManager()));
+            }
+            dialogsListView.setAdapter(dialogsAdapter);
+            dialogsAdapter.notifyDataSetChanged();
+        } else {
+            dialogsListView.setAdapter(null);
+        }
+
+        updateDialogsFooter();
+    }
+
+    private void openForumTopics(Dialog dialog) {
+        dialogsRoot.setVisibility(View.GONE);
+        topicsRoot.setVisibility(View.VISIBLE);
+
+        topicTitleText.setText(dialog.getDisplayName(App.selfId));
+
+        getTopics(dialog.peerId);
+
+        avatarViewBinder.bind(topicChatAvatar, dialog.peerId, dialog.hasAvatar());
     }
 
     private void getTopics(final String peer) {
@@ -1070,6 +1328,11 @@ public class MainActivity extends Activity {
 
     private void updateDialogsFooter() {
         if (footerView == null || loadMoreButton == null) return;
+
+        if (isSearchMode) {
+            footerView.setVisibility(View.GONE);
+            return;
+        }
 
         if (dialogResponse == null || dialogResponse.dialogs == null || dialogResponse.dialogs.isEmpty()) {
             footerView.setVisibility(View.GONE);

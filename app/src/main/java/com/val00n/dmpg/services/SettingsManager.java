@@ -22,7 +22,7 @@ public class SettingsManager {
     public static final String CHAT_STYLE_MODERN = "m";
 
     private static final int DEFAULT_DIALOGS_COUNT = 25;
-    private static final int DEFAULT_MESSAGES_COUNT = 50;
+    private static final int DEFAULT_MESSAGES_COUNT = 30;
     private static final int DEFAULT_DIALOG_POLL_SECS = 3;
     private static final int DEFAULT_MESSAGES_POLL_SECS = 3;
     private static final boolean DEFAULT_LOAD_AVATARS = true;

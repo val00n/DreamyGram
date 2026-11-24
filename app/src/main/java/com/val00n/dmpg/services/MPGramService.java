@@ -6,10 +6,12 @@ import android.os.Looper;
 import android.util.Log;
 import com.val00n.dmpg.App;
 import com.val00n.dmpg.BuildConfig;
+import com.val00n.dmpg.model.Chat;
 import com.val00n.dmpg.model.ForumTopicResponse;
 import com.val00n.dmpg.model.dialog.DialogResponse;
 import com.val00n.dmpg.model.FileParams;
 import com.val00n.dmpg.model.message.HistoryResponse;
+import com.val00n.dmpg.model.search.SearchResult;
 import com.val00n.dmpg.model.Instance;
 import com.val00n.dmpg.model.AuthResponse;
 import com.val00n.dmpg.model.Update;
@@ -45,10 +47,11 @@ public class MPGramService {
     private volatile long activePollToken = 0;
     private volatile boolean cancelDispatched = false;
 
-    private static final int GET_HISTORY_LIMIT = 30; // TODO change this in settings
+    private static final int GET_HISTORY_LIMIT = 30;
     private static final int CHECK_AUTH_TIMEOUT = 10;
     private static final int PROBE_HISTORY_LIMIT = 5;
     private static final int TOPIC_LIMIT = 50;
+    private static final int SEARCH_RESULTS_LIMIT = 20;
 
     public static final int AVATAR_SIZE = 48; // TODO change this in settings
     public static final String FILE_PREVIEW_SIZE = "256"; // TODO change this in settings
@@ -537,6 +540,58 @@ public class MPGramService {
         });
     }
 
+    public void searchChats(String userToken, final String query, final ApiCallback<ArrayList<SearchResult>> callback) {
+        final Map<String, String> queryParams = new HashMap<String, String>();
+        queryParams.put("method", "searchChats");
+        queryParams.put("v", instance.apiVersion);
+        queryParams.put("q", query);
+
+        final Map<String, String> headers = buildHeaders(userToken, false, false);
+
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
+
+                    Log.d(TAG, "Raw API Response: " + stringResponse);
+
+                    JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
+                    Exception jsonError = extractJsonError(parsedJson);
+                    if (jsonError != null) {
+                        if (callback != null) callback.onError(jsonError);
+                        return;
+                    }
+
+                    JSONArray res = parsedJson.getNullableArray("res");
+                    ArrayList<SearchResult> response = new ArrayList<SearchResult>();
+
+                    if (res != null) {
+                        int limit = Math.min(res.size(), SEARCH_RESULTS_LIMIT);
+
+                        for (int i = 0; i < limit; i++) {
+                            JSONObject peerJson = res.getNullableObject(i);
+                            if (peerJson == null) continue;
+
+                            String id = peerJson.getNullableString("id");
+                            if (id == null) continue;
+
+                            if (id.startsWith("-")) {
+                                response.add(new SearchResult(new Chat(peerJson)));
+                            } else {
+                                response.add(new SearchResult(new User(peerJson)));
+                            }
+                        }
+                    }
+
+                    if (callback != null) callback.onSuccess(response);
+                } catch (Exception e) {
+                    if (callback != null) callback.onError(e);
+                }
+            }
+        });
+    }
+
     public void getHistory(final String peer, String offset_id, long offset_date, String userToken, final boolean cache, final String topMsgId, final ApiCallback<HistoryResponse> callback) {
         final Map<String, String> queryParams = new HashMap<String, String>();
         if (topMsgId != null && topMsgId.length() > 0) {
@@ -548,7 +603,13 @@ public class MPGramService {
             queryParams.put("method", "getHistory");
         }
         queryParams.put("v", instance.apiVersion);
-        queryParams.put("limit", Integer.toString(GET_HISTORY_LIMIT));
+
+        int historyLimit = App.getSettingsManager().getMessagesCount();
+        if (historyLimit < 1) {
+            historyLimit = GET_HISTORY_LIMIT;
+        }
+        queryParams.put("limit", Integer.toString(historyLimit));
+
         queryParams.put("peer", peer);
 
         if (offset_id != null) {
