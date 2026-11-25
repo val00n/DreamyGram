@@ -1,11 +1,13 @@
 package com.val00n.dmpg.ui.main;
 
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
+import com.val00n.dmpg.App;
 import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.dialog.Dialog;
 import com.val00n.dmpg.model.dialog.DialogRow;
@@ -18,10 +20,12 @@ public class DialogsAdapter extends BaseAdapter {
     private final ArrayList<Dialog> items;
     private final ArrayList<DialogRow> rows;
     private final AvatarViewBinder avatarViewBinder;
+    private final Context context;
 
     private String selfId;
 
-    public DialogsAdapter(ArrayList<Dialog> items, String selfId, AvatarViewBinder avatarViewBinder) {
+    public DialogsAdapter(Context context, ArrayList<Dialog> items, String selfId, AvatarViewBinder avatarViewBinder) {
+        this.context = context;
         this.selfId = selfId;
         this.items = items;
         this.avatarViewBinder = avatarViewBinder;
@@ -103,7 +107,7 @@ public class DialogsAdapter extends BaseAdapter {
             newRow.title = item.getDisplayName(selfId);
 
             if (item.isTyping) {
-                newRow.subTitle = "Typing...";
+                newRow.subTitle = context.getString(R.string.chat_typing);
             } else {
                 newRow.subTitle = item.getSubtitle();
             }

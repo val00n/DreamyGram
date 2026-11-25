@@ -116,7 +116,7 @@ public class StartupActivity extends Activity {
         });
 
         if (!App.isNetworkAvailable()) {
-            Toast.makeText(this, "Network unavailable", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.startup_network_unavailable, Toast.LENGTH_SHORT).show();
         }
 
         updateChosenInstanceText();
@@ -172,7 +172,7 @@ public class StartupActivity extends Activity {
             if (savedToken != null && savedToken.length() > 0) {
                 navigateToMain(false);
             } else {
-                Toast.makeText(this, "No network or known session", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, R.string.startup_no_network_or_known_session, Toast.LENGTH_LONG).show();
                 showAuthOrWelcomeScreen();
             }
 
@@ -237,18 +237,18 @@ public class StartupActivity extends Activity {
 
                         if (savedToken != null && savedToken.length() > 0) {
                             if (App.getCacheManager().hasCachedDialogs()) {
-                                Toast.makeText(StartupActivity.this, "Server unavailable, showing cached data", Toast.LENGTH_LONG).show();
+                                Toast.makeText(StartupActivity.this, R.string.startup_server_unavailable_showing_cached, Toast.LENGTH_LONG).show();
                             } else {
-                                Toast.makeText(StartupActivity.this, "Server unavailable", Toast.LENGTH_LONG).show();
+                                Toast.makeText(StartupActivity.this, R.string.startup_server_unavailable, Toast.LENGTH_LONG).show();
                             }
                             navigateToMain(true);
                             return;
                         }
 
                         if (error.getMessage() != null) {
-                            Toast.makeText(StartupActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                            Toast.makeText(StartupActivity.this, getString(R.string.startup_error_with_message, error.getMessage()), Toast.LENGTH_LONG).show();
                         } else {
-                            Toast.makeText(StartupActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                            Toast.makeText(StartupActivity.this, getString(R.string.startup_error_class, error.getClass().getName()), Toast.LENGTH_LONG).show();
                         }
 
                         showAuthOrWelcomeScreen();
@@ -277,13 +277,13 @@ public class StartupActivity extends Activity {
             @Override
             public void onTick(long millisUntilFinished) {
                 long seconds = millisUntilFinished / 1000;
-                warningNextButton.setText("Continue (" + seconds + " s)");
+                warningNextButton.setText(getString(R.string.startup_continue_countdown, seconds));
             }
 
             @Override
             public void onFinish() {
                 warningNextButton.setEnabled(true);
-                warningNextButton.setText("Continue");
+                warningNextButton.setText(R.string.startup_continue);
             }
         }.start();
     }
@@ -306,9 +306,9 @@ public class StartupActivity extends Activity {
         Instance selected = App.getInstanceManager().getSelectedInstance();
 
         if (selected != null) {
-            chosenInstanceText.setText("Chosen instance:\n" + selected.baseURL);
+            chosenInstanceText.setText(getString(R.string.startup_chosen_instance, selected.baseURL));
         } else {
-            chosenInstanceText.setText("No instance selected");
+            chosenInstanceText.setText(R.string.startup_no_instance_selected);
         }
     }
 

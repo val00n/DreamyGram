@@ -130,7 +130,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void loadValues() {
-        chatStyles = new String[]{"Classic", "Modern", "Compact"};
+        chatStyles = getResources().getStringArray(R.array.settings_chat_styles);
         chatStyleValues = new String[]{
                 SettingsManager.CHAT_STYLE_DEFAULT,
                 SettingsManager.CHAT_STYLE_MODERN,

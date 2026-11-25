@@ -377,7 +377,7 @@ public class ChatActivity extends Activity {
         };
 
         if (peerId == null) {
-            Toast.makeText(ChatActivity.this, "Invalid peer ID", Toast.LENGTH_SHORT).show();
+            Toast.makeText(ChatActivity.this, R.string.chat_invalid_peer_id, Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
@@ -432,7 +432,7 @@ public class ChatActivity extends Activity {
 
                     chatSendButton.setEnabled(false);
                     retryPending(entry);
-                    chatMessages.setSelection(chatMessages.getCount() - 1);
+                    chatMessages.setSelection(chatMessages.getCount());
                 } else {
                     historyResponse.messages.remove(msg);
                     sendMessage(msg.text);
@@ -507,7 +507,7 @@ public class ChatActivity extends Activity {
         backToBottomButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                chatMessages.setSelection(chatMessages.getCount() - 1);
+                chatMessages.setSelection(chatMessages.getCount());
                 backToBottomButton.setVisibility(View.GONE);
             }
         });
@@ -613,7 +613,7 @@ public class ChatActivity extends Activity {
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
 
-        MenuItem refresh = menu.add(0, MENU_REFRESH, 0, "Refresh");
+        MenuItem refresh = menu.add(0, MENU_REFRESH, 0, R.string.chat_refresh);
         refresh.setIcon(android.R.drawable.ic_menu_rotate);
 
         return true;
@@ -805,7 +805,7 @@ public class ChatActivity extends Activity {
             @Override
             public void run() {
                 if (!isActivityDied) {
-                    chatMessages.setSelection(chatMessages.getCount() - 1);
+                    chatMessages.setSelection(chatMessages.getCount());
                 }
             }
         });
@@ -817,7 +817,7 @@ public class ChatActivity extends Activity {
         }
 
         if (messageAction == MessageAction.EDIT) {
-            Toast.makeText(this, "Finish editing first", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.chat_finish_editing_first, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -867,7 +867,7 @@ public class ChatActivity extends Activity {
            @Override
             public void run() {
                if (!isActivityDied) {
-                   chatMessages.setSelection(chatMessages.getCount() - 1);
+                   chatMessages.setSelection(chatMessages.getCount());
                }
            }
         });
@@ -875,13 +875,13 @@ public class ChatActivity extends Activity {
 
     private void showAttachMenu() {
         if (messageAction == MessageAction.EDIT) {
-            Toast.makeText(this, "Finish editing first", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.chat_finish_editing_first, Toast.LENGTH_SHORT).show();
             return;
         }
 
         new AlertDialog.Builder(this)
-                .setTitle("Attach")
-                .setItems(new String[]{"Photo", "File"}, new DialogInterface.OnClickListener() {
+                .setTitle(R.string.chat_attach_title)
+                .setItems(new String[]{getString(R.string.chat_attach_photo), getString(R.string.chat_attach_file)}, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         if (which == 0) {
@@ -900,9 +900,9 @@ public class ChatActivity extends Activity {
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
         try {
-            startActivityForResult(Intent.createChooser(intent, "Select file"), requestCode);
+            startActivityForResult(Intent.createChooser(intent, getString(R.string.chat_select_file)), requestCode);
         } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, "No file picker found", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.chat_no_file_picker_found, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1054,7 +1054,7 @@ public class ChatActivity extends Activity {
                             messagesAdapter.notifyDataSetChanged();
 
                             if (atBottom) {
-                                chatMessages.setSelection(chatMessages.getCount() - 1);
+                                chatMessages.setSelection(chatMessages.getCount());
                             }
                         }
                     }
@@ -1093,7 +1093,7 @@ public class ChatActivity extends Activity {
                         statusUpdateTask.run();
                     } else {
                         isTyping = true;
-                        chatStatusText.setText("Typing...");
+                        chatStatusText.setText(R.string.chat_typing);
                         statusUpdateHandler.removeCallbacks(statusUpdateTask);
                         statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILLIS);
                     }
@@ -1111,12 +1111,12 @@ public class ChatActivity extends Activity {
                         if (upd.from_id != null && historyResponse.users != null) {
                             User user = historyResponse.users.get(upd.from_id);
                             if (user != null) {
-                                chatStatusText.setText(user.getDisplayName() + " is typing...");
+                                chatStatusText.setText(getString(R.string.chat_user_typing, user.getDisplayName()));
                             } else {
-                                chatStatusText.setText("Typing...");
+                                chatStatusText.setText(R.string.chat_typing);
                             }
                         } else {
-                            chatStatusText.setText("Typing...");
+                            chatStatusText.setText(R.string.chat_typing);
                         }
                         statusUpdateHandler.removeCallbacks(statusUpdateTask);
                         statusUpdateHandler.postDelayed(statusUpdateTask, STATUS_UPDATE_MILLIS);
@@ -1265,7 +1265,7 @@ public class ChatActivity extends Activity {
                         public void run() {
                             if (isActivityDied) return;
                             Toast.makeText(ChatActivity.this,
-                                    "Cannot read file: " + e.getMessage(),
+                                    getString(R.string.chat_cannot_read_file, e.getMessage()),
                                     Toast.LENGTH_SHORT).show();
                         }
                     });
@@ -1290,7 +1290,7 @@ public class ChatActivity extends Activity {
 
         tooltipLayout.setVisibility(View.VISIBLE);
         if (messageAction == MessageAction.NONE) {
-            tooltipText.setText("Attach: " + name);
+            tooltipText.setText(getString(R.string.chat_attach_tooltip, name));
         }
 
         tooltipPreview.setVisibility(View.VISIBLE);
@@ -1373,9 +1373,9 @@ public class ChatActivity extends Activity {
                     @Override
                     public void run() {
                         if (result != null && result.equals("1")) {
-                            Toast.makeText(ChatActivity.this, "Forwarded to " + targetName, Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, getString(R.string.chat_forwarded_to, targetName), Toast.LENGTH_SHORT).show();
                         } else {
-                            Toast.makeText(ChatActivity.this, "Failed to forward", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, R.string.chat_failed_forward, Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -1387,7 +1387,7 @@ public class ChatActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(ChatActivity.this, "Failed to forward: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ChatActivity.this, getString(R.string.chat_failed_forward_error, error.getMessage()), Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -1412,7 +1412,7 @@ public class ChatActivity extends Activity {
                         @Override
                         public void run() {
                             clearDeleted(new ArrayList<String>(Arrays.asList(id)));
-                            Toast.makeText(ChatActivity.this, "Successfully deleted", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, R.string.chat_successfully_deleted, Toast.LENGTH_SHORT).show();
                         }
                     });
                 } else {
@@ -1426,7 +1426,7 @@ public class ChatActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(ChatActivity.this, "Unable to delete: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ChatActivity.this, getString(R.string.chat_unable_delete, error.getMessage()), Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -1468,39 +1468,39 @@ public class ChatActivity extends Activity {
         final ArrayList<MessageOptions> actions = new ArrayList<MessageOptions>();
 
         if (msg.text != null && msg.text.length() > 0) {
-            options.add("Copy");
+            options.add(getString(R.string.chat_copy));
             actions.add(MessageOptions.COPY);
         }
 
-        options.add("Delete");
+        options.add(getString(R.string.action_delete));
         actions.add(MessageOptions.DELETE);
 
-        options.add("Forward");
+        options.add(getString(R.string.chat_forward));
         actions.add(MessageOptions.FORWARD);
 
-        options.add("Reply");
+        options.add(getString(R.string.chat_reply));
         actions.add(MessageOptions.REPLY);
 
         if (msg.media != null) {
-            options.add("Save");
+            options.add(getString(R.string.action_save));
             actions.add(MessageOptions.SAVE);
         }
 
         if (msg.text != null && msg.text.length() > 0) {
-            options.add("Share");
+            options.add(getString(R.string.chat_share));
             actions.add(MessageOptions.SHARE);
         }
 
-        options.add("Info");
+        options.add(getString(R.string.chat_info));
         actions.add(MessageOptions.INFO);
 
         if (msg.text != null && msg.text.length() > 0 && !isMessagePending(msg) && msg.id > 0) {
-            options.add("Edit");
+            options.add(getString(R.string.chat_edit));
             actions.add(MessageOptions.EDIT);
         }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Choose action");
+        builder.setTitle(R.string.chat_choose_action);
 
         builder.setItems(options.toArray(new String[options.size()]), new DialogInterface.OnClickListener() {
             @Override
@@ -1521,21 +1521,21 @@ public class ChatActivity extends Activity {
                             messagesAdapter.notifyDataSetChanged();
                         } else {
                             new AlertDialog.Builder(ChatActivity.this)
-                                    .setTitle("Delete")
-                                    .setMessage("Are you sure?")
-                                    .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                                    .setTitle(R.string.action_delete)
+                                    .setMessage(R.string.chat_delete_confirm)
+                                    .setPositiveButton(R.string.action_delete, new DialogInterface.OnClickListener() {
                                         @Override
                                         public void onClick(DialogInterface dialog, int which) {
                                             deleteMessage(String.valueOf(msg.id), false);
                                         }
                                     })
-                                    .setNegativeButton("Delete for everyone", new DialogInterface.OnClickListener() {
+                                    .setNegativeButton(R.string.chat_delete_for_everyone, new DialogInterface.OnClickListener() {
                                         @Override
                                         public void onClick(DialogInterface dialog, int which) {
                                             deleteMessage(String.valueOf(msg.id), true);
                                         }
                                     })
-                                    .setNeutralButton("Cancel", null)
+                                    .setNeutralButton(R.string.action_cancel, null)
                                     .show();
                         }
                         break;
@@ -1546,9 +1546,9 @@ public class ChatActivity extends Activity {
 
                     case EDIT:
                         if (isMessagePending(msg)) {
-                            Toast.makeText(ChatActivity.this, "Cannot edit pending message", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, R.string.chat_cannot_edit_pending, Toast.LENGTH_SHORT).show();
                         } else if (msg.id <= 0) {
-                            Toast.makeText(ChatActivity.this, "Cannot edit message without server ID", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, R.string.chat_cannot_edit_no_server_id, Toast.LENGTH_SHORT).show();
                         } else {
                             editMessage(msg);
                         }
@@ -1556,7 +1556,7 @@ public class ChatActivity extends Activity {
 
                     case FORWARD:
                         if (isMessagePending(msg)) {
-                            Toast.makeText(ChatActivity.this, "Cannot forward pending message", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, R.string.chat_cannot_forward_pending, Toast.LENGTH_SHORT).show();
                         } else {
                             forwardMessage(msg);
                         }
@@ -1564,7 +1564,7 @@ public class ChatActivity extends Activity {
 
                     case REPLY:
                         if (isMessagePending(msg)) {
-                            Toast.makeText(ChatActivity.this, "Cannot reply to pending message", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, R.string.chat_cannot_reply_pending, Toast.LENGTH_SHORT).show();
                         } else {
                             setReply(msg);
                         }
@@ -1578,7 +1578,7 @@ public class ChatActivity extends Activity {
                         if (msg.text != null) {
                             shareMessage(msg.text);
                         } else {
-                            Toast.makeText(ChatActivity.this, "Message is empty", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ChatActivity.this, R.string.chat_message_empty, Toast.LENGTH_SHORT).show();
                         }
                         break;
 
@@ -1596,17 +1596,17 @@ public class ChatActivity extends Activity {
         ArrayList<String> options = new ArrayList<String>();
         final ArrayList<Integer> actions = new ArrayList<Integer>();
 
-        options.add("Remove");
+        options.add(getString(R.string.chat_remove));
         actions.add(1);
 
-        options.add(pendingAttachmentAsSpoiler ? "Send without spoiler" : "Mark as spoiler");
+        options.add(getString(pendingAttachmentAsSpoiler ? R.string.chat_send_without_spoiler : R.string.chat_mark_as_spoiler));
         actions.add(2);
 
-        options.add(pendingAttachmentAsFile ? "Send as usual" : "Send as file");
+        options.add(getString(pendingAttachmentAsFile ? R.string.chat_send_as_usual : R.string.chat_send_as_file));
         actions.add(3);
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Choose action");
+        builder.setTitle(R.string.chat_choose_action);
 
         builder.setItems(options.toArray(new String[options.size()]), new DialogInterface.OnClickListener() {
             @Override
@@ -1618,7 +1618,7 @@ public class ChatActivity extends Activity {
                         clearPendingAttachment(true);
                         if (messageAction == MessageAction.REPLY) {
                             Message target = findMessageById(targetMessageId);
-                            tooltipText.setText("Reply: " + (target != null && target.text != null ? target.text : ""));
+                            tooltipText.setText(getString(R.string.chat_reply_tooltip, target != null && target.text != null ? target.text : ""));
                             tooltipLayout.setVisibility(View.VISIBLE);
                         } else {
                             tooltipLayout.setVisibility(View.GONE);
@@ -1648,16 +1648,16 @@ public class ChatActivity extends Activity {
             chatInputEditText.setText(message.text);
 
             tooltipLayout.setVisibility(View.VISIBLE);
-            tooltipText.setText("Editing message:");
+            tooltipText.setText(R.string.chat_editing_tooltip);
         } else {
-            Toast.makeText(ChatActivity.this, "Message is empty", Toast.LENGTH_SHORT).show();
+            Toast.makeText(ChatActivity.this, R.string.chat_message_empty, Toast.LENGTH_SHORT).show();
             return;
         }
     }
 
     private void setReply(Message message) {
         String tooltipReplyText;
-        tooltipReplyText = "Reply: ";
+        tooltipReplyText = getString(R.string.chat_reply_tooltip, "");
 
         if (message.text != null) {
             tooltipReplyText += message.text;
@@ -1692,7 +1692,7 @@ public class ChatActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(ChatActivity.this, "Unable to edit: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ChatActivity.this, getString(R.string.chat_unable_edit, error.getMessage()), Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -1704,12 +1704,12 @@ public class ChatActivity extends Activity {
         sendIntent.setAction(Intent.ACTION_SEND);
         sendIntent.setType("text/plain");
         sendIntent.putExtra(Intent.EXTRA_TEXT, text);
-        startActivity(Intent.createChooser(sendIntent, "Send message"));
+        startActivity(Intent.createChooser(sendIntent, getString(R.string.chat_send_message)));
     }
 
     private void copy(String text) {
         if (text == null || text.length() <= 0) {
-            Toast.makeText(ChatActivity.this, "Message is empty", Toast.LENGTH_SHORT).show();
+            Toast.makeText(ChatActivity.this, R.string.chat_message_empty, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -1737,9 +1737,9 @@ public class ChatActivity extends Activity {
         stringBuilder.append("\n\nTEXT: ").append(msg.text);
 
         new AlertDialog.Builder(ChatActivity.this)
-                .setTitle("Message info")
+                .setTitle(R.string.chat_message_info_title)
                 .setMessage(stringBuilder.toString())
-                .setNeutralButton("Ok", null)
+                .setNeutralButton(R.string.action_ok, null)
                 .show();
     }
 
@@ -1874,7 +1874,7 @@ public class ChatActivity extends Activity {
                         chatMessages.post(new Runnable() {
                             @Override
                             public void run() {
-                                chatMessages.setSelection(chatMessages.getCount() - 1);
+                                chatMessages.setSelection(chatMessages.getCount());
                             }
                         });
 
@@ -1897,7 +1897,7 @@ public class ChatActivity extends Activity {
                         updateNetworkStatusPosition();
                     }
                 } else {
-                    Toast.makeText(ChatActivity.this, "No network or cached history", Toast.LENGTH_LONG).show();
+                    Toast.makeText(ChatActivity.this, R.string.chat_no_network_or_cached_history, Toast.LENGTH_LONG).show();
                     finish();
                 }
 
@@ -1919,7 +1919,7 @@ public class ChatActivity extends Activity {
             }
 
             headerText.setVisibility(View.VISIBLE);
-            headerText.setText("Loading messages...");
+            headerText.setText(R.string.chat_loading_messages);
             headerProgressBar.setVisibility(View.VISIBLE);
             headerButton.setVisibility(View.GONE);
         }
@@ -1971,7 +1971,7 @@ public class ChatActivity extends Activity {
                                chatMessages.post(new Runnable() {
                                    @Override
                                    public void run() {
-                                       chatMessages.setSelection(chatMessages.getCount() - 1);
+                                       chatMessages.setSelection(chatMessages.getCount());
                                    }
                                });
                            }
@@ -2009,10 +2009,10 @@ public class ChatActivity extends Activity {
                                 progressBar.setVisibility(View.GONE);
 
                                 if (!hasCachedHistory) {
-                                    Toast.makeText(ChatActivity.this, "Failed to load history " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(ChatActivity.this, getString(R.string.chat_failed_load_history, error.getMessage()), Toast.LENGTH_SHORT).show();
                                 } else {
                                     if (networkStatusText != null) {
-                                        networkStatusText.setText("Server unavailable");
+                                        networkStatusText.setText(R.string.chat_server_unavailable);
                                         networkStatusText.setVisibility(View.VISIBLE);
                                         updateNetworkStatusPosition();
                                     }
@@ -2023,7 +2023,7 @@ public class ChatActivity extends Activity {
                                 headerView.setVisibility(View.VISIBLE);
                                 headerProgressBar.setVisibility(View.GONE);
                                 headerButton.setVisibility(View.VISIBLE);
-                                Toast.makeText(ChatActivity.this, "Failed to load: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                                Toast.makeText(ChatActivity.this, getString(R.string.chat_failed_load, error.getMessage()), Toast.LENGTH_SHORT).show();
                             }
                         }
                     });
@@ -2219,7 +2219,7 @@ public class ChatActivity extends Activity {
                         showMessages();
 
                         if (atBottom) {
-                            chatMessages.setSelection(chatMessages.getCount() - 1);
+                            chatMessages.setSelection(chatMessages.getCount());
                         }
 
                         hasUpdateOffset = false;
@@ -2270,7 +2270,7 @@ public class ChatActivity extends Activity {
             return reply;
         }
 
-        MessageReply reply = new MessageReply("Loading...");
+        MessageReply reply = new MessageReply(getString(R.string.chat_loading_placeholder));
         reply.replyId = replyId;
         return reply;
     }
@@ -2381,7 +2381,7 @@ public class ChatActivity extends Activity {
                                 pendingCheckInProgress = false;
                                 chatSendButton.setEnabled(true);
                                 Toast.makeText(ChatActivity.this,
-                                        "Cannot verify message status",
+                                        R.string.chat_cannot_verify_status,
                                         Toast.LENGTH_SHORT).show();
                             }
                         });
@@ -2542,7 +2542,7 @@ public class ChatActivity extends Activity {
 
         if (networkStatusText != null) {
             networkStatusText.setVisibility(View.VISIBLE);
-            networkStatusText.setText("Network lost...");
+            networkStatusText.setText(R.string.chat_network_lost);
             updateNetworkStatusPosition();
         }
     }
@@ -2566,7 +2566,7 @@ public class ChatActivity extends Activity {
 
     private void hideNetworkStatus() {
         if (networkStatusText == null) return;
-        networkStatusText.setText("Network lost...");
+        networkStatusText.setText(R.string.chat_network_lost);
         networkStatusText.setVisibility(View.GONE);
     }
 
@@ -2648,7 +2648,7 @@ public class ChatActivity extends Activity {
                 fetchError = false;
                 headerButton.setVisibility(View.GONE);
                 headerProgressBar.setVisibility(View.VISIBLE);
-                headerText.setText("Loading messages...");
+                headerText.setText(R.string.chat_loading_messages);
                 loadHistory(false, historyResponse.offsetId, historyResponse.offsetDate);
             }
         });

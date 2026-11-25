@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.widget.Toast;
 import com.val00n.dmpg.App;
+import com.val00n.dmpg.R;
 import com.val00n.dmpg.cache.CacheManager;
 import com.val00n.dmpg.model.message.Message;
 import java.io.File;
@@ -32,7 +33,7 @@ public class MessageFileActions {
         boolean document = isDocument(msg);
 
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        builder.setTitle("Save");
+        builder.setTitle(R.string.file_actions_save_title);
 
         if (document) {
             String displayName = msg.media.name;
@@ -46,10 +47,10 @@ public class MessageFileActions {
                 sizeText = " (" + FileHelper.formatSize(msg.media.size) + ")";
             }
 
-            builder.setMessage("Save \"" + displayName + "\"" + sizeText + " into global storage?");
+            builder.setMessage(activity.getString(R.string.file_actions_save_message, displayName, sizeText));
 
             builder.setPositiveButton(
-                    "Save",
+                    R.string.action_save,
                     new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int which) {
                             saveMessage(activity, peerId, msg, true, false);
@@ -59,7 +60,7 @@ public class MessageFileActions {
 
             if (withOpen) {
                 builder.setNeutralButton(
-                        "Save and open with...",
+                        R.string.file_actions_save_and_open,
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int which) {
                                 saveMessage(activity, peerId, msg, true, true);
@@ -68,9 +69,9 @@ public class MessageFileActions {
                 );
             }
 
-            builder.setNegativeButton("Cancel", null);
+            builder.setNegativeButton(R.string.action_cancel, null);
         } else {
-            builder.setMessage("Save file into global storage?");
+            builder.setMessage(R.string.file_actions_save_file_message);
 
             if (withOpen) {
                 builder.setPositiveButton(
@@ -83,7 +84,7 @@ public class MessageFileActions {
                 );
 
                 builder.setNeutralButton(
-                        "Save and open with...",
+                        R.string.file_actions_save_and_open,
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int which) {
                                 saveMessage(activity, peerId, msg, true, true);
@@ -93,7 +94,7 @@ public class MessageFileActions {
             } else {
                 if (!msg.media.type.equals("video")) {
                     builder.setPositiveButton(
-                            "Save original",
+                            R.string.file_actions_save_original,
                             new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     saveMessage(activity, peerId, msg, true, false);
@@ -102,7 +103,7 @@ public class MessageFileActions {
                     );
 
                     builder.setNeutralButton(
-                            "Save cached",
+                            R.string.file_actions_save_cached,
                             new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     saveMessage(activity, peerId, msg, false, false);
@@ -111,7 +112,7 @@ public class MessageFileActions {
                     );
                 } else {
                     builder.setPositiveButton(
-                            "Save",
+                            R.string.action_save,
                             new DialogInterface.OnClickListener() {
                                 public void onClick(DialogInterface dialog, int which) {
                                     saveMessage(activity, peerId, msg, false, false);
@@ -121,7 +122,7 @@ public class MessageFileActions {
                 }
             }
 
-            builder.setNegativeButton("Cancel", null);
+            builder.setNegativeButton(R.string.action_cancel, null);
         }
 
         builder.show();
@@ -137,14 +138,14 @@ public class MessageFileActions {
         }
 
         if (message.id <= 0) {
-            Toast.makeText(activity, "Cannot save pending message", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, R.string.file_actions_cannot_save_pending, Toast.LENGTH_SHORT).show();
             return;
         }
 
         final String filename = getFileName(peer, message, !original);
 
         if (filename == null) {
-            Toast.makeText(activity, "Cannot resolve file name", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, R.string.file_actions_cannot_resolve_filename, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -154,7 +155,7 @@ public class MessageFileActions {
             if (openAfter) {
                 openFile(activity, existing, message.media.mime);
             } else {
-                Toast.makeText(activity, "Already saved: " + existing.getName(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, activity.getString(R.string.file_actions_already_saved, existing.getName()), Toast.LENGTH_SHORT).show();
             }
 
             return;
@@ -172,7 +173,7 @@ public class MessageFileActions {
                                 if (openAfter) {
                                     openFile(activity, file, message.media.mime);
                                 } else {
-                                    Toast.makeText(activity, "Saved from cache: " + file.getName(), Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(activity, activity.getString(R.string.file_actions_saved_from_cache, file.getName()), Toast.LENGTH_SHORT).show();
                                 }
                             } else {
                                 downloadWithDialog(activity, peer, message, filename, openAfter);
@@ -239,7 +240,7 @@ public class MessageFileActions {
         }
 
         if (file == null || !file.exists() || file.length() == 0) {
-            Toast.makeText(context, "File not found", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.file_actions_file_not_found, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -255,7 +256,7 @@ public class MessageFileActions {
         intent.setDataAndType(uri, openMime);
 
         try {
-            Intent chooser = Intent.createChooser(intent, "Open with");
+            Intent chooser = Intent.createChooser(intent, context.getString(R.string.file_actions_open_with));
 
             if (!(context instanceof Activity)) {
                 chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -263,7 +264,7 @@ public class MessageFileActions {
 
             context.startActivity(chooser);
         } catch (Exception e) {
-            Toast.makeText(context, "No app found to open file", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.file_actions_no_app_to_open, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -289,15 +290,15 @@ public class MessageFileActions {
         }
 
         final ProgressDialog dialog = new ProgressDialog(activity);
-        dialog.setTitle("Saving...");
-        dialog.setMessage("Saving \"" + filename + "\" into DreamyGram folder");
+        dialog.setTitle(R.string.file_actions_saving_title);
+        dialog.setMessage(activity.getString(R.string.file_actions_saving_message, filename));
         dialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
         dialog.setIndeterminate(true);
         dialog.setCancelable(true);
         dialog.setMax(100);
 
         dialog.setButton2(
-                "Cancel",
+                activity.getString(R.string.action_cancel),
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int which) {
                         d.cancel();
@@ -373,7 +374,7 @@ public class MessageFileActions {
 
                             openFile(activity, file, mime);
                         } else {
-                            Toast.makeText(activity, "Saved " + file.getName(), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, activity.getString(R.string.file_actions_saved, file.getName()), Toast.LENGTH_SHORT).show();
                         }
                     }
 
@@ -384,10 +385,10 @@ public class MessageFileActions {
 
                         dismissQuietly(dialog);
 
-                        String messageText = "Download failed";
+                        String messageText = activity.getString(R.string.file_actions_download_failed);
 
                         if (error != null && error.getMessage() != null) {
-                            messageText += ": " + error.getMessage();
+                            messageText = activity.getString(R.string.file_actions_download_failed_with_message, error.getMessage());
                         }
 
                         Toast.makeText(activity, messageText, Toast.LENGTH_SHORT).show();
@@ -399,7 +400,7 @@ public class MessageFileActions {
                         }
 
                         dismissQuietly(dialog);
-                        Toast.makeText(activity, "Download cancelled", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity, R.string.file_actions_download_cancelled, Toast.LENGTH_SHORT).show();
                     }
                 }
         );

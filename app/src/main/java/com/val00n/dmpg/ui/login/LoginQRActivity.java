@@ -72,7 +72,7 @@ public class LoginQRActivity extends Activity {
                                 qrPollingHandler.postDelayed(qrPollTask, 3000);
                             }
                         } else {
-                            error(new Exception("Poll has died unexpectedly :("));
+                            error(new Exception(getString(R.string.login_qr_poll_died)));
                         }
                     }
 
@@ -128,7 +128,7 @@ public class LoginQRActivity extends Activity {
                         }
                     });
                 } else {
-                    error(new Exception("unexpected response: " + response.response));
+                    error(new Exception(getString(R.string.login_qr_unexpected_response, response.response)));
                 }
             }
 
@@ -159,7 +159,7 @@ public class LoginQRActivity extends Activity {
                         }
                     });
                 } else {
-                    error(new Exception("unexpected response: " + result.response));
+                    error(new Exception(getString(R.string.login_qr_unexpected_response, result.response)));
                 }
             }
 
@@ -178,7 +178,7 @@ public class LoginQRActivity extends Activity {
                     showQRCode(result);
                 } else {
                     Log.d(TAG, "onSuccess: ERR: qr img bytes is null");
-                    Toast.makeText(LoginQRActivity.this, "onError: null image", Toast.LENGTH_LONG).show();
+                    Toast.makeText(LoginQRActivity.this, R.string.login_qr_on_error_null_image, Toast.LENGTH_LONG).show();
                     finish();
                 }
             }
@@ -202,10 +202,10 @@ public class LoginQRActivity extends Activity {
                     if (bitmap != null) {
                         captchaImageView.setImageBitmap(bitmap);
                     } else {
-                        error(new Exception("ERR: Failed to decode bitmap"));
+                        error(new Exception(getString(R.string.login_qr_err_failed_decode_bitmap)));
                     }
                 } else {
-                    error(new Exception("ERR: Empty captcha image"));
+                    error(new Exception(getString(R.string.login_qr_err_empty_captcha_image)));
                 }
             }
         });
@@ -223,10 +223,10 @@ public class LoginQRActivity extends Activity {
                     if (bitmap != null) {
                         qrImageView.setImageBitmap(bitmap);
                     } else {
-                        error(new Exception("ERR: Failed to decode bitmap"));
+                        error(new Exception(getString(R.string.login_qr_err_failed_decode_bitmap)));
                     }
                 } else {
-                    error(new Exception("ERR: empty image"));
+                    error(new Exception(getString(R.string.login_qr_err_empty_image)));
                 }
             }
         });
@@ -263,9 +263,9 @@ public class LoginQRActivity extends Activity {
             @Override
             public void run() {
                 if (error.getMessage() != null) {
-                    Toast.makeText(LoginQRActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(LoginQRActivity.this, getString(R.string.login_qr_error_with_message, error.getMessage()), Toast.LENGTH_LONG).show();
                 } else {
-                    Toast.makeText(LoginQRActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(LoginQRActivity.this, getString(R.string.login_qr_error_class, error.getClass().getName()), Toast.LENGTH_LONG).show();
                 }
                 finish();
             }

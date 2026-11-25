@@ -76,7 +76,7 @@ public class ImageViewerActivity extends Activity {
                 if (bitmap != null) {
                     imageView.setImageBitmap(bitmap);
                 } else {
-                    Toast.makeText(ImageViewerActivity.this, "Failed to load image", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(ImageViewerActivity.this, R.string.image_viewer_failed_load_image, Toast.LENGTH_SHORT).show();
                     finish();
                 }
             }
@@ -84,7 +84,7 @@ public class ImageViewerActivity extends Activity {
             @Override
             public void onError(Exception error) {
                 progressBar.setVisibility(View.GONE);
-                Toast.makeText(ImageViewerActivity.this, "Failed to load image", Toast.LENGTH_SHORT).show();
+                Toast.makeText(ImageViewerActivity.this, R.string.image_viewer_failed_load_image, Toast.LENGTH_SHORT).show();
                 finish();
             }
         });
@@ -94,7 +94,7 @@ public class ImageViewerActivity extends Activity {
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
 
-        MenuItem deleteItem = menu.add(0, MENU_SAVE, 1, "Save");
+        MenuItem deleteItem = menu.add(0, MENU_SAVE, 1, R.string.action_save);
         deleteItem.setIcon(android.R.drawable.ic_menu_save);
 
         return true;

@@ -160,7 +160,6 @@ public class MPGramService {
                     }
 
                     boolean result = stringResponse.contains("\"dialogs\":");
-                    Log.d(TAG, "checkAuth (getDialogs) Raw Response ( " + stringResponse + " )");
                     if (callback != null) callback.onSuccess(result);
                 } catch (IOException e) {
                     String msg = e.getMessage();
@@ -216,8 +215,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
                     if (jsonError != null) {
@@ -251,8 +248,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
 
@@ -278,8 +273,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
 
@@ -303,8 +296,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "poll Raw Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
@@ -353,8 +344,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
 
@@ -382,8 +371,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
 
@@ -408,8 +395,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
@@ -436,8 +421,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
@@ -482,8 +465,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);
 
@@ -516,8 +497,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
@@ -553,8 +532,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
@@ -630,8 +607,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
@@ -740,8 +715,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
                     if (jsonError != null) {
@@ -812,8 +785,6 @@ public class MPGramService {
                             instance.disableCertCheck
                     );
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
                     if (jsonError != null) {
@@ -849,8 +820,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
                     if (jsonError != null) {
@@ -883,8 +852,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
@@ -953,8 +920,6 @@ public class MPGramService {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, timeoutSeconds, queryParams, headers, instance.disableCertCheck);
                     stringResponse = stringResponse.trim();
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     if (parsedJson.has("cancel")) {
                         if (callback != null) callback.onSuccess(new ArrayList<Update>());
@@ -1015,8 +980,6 @@ public class MPGramService {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, timeoutSeconds, queryParams, headers, instance.disableCertCheck);
                     stringResponse = stringResponse.trim();
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
 
                     if (parsedJson.has("error")) {
@@ -1052,8 +1015,6 @@ public class MPGramService {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
 
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
-
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     String response = parsedJson.getNullableString("res");
 
@@ -1078,8 +1039,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(instance.baseURL, instance.apiEndpoint, queryParams, headers, instance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
@@ -1240,8 +1199,6 @@ public class MPGramService {
             public void run() {
                 try {
                     String stringResponse = restClient.postString(pickedInstance.baseURL, pickedInstance.apiEndpoint, queryParams, headers, pickedInstance.disableCertCheck);
-
-                    Log.d(TAG, "Raw API Response: " + stringResponse);
 
                     JSONObject parsedJson = (JSONObject) cc.nnproject.json.JSON.get(stringResponse);
                     AuthResponse response = new AuthResponse(parsedJson);

@@ -55,16 +55,16 @@ public class InstanceSettingsActivity extends Activity {
             @Override
             public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
                 new AlertDialog.Builder(InstanceSettingsActivity.this)
-                        .setTitle("Remove instance?")
-                        .setMessage("Are you sure?")
-                        .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                        .setTitle(R.string.instance_settings_remove_title)
+                        .setMessage(R.string.instance_settings_remove_message)
+                        .setPositiveButton(R.string.action_delete, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 App.getInstanceManager().deleteInstance(position);
                                 getInstances();
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(R.string.action_cancel, null)
                         .show();
                 return true;
             }
@@ -88,41 +88,41 @@ public class InstanceSettingsActivity extends Activity {
             @Override
             public void onClick(View view) {
                 new AlertDialog.Builder(InstanceSettingsActivity.this)
-                        .setTitle("Logout")
-                        .setMessage("Please choose")
-                        .setPositiveButton("Every instance", new DialogInterface.OnClickListener() {
+                        .setTitle(R.string.instance_settings_logout_title)
+                        .setMessage(R.string.instance_settings_logout_message)
+                        .setPositiveButton(R.string.instance_settings_every_instance, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int i) {
                                 new AlertDialog.Builder(InstanceSettingsActivity.this)
-                                        .setTitle("ARE YOU SURE?")
-                                        .setMessage("Logout from every instance?")
-                                        .setPositiveButton("Logout", new DialogInterface.OnClickListener() {
+                                        .setTitle(R.string.instance_settings_logout_everywhere_title)
+                                        .setMessage(R.string.instance_settings_logout_everywhere_message)
+                                        .setPositiveButton(R.string.instance_settings_logout_button, new DialogInterface.OnClickListener() {
                                             @Override
                                             public void onClick(DialogInterface dialog, int which) {
                                             logoutEverywhere();
                                             }
                                         })
-                                        .setNegativeButton("Cancel", null)
+                                        .setNegativeButton(R.string.action_cancel, null)
                                         .show();
                             }
                         })
-                        .setNeutralButton("Current instance", new DialogInterface.OnClickListener() {
+                        .setNeutralButton(R.string.instance_settings_current_instance, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int i) {
                                 new AlertDialog.Builder(InstanceSettingsActivity.this)
-                                        .setTitle("Are you sure?")
-                                        .setMessage("Logout from current instance?")
-                                        .setPositiveButton("Logout", new DialogInterface.OnClickListener() {
+                                        .setTitle(R.string.instance_settings_remove_message)
+                                        .setMessage(R.string.instance_settings_logout_current_message)
+                                        .setPositiveButton(R.string.instance_settings_logout_button, new DialogInterface.OnClickListener() {
                                             @Override
                                             public void onClick(DialogInterface dialog, int which) {
                                             logout();
                                             }
                                         })
-                                        .setNegativeButton("Cancel", null)
+                                        .setNegativeButton(R.string.action_cancel, null)
                                         .show();
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -214,7 +214,7 @@ public class InstanceSettingsActivity extends Activity {
 
         App.getSessionManager().clearSession(instance.baseURL);
 
-        wipeAndNavigate("Logged out");
+        wipeAndNavigate(getString(R.string.instance_settings_logged_out));
     }
 
     private void logoutEverywhere() {
@@ -235,7 +235,7 @@ public class InstanceSettingsActivity extends Activity {
         }
 
         if (toLogout.isEmpty()) {
-            Toast.makeText(this, "No active sessions", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.instance_settings_no_active_sessions, Toast.LENGTH_SHORT).show();
             App.getCacheManager().wipeCache(null);
             return;
         }
@@ -246,7 +246,7 @@ public class InstanceSettingsActivity extends Activity {
             mpgService.logout(toLogout.get(i), tokens.get(i), null);
         }
 
-        wipeAndNavigate("Logged out everywhere");
+        wipeAndNavigate(getString(R.string.instance_settings_logged_out_everywhere));
     }
 
     private void wipeAndNavigate(final String message) {

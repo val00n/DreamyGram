@@ -126,7 +126,7 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
 
-        MenuItem deleteItem = menu.add(0, MENU_SAVE, 1, "Save");
+        MenuItem deleteItem = menu.add(0, MENU_SAVE, 1, R.string.action_save);
         deleteItem.setIcon(android.R.drawable.ic_menu_save);
 
         return true;
@@ -159,7 +159,7 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
                     public void run() {
                         if (file == null || !file.exists()) {
                             Log.e(TAG, "onLoaded: File is null or does not exist!");
-                            Toast.makeText(VideoViewerActivity.this, "File not found in cache", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(VideoViewerActivity.this, R.string.video_viewer_file_not_found_cache, Toast.LENGTH_SHORT).show();
                             finish();
                             return;
                         }
@@ -180,7 +180,7 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
                         Log.e(TAG, "CacheManager loadVideo error", error);
                         progressBar.setVisibility(View.GONE);
                         Toast.makeText(VideoViewerActivity.this,
-                                "Failed to load video: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                                getString(R.string.video_viewer_failed_load, error.getMessage()), Toast.LENGTH_SHORT).show();
                         finish();
                     }
                 });
@@ -222,7 +222,7 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
 
         } catch (IOException e) {
             Log.e(TAG, "Failed to set data source", e);
-            Toast.makeText(this, "Failed to open video file: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.video_viewer_failed_open, e.getMessage()), Toast.LENGTH_SHORT).show();
             finish();
         }
     }
@@ -301,7 +301,7 @@ public class VideoViewerActivity extends Activity implements SurfaceHolder.Callb
     @Override
     public boolean onError(MediaPlayer mp, int what, int extra) {
         Log.e(TAG, "MediaPlayer Error: what=" + what + ", extra=" + extra);
-        Toast.makeText(this, "Video playback error (" + what + ", " + extra + ")", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.video_viewer_playback_error, what, extra), Toast.LENGTH_SHORT).show();
         finish();
         return true;
     }

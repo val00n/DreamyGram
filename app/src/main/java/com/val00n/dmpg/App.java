@@ -128,7 +128,7 @@ public class App extends Application {
                         activity.runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                Toast.makeText(activity, "session has died", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(activity, R.string.app_session_died, Toast.LENGTH_SHORT).show();
 
                                 Intent intent = new Intent(activity, StartupActivity.class);
                                 activity.startActivity(intent);

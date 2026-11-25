@@ -6,7 +6,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Log in"
+        android:text="@string/login_title"
         android:textSize="48sp"
         android:textStyle="bold"
         android:layout_centerHorizontal="true"
@@ -39,12 +39,12 @@
             android:id="@+id/loginQRCaptchaEditText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Captcha code..."/>
+            android:hint="@string/hint_captcha_code"/>
         <Button
             android:id="@+id/loginQRCaptchaSubmitButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Submit"/>
+            android:text="@string/action_submit"/>
     </LinearLayout>
 
     <ImageView
@@ -58,7 +58,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Do not use new accounts that were created less than 6 months ago!"
+        android:text="@string/login_warning_new_accounts"
         android:textSize="16sp"
         android:textStyle="italic"
         android:gravity="center"

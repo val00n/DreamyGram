@@ -482,9 +482,9 @@ public class MainActivity extends Activity {
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
 
-        MenuItem refresh = menu.add(0, MENU_REFRESH, 0, "Refresh");
+        MenuItem refresh = menu.add(0, MENU_REFRESH, 0, R.string.main_refresh);
         refresh.setIcon(android.R.drawable.ic_menu_rotate);
-        MenuItem about = menu.add(0, MENU_ABOUT, 1, "About");
+        MenuItem about = menu.add(0, MENU_ABOUT, 1, R.string.main_about_title);
         about.setIcon(android.R.drawable.ic_menu_info_details);
 
         return true;
@@ -498,9 +498,9 @@ public class MainActivity extends Activity {
                 break;
             case MENU_ABOUT:
                 new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("About")
-                        .setMessage("DreamyGram " + BuildConfig.VERSION_NAME + "\n\nAndroid 1.0+ lightweight Telegram client. Powered by MPGram WEB API.\n\nval00n ;3")
-                        .setNeutralButton("Ok", null)
+                        .setTitle(R.string.main_about_title)
+                        .setMessage(getString(R.string.main_about_message, BuildConfig.VERSION_NAME))
+                        .setNeutralButton(R.string.main_ok, null)
                         .show();
                 return true;
             default:
@@ -822,7 +822,7 @@ public class MainActivity extends Activity {
                 updateDialogsFooter();
 
                 if (!hasCachedDialogs) {
-                    Toast.makeText(MainActivity.this, "No network or cached dialogs", Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this, R.string.main_no_network_or_cached_dialogs, Toast.LENGTH_LONG).show();
                 }
 
                 return;
@@ -834,7 +834,7 @@ public class MainActivity extends Activity {
                 isLoading = false;
                 updateDialogsFooter();
 
-                Toast.makeText(MainActivity.this, "No network", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, R.string.main_no_network, Toast.LENGTH_SHORT).show();
 
                 return;
             }
@@ -877,7 +877,7 @@ public class MainActivity extends Activity {
                                 && loadedDialogs >= dialogResponse.totalCount);
 
                         if (allLoaded && !initial) {
-                            Toast.makeText(MainActivity.this, "Everything is loaded", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, R.string.main_everything_loaded, Toast.LENGTH_SHORT).show();
                         }
 
                         isLoading = false;
@@ -903,13 +903,13 @@ public class MainActivity extends Activity {
                             progressBar.setVisibility(View.GONE);
 
                             if (initial && !hasCachedDialogs) {
-                                Toast.makeText(MainActivity.this, "Failed to load dialogResponse " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                                Toast.makeText(MainActivity.this, getString(R.string.main_failed_load_dialog_response, error.getMessage()), Toast.LENGTH_SHORT).show();
                             } else if (initial && hasCachedDialogs) {
                                 showServerUnavailable();
                                 tryStartPolling();
                             } else if (!initial) {
                                 loadMoreButton.setEnabled(true);
-                                Toast.makeText(MainActivity.this, "Failed to load dialogs " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                                Toast.makeText(MainActivity.this, getString(R.string.main_failed_load_dialogs, error.getMessage()), Toast.LENGTH_SHORT).show();
                             }
 
                             maybeRefreshDialogs();
@@ -972,7 +972,7 @@ public class MainActivity extends Activity {
         applyReadStates();
 
         if (dialogsAdapter == null) {
-            dialogsAdapter = new DialogsAdapter(dialogResponse.dialogs, App.selfId, new AvatarViewBinder(App.getCacheManager()));
+            dialogsAdapter = new DialogsAdapter(this, dialogResponse.dialogs, App.selfId, new AvatarViewBinder(App.getCacheManager()));
             if (!isSearchMode) {
                 dialogsListView.setAdapter(dialogsAdapter);
             }
@@ -1056,7 +1056,7 @@ public class MainActivity extends Activity {
                         if (isActivityDied || isPaused) return;
                         if (seq != searchSeq || !query.equals(currentSearchQuery)) return;
 
-                        Toast.makeText(MainActivity.this, "Search failed: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, getString(R.string.main_search_failed, error.getMessage()), Toast.LENGTH_SHORT).show();
                         showSearchResults(null, searchLocalDialogs(currentSearchQuery), true);
                     }
                 });
@@ -1172,7 +1172,7 @@ public class MainActivity extends Activity {
 
         if (dialogResponse != null && dialogResponse.dialogs != null) {
             if (dialogsAdapter == null) {
-                dialogsAdapter = new DialogsAdapter(dialogResponse.dialogs, App.selfId, new AvatarViewBinder(App.getCacheManager()));
+                dialogsAdapter = new DialogsAdapter(this, dialogResponse.dialogs, App.selfId, new AvatarViewBinder(App.getCacheManager()));
             }
             dialogsListView.setAdapter(dialogsAdapter);
             dialogsAdapter.notifyDataSetChanged();
@@ -1376,7 +1376,7 @@ public class MainActivity extends Activity {
         statusUpdateHandler.removeCallbacks(statusUpdateTask);
 
         if (networkStatusText != null) {
-            networkStatusText.setText("Network lost...");
+            networkStatusText.setText(R.string.main_network_lost);
             networkStatusText.setVisibility(View.VISIBLE);
         }
     }
@@ -1394,13 +1394,13 @@ public class MainActivity extends Activity {
 
     private void showServerUnavailable() {
         if (networkStatusText == null) return;
-        networkStatusText.setText("Server unavailable, showing cached data");
+        networkStatusText.setText(R.string.main_server_unavailable_cached);
         networkStatusText.setVisibility(View.VISIBLE);
     }
 
     private void hideNetworkStatus() {
         if (networkStatusText == null) return;
-        networkStatusText.setText("Network lost...");
+        networkStatusText.setText(R.string.main_network_lost);
         networkStatusText.setVisibility(View.GONE);
     }
 }

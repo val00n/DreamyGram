@@ -122,13 +122,13 @@ public class LoginPhoneActivity extends Activity {
             @Override
             public void onTick(long millisUntilFinished) {
                 long seconds = millisUntilFinished / 1000;
-                phoneResendSubmitButton.setText("Resend (" + seconds + " s)");
+                phoneResendSubmitButton.setText(getString(R.string.login_phone_resend_countdown, seconds));
             }
 
             @Override
             public void onFinish() {
                 phoneResendSubmitButton.setEnabled(true);
-                phoneResendSubmitButton.setText("Resend Code");
+                phoneResendSubmitButton.setText(R.string.login_phone_resend_code);
             }
         }.start();
     }
@@ -142,7 +142,7 @@ public class LoginPhoneActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(LoginPhoneActivity.this, "Code sent again", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LoginPhoneActivity.this, R.string.login_phone_code_sent_again, Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -164,7 +164,7 @@ public class LoginPhoneActivity extends Activity {
                     showCaptchaStep();
                     fetchCaptchaImage();
                 } else {
-                    showPhoneNumberStep("unexpected response: " + response.response);
+                    showPhoneNumberStep(getString(R.string.login_phone_unexpected_response, response.response));
                 }
             }
 
@@ -187,9 +187,9 @@ public class LoginPhoneActivity extends Activity {
                 } else if ("wrong_captcha".equals(response.response)) {
                     showCaptchaStep();
                 } else if ("phone_number_invalid".equals(response.response)) {
-                    showPhoneNumberStep("phone number invalid");
+                    showPhoneNumberStep(getString(R.string.login_phone_number_invalid));
                 } else {
-                    showPhoneNumberStep("unexpected response: " + response.response);
+                    showPhoneNumberStep(getString(R.string.login_phone_unexpected_response, response.response));
                 }
             }
 
@@ -210,9 +210,9 @@ public class LoginPhoneActivity extends Activity {
                 } else if ("password".equals(response.response)) {
                     navigateTo2FA(userToken);
                 } else if ("phone_code_invalid".equals(response.response)) {
-                    showPhoneNumberStep("phone code invalid");
+                    showPhoneNumberStep(getString(R.string.login_phone_code_invalid));
                 } else {
-                    showPhoneNumberStep("unexpected response: " + response.response);
+                    showPhoneNumberStep(getString(R.string.login_phone_unexpected_response, response.response));
                 }
             }
 
@@ -270,12 +270,12 @@ public class LoginPhoneActivity extends Activity {
                     if (bitmap != null) {
                         phoneCaptchaImageView.setImageBitmap(bitmap);
                     } else {
-                        Toast.makeText(LoginPhoneActivity.this, "ERR: Failed to decode bitmap", Toast.LENGTH_LONG).show();
+                        Toast.makeText(LoginPhoneActivity.this, R.string.login_phone_err_failed_decode_bitmap, Toast.LENGTH_LONG).show();
                         Log.e(TAG, "ERR: Failed to decode bitmap");
                         finish();
                     }
                 } else {
-                    Toast.makeText(LoginPhoneActivity.this, "ERR: Empty captcha image", Toast.LENGTH_LONG).show();
+                    Toast.makeText(LoginPhoneActivity.this, R.string.login_phone_err_empty_captcha_image, Toast.LENGTH_LONG).show();
                     Log.e(TAG, "ERR: Empty captcha image bytes");
                     finish();
                 }
@@ -324,9 +324,9 @@ public class LoginPhoneActivity extends Activity {
             @Override
             public void run() {
                 if (error.getMessage() != null) {
-                    Toast.makeText(LoginPhoneActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(LoginPhoneActivity.this, getString(R.string.login_phone_error_with_message, error.getMessage()), Toast.LENGTH_LONG).show();
                 } else {
-                    Toast.makeText(LoginPhoneActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(LoginPhoneActivity.this, getString(R.string.login_phone_error_class, error.getClass().getName()), Toast.LENGTH_LONG).show();
                 }
                 finish();
             }

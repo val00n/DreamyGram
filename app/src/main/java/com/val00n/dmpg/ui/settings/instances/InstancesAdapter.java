@@ -126,28 +126,28 @@ public class InstancesAdapter extends BaseAdapter {
 
         switch (sessionStatus[position]) {
             case UNKNOWN_STATUS:
-                holder.sessionAuthStatus.setText("Session: unknown");
+                holder.sessionAuthStatus.setText(R.string.instance_adapter_session_unknown);
                 break;
             case NO_SESSION_STATUS:
-                holder.sessionAuthStatus.setText("Session: no session");
+                holder.sessionAuthStatus.setText(R.string.instance_adapter_session_no_session);
                 break;
             case INACTIVE_STATUS:
-                holder.sessionAuthStatus.setText("Session: inactive");
+                holder.sessionAuthStatus.setText(R.string.instance_adapter_session_inactive);
                 break;
             case ACTIVE_STATUS:
-                holder.sessionAuthStatus.setText("Session: active");
+                holder.sessionAuthStatus.setText(R.string.instance_adapter_session_active);
                 break;
             case ERROR_STATUS:
-                holder.sessionAuthStatus.setText("Session: error");
+                holder.sessionAuthStatus.setText(R.string.instance_adapter_session_error);
                 break;
         }
 
         if (pingResults[position] == 0) {
-            holder.ping.setText("Response time: --");
+            holder.ping.setText(R.string.instance_adapter_ping_unknown);
         } else if (pingResults[position] == -1) {
-            holder.ping.setText("Response time: -1ms");
+            holder.ping.setText(R.string.instance_adapter_ping_error);
         } else {
-            holder.ping.setText("Response time: " + pingResults[position] + "ms");
+            holder.ping.setText(context.getString(R.string.instance_adapter_ping_value, pingResults[position]));
         }
 
         return convertView;

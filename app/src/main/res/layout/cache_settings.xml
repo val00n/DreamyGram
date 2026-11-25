@@ -13,7 +13,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
-            android:text="Global: XX.XX/XX MB"
+            android:text="@string/cache_settings_global_label"
             android:textSize="26dp"
             android:textStyle="bold"
             android:layout_marginTop="24dp"/>
@@ -22,21 +22,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
-            android:text="Avatars: XX.XX MB"
+            android:text="@string/cache_settings_avatars_label"
             android:textSize="20dp"/>
         <TextView
             android:id="@+id/cacheSettingsMediaText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
-            android:text="Media: XX.XX MB"
+            android:text="@string/cache_settings_media_label"
             android:textSize="20dp"/>
         <TextView
             android:id="@+id/cacheSettingsChatsText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
-            android:text="Chats: XX.XX MB"
+            android:text="@string/cache_settings_chats_label"
             android:textSize="20dp"
             android:layout_marginBottom="18dp"/>
 
@@ -51,7 +51,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
-            android:text="Storage saved: XX.XX MB"
+            android:text="@string/cache_settings_storage_label"
             android:textSize="20dp"
             android:layout_marginBottom="6dp"/>
 
@@ -74,13 +74,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Clear avatar cache"
+                    android:text="@string/cache_settings_clear_avatar_cache"
                     android:textSize="16dp"/>
                 <Button
                     android:id="@+id/cacheSettingsAvatarClear"
                     android:layout_width="100dp"
                     android:layout_height="45dp"
-                    android:text="Clear"/>
+                    android:text="@string/action_clear"/>
             </LinearLayout>
 
             <LinearLayout
@@ -92,13 +92,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Clear media cache"
+                    android:text="@string/cache_settings_clear_media_cache"
                     android:textSize="16dp"/>
                 <Button
                     android:id="@+id/cacheSettingsMediaClear"
                     android:layout_width="100dp"
                     android:layout_height="45dp"
-                    android:text="Clear"/>
+                    android:text="@string/action_clear"/>
             </LinearLayout>
 
             <LinearLayout
@@ -110,13 +110,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Clear chats cache"
+                    android:text="@string/cache_settings_clear_chats_cache"
                     android:textSize="16dp"/>
                 <Button
                     android:id="@+id/cacheSettingsChatsClear"
                     android:layout_width="100dp"
                     android:layout_height="45dp"
-                    android:text="Clear"/>
+                    android:text="@string/action_clear"/>
             </LinearLayout>
 
             <LinearLayout
@@ -128,13 +128,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Clear storage saved"
+                    android:text="@string/cache_settings_clear_storage_cache"
                     android:textSize="16dp"/>
                 <Button
                     android:id="@+id/cacheSettingsStorageSavedClear"
                     android:layout_width="100dp"
                     android:layout_height="45dp"
-                    android:text="Clear"/>
+                    android:text="@string/action_clear"/>
             </LinearLayout>
 
             <LinearLayout
@@ -146,13 +146,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Avatar cache limit (in MB)"
+                    android:text="@string/cache_settings_avatar_cache_limit"
                     android:textSize="16dp"/>
                 <EditText
                     android:id="@+id/cacheSettingsAvatarEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:hint="number..."/>
+                    android:hint="@string/hint_number"/>
             </LinearLayout>
 
             <LinearLayout
@@ -164,13 +164,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Media cache limit (in MB)"
+                    android:text="@string/cache_settings_media_cache_limit"
                     android:textSize="16dp"/>
                 <EditText
                     android:id="@+id/cacheSettingsMediaEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:hint="number..."/>
+                    android:hint="@string/hint_number"/>
             </LinearLayout>
 
             <LinearLayout
@@ -182,13 +182,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Chats cache limit (in MB)"
+                    android:text="@string/cache_settings_chats_cache_limit"
                     android:textSize="16dp"/>
                 <EditText
                     android:id="@+id/cacheSettingsChatsEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:hint="number..."/>
+                    android:hint="@string/hint_number"/>
             </LinearLayout>
 
             <LinearLayout
@@ -200,13 +200,13 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Avatar cache TTL (days)"
+                    android:text="@string/cache_settings_avatar_cache_ttl"
                     android:textSize="16dp"/>
                 <EditText
                     android:id="@+id/cacheSettingsAvatarTTLEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:hint="number..."/>
+                    android:hint="@string/hint_number"/>
             </LinearLayout>
 
             <LinearLayout
@@ -218,34 +218,34 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Media cache TTL (days)"
+                    android:text="@string/cache_settings_media_cache_ttl"
                     android:textSize="16dp"/>
                 <EditText
                     android:id="@+id/cacheSettingsMediaTTLEditText"
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
-                    android:hint="number..."/>
+                    android:hint="@string/hint_number"/>
             </LinearLayout>
 
             <CheckBox
                 android:id="@+id/cacheSettingsAvatarStoreCheckBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Store avatar cache"
+                android:text="@string/cache_settings_store_avatar_cache"
                 android:checked="true"
                 android:layout_marginTop="4dp"/>
             <CheckBox
                 android:id="@+id/cacheSettingsMediaStoreCheckBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Store media cache"
+                android:text="@string/cache_settings_store_media_cache"
                 android:checked="true"
                 android:layout_marginTop="4dp"/>
             <CheckBox
                 android:id="@+id/cacheSettingsChatsStoreCheckBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Store chats cache"
+                android:text="@string/cache_settings_store_chats_cache"
                 android:checked="true"
                 android:layout_marginTop="4dp"/>
         </LinearLayout>

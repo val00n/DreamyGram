@@ -16,7 +16,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Instance"
+                android:text="@string/instance_edit_instance"
                 android:textAlignment="center"
                 android:textSize="48sp"
                 android:textStyle="bold"
@@ -27,7 +27,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Base URL"
+                android:text="@string/instance_edit_base_url"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -35,12 +35,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="example.com"/>
+                android:hint="@string/hint_example_com"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="API endpoint"
+                android:text="@string/instance_edit_api_endpoint"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -48,12 +48,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="api.php"/>
+                android:hint="@string/hint_api_php"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Avatar endpoint"
+                android:text="@string/instance_edit_avatar_endpoint"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -61,12 +61,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="ava.php"/>
+                android:hint="@string/hint_ava_php"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="File endpoint"
+                android:text="@string/instance_edit_file_endpoint"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -74,12 +74,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="file.php"/>
+                android:hint="@string/hint_file_php"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Voice endpoint"
+                android:text="@string/instance_edit_voice_endpoint"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -87,12 +87,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="voice.php"/>
+                android:hint="@string/hint_voice_php"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="QR endpoint"
+                android:text="@string/instance_edit_qr_endpoint"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -100,12 +100,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="qrcode.php"/>
+                android:hint="@string/hint_qrcode_php"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="API version"
+                android:text="@string/instance_edit_api_version"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -113,12 +113,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="12"/>
+                android:hint="@string/hint_api_version"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Instance password (blank if there is no)"
+                android:text="@string/instance_edit_password"
                 android:textSize="18sp"
                 android:layout_marginBottom="2dp"/>
             <EditText
@@ -126,13 +126,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:hint="123qwe..."/>
+                android:hint="@string/hint_password_placeholder"/>
 
             <CheckBox
                 android:id="@+id/instanceEditCheckCertsCheckBox"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Enable certs check"
+                android:text="@string/instance_edit_enable_certs_check"
                 android:checked="true"
                 android:layout_marginBottom="8dp"/>
         </LinearLayout>
@@ -142,6 +142,6 @@
         android:id="@+id/instanceEditSaveButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Save"
+        android:text="@string/instance_edit_save"
         android:layout_margin="4dp"/>
 </LinearLayout>

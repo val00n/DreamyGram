@@ -1,5 +1,7 @@
 package com.val00n.dmpg.model.dialog;
 
+import com.val00n.dmpg.App;
+import com.val00n.dmpg.R;
 import com.val00n.dmpg.model.Chat;
 import com.val00n.dmpg.model.User;
 import com.val00n.dmpg.model.message.Message;
@@ -87,19 +89,19 @@ public class Dialog {
 
         if (msg.media != null && msg.media.type != null) {
             if (msg.media.type.equals("photo")) {
-                return "Photo";
+                return App.get().getString(R.string.dialog_media_photo);
             } else if (msg.media.type.equals("sticker")) {
-                return "Sticker";
+                return App.get().getString(R.string.dialog_media_sticker);
             } else if (msg.media.type.equals("document")) {
-                return "Attachment";
+                return App.get().getString(R.string.dialog_media_attachment);
             } else if (msg.media.type.equals("webpage")) {
-                return "Link";
+                return App.get().getString(R.string.dialog_media_link);
             } else if (msg.media.type.equals("geo")) {
-                return "Location";
+                return App.get().getString(R.string.dialog_media_location);
             } else if (msg.media.type.equals("poll")) {
-                return "Poll";
+                return App.get().getString(R.string.dialog_media_poll);
             } else {
-                return "Attachment";
+                return App.get().getString(R.string.dialog_media_attachment);
             }
         } else if (msg.act != null) {
             return msg.act.action.replaceAll("_", " ");
@@ -113,6 +115,6 @@ public class Dialog {
             return DateUtils.formatChatTime(msg.date, true, System.currentTimeMillis());
         }
 
-        return "XX:XX";
+        return App.get().getString(R.string.layout_time_placeholder);
     }
 }

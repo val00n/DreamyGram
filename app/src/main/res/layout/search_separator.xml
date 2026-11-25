@@ -20,7 +20,7 @@
         android:layout_height="wrap_content"
         android:paddingLeft="8dp"
         android:paddingRight="8dp"
-        android:text="In your chats"
+        android:text="@string/search_separator_in_chats"
         android:textColor="@android:color/secondary_text_dark"
         android:textSize="14sp"/>
 

@@ -69,7 +69,7 @@ public class InstanceEditActivity extends Activity {
     private void saveChanges() {
         String baseURL = baseURLEditText.getText().toString();
         if (baseURL.length() < 1) {
-            Toast.makeText(this, "Invalid base URL", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.instance_edit_invalid_base_url, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -96,7 +96,7 @@ public class InstanceEditActivity extends Activity {
 
             if (instanceIndex > -1) {
                 if (App.getInstanceManager().hasInstanceWithUrl(baseURL, instanceIndex)) {
-                    Toast.makeText(this, "Instance with this base URL already exists", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, R.string.instance_edit_instance_exists, Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -104,7 +104,7 @@ public class InstanceEditActivity extends Activity {
                 App.getInstanceManager().selectInstance(instanceIndex);
             } else {
                 if (App.getInstanceManager().hasInstanceWithUrl(baseURL, -1)) {
-                    Toast.makeText(this, "Instance with this base URL already exists", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, R.string.instance_edit_instance_exists, Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -114,7 +114,7 @@ public class InstanceEditActivity extends Activity {
 
             finish();
         } else {
-            Toast.makeText(this, "Invalid fields", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.instance_edit_invalid_fields, Toast.LENGTH_SHORT).show();
         }
     }
 }

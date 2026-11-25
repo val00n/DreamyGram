@@ -111,14 +111,14 @@ public class CacheSettingsActivity extends Activity {
             @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
-                        .setTitle("Are you sure?")
-                        .setMessage("Wipe avatar cache?")
-                        .setPositiveButton("Wipe", new DialogInterface.OnClickListener() {
+                        .setTitle(getString(R.string.cache_settings_are_you_sure))
+                        .setMessage(getString(R.string.cache_settings_wipe_avatar_cache))
+                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
-                                pd.setTitle("Clearing...");
-                                pd.setMessage("Wiping avatar cache");
+                                pd.setTitle(getString(R.string.cache_settings_clearing));
+                                pd.setMessage(getString(R.string.cache_settings_wiping_avatar_cache));
                                 pd.setCancelable(false);
                                 pd.show();
 
@@ -129,7 +129,7 @@ public class CacheSettingsActivity extends Activity {
                                         runOnUiThread(new Runnable() {
                                             @Override
                                             public void run() {
-                                                Toast.makeText(CacheSettingsActivity.this, "Avatar cache cleared", Toast.LENGTH_SHORT).show();
+                                                Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_avatar_cleared, Toast.LENGTH_SHORT).show();
                                                 loadValues();
                                                 showValues();
                                             }
@@ -138,7 +138,7 @@ public class CacheSettingsActivity extends Activity {
                                 }, true);
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -147,14 +147,14 @@ public class CacheSettingsActivity extends Activity {
             @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
-                        .setTitle("Are you sure?")
-                        .setMessage("Wipe chats cache?")
-                        .setPositiveButton("Wipe", new DialogInterface.OnClickListener() {
+                        .setTitle(getString(R.string.cache_settings_are_you_sure))
+                        .setMessage(getString(R.string.cache_settings_wipe_chats_cache))
+                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
-                                pd.setTitle("Clearing...");
-                                pd.setMessage("Wiping chats cache");
+                                pd.setTitle(getString(R.string.cache_settings_clearing));
+                                pd.setMessage(getString(R.string.cache_settings_wiping_chats_cache));
                                 pd.setCancelable(false);
                                 pd.show();
 
@@ -165,7 +165,7 @@ public class CacheSettingsActivity extends Activity {
                                         runOnUiThread(new Runnable() {
                                             @Override
                                             public void run() {
-                                                Toast.makeText(CacheSettingsActivity.this, "Chats cache cleared", Toast.LENGTH_SHORT).show();
+                                                Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_chats_cleared, Toast.LENGTH_SHORT).show();
                                                 loadValues();
                                                 showValues();
                                             }
@@ -174,7 +174,7 @@ public class CacheSettingsActivity extends Activity {
                                 });
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -183,14 +183,14 @@ public class CacheSettingsActivity extends Activity {
             @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
-                        .setTitle("Are you sure?")
-                        .setMessage("Wipe media cache?")
-                        .setPositiveButton("Wipe", new DialogInterface.OnClickListener() {
+                        .setTitle(getString(R.string.cache_settings_are_you_sure))
+                        .setMessage(getString(R.string.cache_settings_wipe_media_cache))
+                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
-                                pd.setTitle("Clearing...");
-                                pd.setMessage("Wiping media cache");
+                                pd.setTitle(getString(R.string.cache_settings_clearing));
+                                pd.setMessage(getString(R.string.cache_settings_wiping_media_cache));
                                 pd.setCancelable(false);
                                 pd.show();
 
@@ -201,7 +201,7 @@ public class CacheSettingsActivity extends Activity {
                                         runOnUiThread(new Runnable() {
                                             @Override
                                             public void run() {
-                                                Toast.makeText(CacheSettingsActivity.this, "Media cache cleared", Toast.LENGTH_SHORT).show();
+                                                Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_media_cleared, Toast.LENGTH_SHORT).show();
                                                 loadValues();
                                                 showValues();
                                             }
@@ -210,7 +210,7 @@ public class CacheSettingsActivity extends Activity {
                                 }, false);
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -219,18 +219,18 @@ public class CacheSettingsActivity extends Activity {
             @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
-                        .setTitle("Are you sure?")
-                        .setMessage("Wipe external storage cache?")
-                        .setPositiveButton("Wipe", new DialogInterface.OnClickListener() {
+                        .setTitle(getString(R.string.cache_settings_are_you_sure))
+                        .setMessage(getString(R.string.cache_settings_wipe_storage_cache))
+                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 FileHelper.deleteDirectory(false);
-                                Toast.makeText(CacheSettingsActivity.this, "Storage cache cleared", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_storage_cleared, Toast.LENGTH_SHORT).show();
                                 loadValues();
                                 showValues();
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -302,11 +302,11 @@ public class CacheSettingsActivity extends Activity {
         globalSize = avatarsSize + mediaSize + chatsSize;
         globalLimit = avatarsLimit + mediaLimit + chatsLimit;
 
-        globalText.setText("Global: " + FileHelper.formatSize(globalSize) + "/" + FileHelper.formatSize(globalLimit));
-        avatarsText.setText("Avatars: " + FileHelper.formatSize(avatarsSize) + "/" + FileHelper.formatSize(avatarsLimit));
-        mediaText.setText("Media: " + FileHelper.formatSize(mediaSize) + "/" + FileHelper.formatSize(mediaLimit));
-        chatsText.setText("Chats: " + FileHelper.formatSize(chatsSize) + "/" + FileHelper.formatSize(chatsLimit));
-        storageText.setText("External: " + FileHelper.formatSize(storageSize));
+        globalText.setText(getString(R.string.cache_settings_global, FileHelper.formatSize(globalSize), FileHelper.formatSize(globalLimit)));
+        avatarsText.setText(getString(R.string.cache_settings_avatars, FileHelper.formatSize(avatarsSize), FileHelper.formatSize(avatarsLimit)));
+        mediaText.setText(getString(R.string.cache_settings_media, FileHelper.formatSize(mediaSize), FileHelper.formatSize(mediaLimit)));
+        chatsText.setText(getString(R.string.cache_settings_chats, FileHelper.formatSize(chatsSize), FileHelper.formatSize(chatsLimit)));
+        storageText.setText(getString(R.string.cache_settings_storage, FileHelper.formatSize(storageSize)));
 
         avatarEditText.setText(String.valueOf(avatarsLimitMb));
         mediaEditText.setText(String.valueOf(mediaLimitMb));

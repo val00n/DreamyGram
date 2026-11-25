@@ -12,7 +12,7 @@
        <TextView
            android:layout_width="wrap_content"
            android:layout_height="wrap_content"
-           android:text="Settings"
+           android:text="@string/settings_title"
            android:gravity="center"
            android:textSize="48sp"
            android:textStyle="bold"
@@ -28,13 +28,13 @@
                android:layout_width="0dp"
                android:layout_height="wrap_content"
                android:layout_weight="1"
-               android:text="Dialogs count at one time"
+               android:text="@string/settings_dialogs_count"
                android:textSize="16dp"/>
            <EditText
                android:id="@+id/settingsDialogsCountEditText"
                android:layout_width="100dp"
                android:layout_height="wrap_content"
-               android:hint="number..."/>
+               android:hint="@string/hint_number"/>
        </LinearLayout>
 
        <LinearLayout
@@ -46,13 +46,13 @@
                android:layout_width="0dp"
                android:layout_height="wrap_content"
                android:layout_weight="1"
-               android:text="Messages count at one time"
+               android:text="@string/settings_messages_count"
                android:textSize="16dp"/>
            <EditText
                android:id="@+id/settingsMessagesCountEditText"
                android:layout_width="100dp"
                android:layout_height="wrap_content"
-               android:hint="number..."/>
+               android:hint="@string/hint_number"/>
        </LinearLayout>
 
        <LinearLayout
@@ -64,13 +64,13 @@
                android:layout_width="0dp"
                android:layout_height="wrap_content"
                android:layout_weight="1"
-               android:text="Dialogs poll time (sec)"
+               android:text="@string/settings_dialogs_poll_time"
                android:textSize="16dp"/>
            <EditText
                android:id="@+id/settingsDialogPollEditText"
                android:layout_width="100dp"
                android:layout_height="wrap_content"
-               android:hint="number..."/>
+               android:hint="@string/hint_number"/>
        </LinearLayout>
 
        <LinearLayout
@@ -82,19 +82,19 @@
                android:layout_width="0dp"
                android:layout_height="wrap_content"
                android:layout_weight="1"
-               android:text="Messages poll time (sec)"
+               android:text="@string/settings_messages_poll_time"
                android:textSize="16dp"/>
            <EditText
                android:id="@+id/settingsMessagesPollEditText"
                android:layout_width="100dp"
                android:layout_height="wrap_content"
-               android:hint="number..."/>
+               android:hint="@string/hint_number"/>
        </LinearLayout>
 
        <TextView
            android:layout_width="wrap_content"
            android:layout_height="wrap_content"
-           android:text="Chat style"
+           android:text="@string/settings_chat_style"
            android:textSize="16sp"
            android:layout_marginTop="8dp"
            android:layout_marginBottom="4dp"/>
@@ -108,21 +108,21 @@
            android:id="@+id/settingsLoadAvatarsCheckBox"
            android:layout_width="match_parent"
            android:layout_height="wrap_content"
-           android:text="Load avatars"
+           android:text="@string/settings_load_avatars"
            android:checked="true"
            android:layout_marginTop="4dp"/>
        <CheckBox
            android:id="@+id/settingsLoadMediaCheckBox"
            android:layout_width="match_parent"
            android:layout_height="wrap_content"
-           android:text="Load media"
+           android:text="@string/settings_load_media"
            android:checked="true"
            android:layout_marginTop="4dp"/>
        <CheckBox
            android:id="@+id/settingsDialogPollCheckBox"
            android:layout_width="match_parent"
            android:layout_height="wrap_content"
-           android:text="Dialogs polling"
+           android:text="@string/settings_dialogs_polling"
            android:checked="true"
            android:layout_marginTop="4dp"/>
 
@@ -130,7 +130,7 @@
            android:id="@+id/settingsChatPollCheckBox"
            android:layout_width="match_parent"
            android:layout_height="wrap_content"
-           android:text="Chats polling"
+           android:text="@string/settings_chats_polling"
            android:checked="true"
            android:layout_marginTop="4dp"/>
 
@@ -138,12 +138,12 @@
            android:id="@+id/settingsInstancesButton"
            android:layout_width="match_parent"
            android:layout_height="wrap_content"
-           android:text="Instance settings"/>
+           android:text="@string/settings_instance_settings"/>
        <Button
            android:id="@+id/settingsCacheButton"
            android:layout_width="match_parent"
            android:layout_height="wrap_content"
-           android:text="Cache management"
+           android:text="@string/settings_cache_management"
            android:layout_marginBottom="12dp"/>
    </LinearLayout>
 

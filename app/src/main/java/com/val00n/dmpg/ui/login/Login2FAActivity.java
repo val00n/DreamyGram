@@ -58,11 +58,11 @@ public class Login2FAActivity extends Activity {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            Toast.makeText(Login2FAActivity.this, "Wrong password", Toast.LENGTH_LONG).show();
+                            Toast.makeText(Login2FAActivity.this, R.string.login_2fa_wrong_password, Toast.LENGTH_LONG).show();
                         }
                     });
                 } else {
-                    onError(new Exception("Unexpected response: " + result.response));
+                    onError(new Exception(getString(R.string.login_2fa_unexpected_response, result.response)));
                 }
             }
 
@@ -74,9 +74,9 @@ public class Login2FAActivity extends Activity {
                     @Override
                     public void run() {
                         if (error.getMessage() != null) {
-                            Toast.makeText(Login2FAActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_LONG).show();
+                            Toast.makeText(Login2FAActivity.this, getString(R.string.login_2fa_error_with_message, error.getMessage()), Toast.LENGTH_LONG).show();
                         } else {
-                            Toast.makeText(Login2FAActivity.this, "Error: " + error.getClass().getName(), Toast.LENGTH_LONG).show();
+                            Toast.makeText(Login2FAActivity.this, getString(R.string.login_2fa_error_class, error.getClass().getName()), Toast.LENGTH_LONG).show();
                         }
                         finish();
                     }

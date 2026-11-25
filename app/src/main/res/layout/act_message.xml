@@ -13,7 +13,7 @@
         android:id="@+id/actMessageText"
         android:padding="6dp"
         android:gravity="center"
-        android:text="Action message text"
+        android:text="@string/layout_action_message_text"
         android:textSize="16sp"
         android:textColor="@android:color/secondary_text_dark"
         android:layout_width="match_parent"

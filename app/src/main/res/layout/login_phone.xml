@@ -6,7 +6,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Log in"
+        android:text="@string/login_title"
         android:textSize="48sp"
         android:textStyle="bold"
         android:layout_centerHorizontal="true"
@@ -34,14 +34,14 @@
             android:layout_height="wrap_content"
             android:layout_marginLeft="24dp"
             android:layout_marginRight="24dp"
-            android:hint="Phone number..."/>
+            android:hint="@string/hint_phone_number"/>
         <Button
             android:id="@+id/loginPhoneNumberSubmitButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginLeft="23dp"
             android:layout_marginRight="23dp"
-            android:text="Submit"/>
+            android:text="@string/action_submit"/>
     </LinearLayout>
 
     <LinearLayout
@@ -66,14 +66,14 @@
             android:layout_height="wrap_content"
             android:layout_marginLeft="24dp"
             android:layout_marginRight="24dp"
-            android:hint="Captcha code..."/>
+            android:hint="@string/hint_captcha_code"/>
         <Button
             android:id="@+id/loginPhoneCaptchaSubmitButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginLeft="24dp"
             android:layout_marginRight="24dp"
-            android:text="Submit"/>
+            android:text="@string/action_submit"/>
     </LinearLayout>
 
     <LinearLayout
@@ -90,14 +90,14 @@
             android:layout_height="wrap_content"
             android:layout_marginLeft="24dp"
             android:layout_marginRight="24dp"
-            android:hint="SMS code..."/>
+            android:hint="@string/hint_sms_code"/>
         <Button
             android:id="@+id/loginPhoneCodeSubmitButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginLeft="24dp"
             android:layout_marginRight="24dp"
-            android:text="Submit"/>
+            android:text="@string/action_submit"/>
 
         <Button
             android:id="@+id/loginPhoneResendCodeButton"
@@ -106,13 +106,13 @@
             android:layout_marginTop="24dp"
             android:layout_marginLeft="24dp"
             android:layout_marginRight="24dp"
-            android:text="Resend code"/>
+            android:text="@string/action_resend_code"/>
     </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Do not use new accounts that were created less than 6 months ago!"
+        android:text="@string/login_warning_new_accounts"
         android:textSize="16sp"
         android:textStyle="italic"
         android:gravity="center"

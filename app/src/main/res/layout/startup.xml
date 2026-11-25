@@ -35,7 +35,7 @@
             android:layout_width="256dp"
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
-            android:text="Android 1.0+ lightweight Telegram client. Powered by MPGram WEB API."
+            android:text="@string/startup_welcome_description"
             android:gravity="center"
             android:layout_marginTop="6dp"/>
         <Button
@@ -43,7 +43,7 @@
             android:layout_centerInParent="true"
             android:layout_width="128dp"
             android:layout_height="wrap_content"
-            android:text="Next"
+            android:text="@string/action_next"
             android:layout_alignParentBottom="true"
             android:layout_marginTop="72dp"
             android:layout_marginBottom="16dp"/>
@@ -60,7 +60,7 @@
             android:layout_centerHorizontal="true"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="WARNING!!!"
+            android:text="@string/startup_warning_title"
             android:textColor="@android:color/primary_text_dark"
             android:textStyle="bold"
             android:textSize="28sp"
@@ -77,7 +77,7 @@
                 android:layout_height="wrap_content"
                 android:textSize="17sp"
                 android:textColor="@android:color/primary_text_dark"
-                android:text="Using this app, may lead to some risk about your telegram account.\n1) If your account is younger than 6 months, and you never used third party clients, your account may very likely be banned. If it's not, anyway account safety cannot be guaranteed. \n2) Using this client, instance owner may have access to your data (phone number, chats, media, etc). So it's highly desirable to use your own hosted instance instead of public ones.\n3) The developers are not responsible for your account anyhow. It is just MPGram Client. Pressing the button below, means, that you accepted all of above listed.\nEnjoy :)"
+                android:text="@string/startup_warning_text"
                 android:layout_marginTop="6dp"/>
         </ScrollView>
         <Button
@@ -86,7 +86,7 @@
             android:layout_centerHorizontal="true"
             android:layout_width="148dp"
             android:layout_height="wrap_content"
-            android:text="Continue"
+            android:text="@string/startup_continue"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="16dp"/>
     </RelativeLayout>
@@ -99,7 +99,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Log in"
+            android:text="@string/login_title"
             android:textSize="48sp"
             android:textStyle="bold"
             android:layout_centerHorizontal="true"
@@ -116,14 +116,14 @@
                 android:layout_centerInParent="true"
                 android:layout_width="196dp"
                 android:layout_height="wrap_content"
-                android:text="QR code login"
+                android:text="@string/startup_qr_login"
                 android:layout_alignParentBottom="true"/>
             <Button
                 android:id="@+id/startupPhoneLoginButton"
                 android:layout_centerInParent="true"
                 android:layout_width="196dp"
                 android:layout_height="wrap_content"
-                android:text="Phone number login"
+                android:text="@string/startup_phone_login"
                 android:layout_alignParentBottom="true"
                 android:layout_marginTop="2dp"/>
             <Button
@@ -131,7 +131,7 @@
                 android:layout_centerInParent="true"
                 android:layout_width="196dp"
                 android:layout_height="wrap_content"
-                android:text="Instance settings"
+                android:text="@string/settings_instance_settings"
                 android:layout_alignParentBottom="true"
                 android:layout_marginTop="2dp"/>
         </LinearLayout>
@@ -142,7 +142,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_below="@+id/startupLoginButtonsLayout"
-            android:text="Chosen instance:\nexample.com"
+            android:text="@string/startup_chosen_instance_placeholder"
             android:gravity="center"
             android:layout_centerHorizontal="true"
             android:layout_marginTop="2dp"/>
@@ -151,7 +151,7 @@
             android:padding="4dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Phone number login is not recommended, because code may not be sent."
+            android:text="@string/startup_phone_login_warning"
             android:gravity="center"
             android:textStyle=""
             android:layout_marginBottom="12dp"

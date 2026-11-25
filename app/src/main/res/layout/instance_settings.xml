@@ -8,7 +8,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Instances"
+        android:text="@string/instance_settings_instances"
         android:gravity="center"
         android:textSize="48sp"
         android:textStyle="bold"
@@ -22,7 +22,7 @@
 
     <Button
         android:id="@+id/instanceSettingsCheckButton"
-        android:text="Check instances"
+        android:text="@string/instance_settings_check_instances"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
@@ -31,13 +31,13 @@
         android:layout_height="wrap_content">
         <Button
             android:id="@+id/instanceSettingsLogoutButton"
-            android:text="Logout"
+            android:text="@string/instance_settings_logout"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"/>
         <Button
             android:id="@+id/instanceSettingsAddButton"
-            android:text="Add instance"
+            android:text="@string/instance_settings_add_instance"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"/>

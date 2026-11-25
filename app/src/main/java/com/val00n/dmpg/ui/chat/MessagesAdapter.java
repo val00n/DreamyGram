@@ -689,10 +689,10 @@ public class MessagesAdapter extends BaseAdapter {
             } else if (item.fwd.fromId != null && item.fwd.fromId.length() > 0) {
                 senderName = getNameString(item.fwd.fromId);
             } else {
-                senderName = "unknown";
+                senderName = App.get().getString(R.string.adapter_unknown);
             }
 
-            row.forwardCaption = "Forwarded from: " + senderName;
+            row.forwardCaption = App.get().getString(R.string.adapter_forwarded_from, senderName);
         } else {
             row.forwardCaption = null;
         }
@@ -936,31 +936,31 @@ public class MessagesAdapter extends BaseAdapter {
 
         switch (type) {
             case "ChatCreate":
-                return "Group created";
+                return App.get().getString(R.string.act_group_created);
             case "ChannelCreate":
-                return "Channel created";
+                return App.get().getString(R.string.act_channel_created);
             case "ChatEditPhoto":
-                return "Photo was updated";
+                return App.get().getString(R.string.act_photo_updated);
             case "HistoryClear":
-                return "History was cleared";
+                return App.get().getString(R.string.act_history_cleared);
             case "ChatEditTitle":
-                return "Title changed: " + act.t;
+                return App.get().getString(R.string.act_title_changed, act.t);
             case "PinMessage":
-                return name + " pinned message";
+                return App.get().getString(R.string.act_pinned_message, name);
             case "ChatJoinedByLink":
-                return name + " joined by link";
+                return App.get().getString(R.string.act_joined_by_link, name);
             case "ChatJoinedByRequest":
-                return name + " joined by request";
+                return App.get().getString(R.string.act_joined_by_request, name);
             case "ChatAddUser":
                 if (item.from_id != null && item.from_id.equals(act.user))
-                    return name + " joined";
-                return name + " added " + getUserTitle(users, act.user);
+                    return App.get().getString(R.string.act_joined, name);
+                return App.get().getString(R.string.act_added_user, name, getUserTitle(users, act.user));
             case "ChatDeleteUser":
                 if (item.from_id != null && item.from_id.equals(act.user))
-                    return name + " left";
-                return name + " removed " + getUserTitle(users, act.user);
+                    return App.get().getString(R.string.act_left, name);
+                return App.get().getString(R.string.act_removed_user, name, getUserTitle(users, act.user));
             default:
-                return "Action: " + type;
+                return App.get().getString(R.string.act_unknown, type);
         }
     }
 
