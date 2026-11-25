@@ -56,6 +56,8 @@ public class FileMessageView extends LinearLayout {
             return;
         }
 
+        icon.setImageDrawable(null);
+
         this.message = msg;
         this.peer = peer;
 

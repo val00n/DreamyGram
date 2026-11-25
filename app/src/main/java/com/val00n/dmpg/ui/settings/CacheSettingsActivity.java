@@ -113,7 +113,7 @@ public class CacheSettingsActivity extends Activity {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_avatar_cache))
-                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
+                        .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
@@ -138,7 +138,7 @@ public class CacheSettingsActivity extends Activity {
                                 }, true);
                             }
                         })
-                        .setNegativeButton(R.string.action_cancel, null)
+                        .setPositiveButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -149,7 +149,7 @@ public class CacheSettingsActivity extends Activity {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_chats_cache))
-                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
+                        .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
@@ -174,7 +174,7 @@ public class CacheSettingsActivity extends Activity {
                                 });
                             }
                         })
-                        .setNegativeButton(R.string.action_cancel, null)
+                        .setPositiveButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -185,7 +185,7 @@ public class CacheSettingsActivity extends Activity {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_media_cache))
-                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
+                        .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
@@ -210,7 +210,7 @@ public class CacheSettingsActivity extends Activity {
                                 }, false);
                             }
                         })
-                        .setNegativeButton(R.string.action_cancel, null)
+                        .setPositiveButton(R.string.action_cancel, null)
                         .show();
             }
         });
@@ -221,7 +221,7 @@ public class CacheSettingsActivity extends Activity {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_storage_cache))
-                        .setPositiveButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
+                        .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 FileHelper.deleteDirectory(false);
@@ -230,7 +230,7 @@ public class CacheSettingsActivity extends Activity {
                                 showValues();
                             }
                         })
-                        .setNegativeButton(R.string.action_cancel, null)
+                        .setPositiveButton(R.string.action_cancel, null)
                         .show();
             }
         });

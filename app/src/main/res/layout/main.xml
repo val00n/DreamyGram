@@ -12,22 +12,23 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="2dp">
+            android:gravity="center"
+            android:padding="2dp"
+            android:layout_marginTop="2dp">
             <EditText
                 android:maxLines="1"
                 android:id="@+id/mainSearchEditText"
                 android:hint="@string/main_search_hint"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:layout_weight="1"/>
             <ImageButton
                 android:id="@+id/mainSettingsButton"
                 android:src="@android:drawable/ic_menu_preferences"
                 android:layout_width="48dp"
-                android:layout_height="match_parent"
+                android:layout_height="48dp"
                 android:scaleType="centerInside"
-                android:padding="6dp"
-                android:layout_marginTop="1dp"/>
+                android:padding="6dp"/>
         </LinearLayout>
 
         <ListView

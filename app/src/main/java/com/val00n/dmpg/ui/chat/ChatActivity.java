@@ -518,6 +518,13 @@ public class ChatActivity extends Activity {
                 restoreActionMode();
             }
         });
+
+        chatOptionsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openOptionsMenu();
+            }
+        });
     }
 
     @Override
@@ -623,7 +630,10 @@ public class ChatActivity extends Activity {
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         switch (menuItem.getItemId()) {
             case MENU_REFRESH:
-                loadHistory(true, null, 0);
+                if (!isLoading) {
+                    loadHistory(true, null, 0);
+                }
+                return true;
             default:
                 return super.onOptionsItemSelected(menuItem);
         }
