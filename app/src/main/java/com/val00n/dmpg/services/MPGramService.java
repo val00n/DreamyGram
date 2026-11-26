@@ -1058,7 +1058,7 @@ public class MPGramService {
     }
 
     public void getForumTopics(final String peer, String userToken, final ApiCallback<ForumTopicResponse> callback) {
-        final Map<String, String> queryParams = new HashMap<>();
+        final Map<String, String> queryParams = new HashMap<String, String>();
         queryParams.put("method", "getForumTopics");
         queryParams.put("v", instance.apiVersion);
         queryParams.put("peer", peer);
@@ -1075,7 +1075,7 @@ public class MPGramService {
                     JSONObject parsedJson = (JSONObject) JSON.get(stringResponse);
                     Exception jsonError = extractJsonError(parsedJson);
                     if (jsonError != null) {
-                        callback.onError(jsonError);
+                        if (callback != null) callback.onError(jsonError);
                         return;
                     }
 

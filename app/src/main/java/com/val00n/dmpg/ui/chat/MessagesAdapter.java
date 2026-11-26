@@ -489,7 +489,7 @@ public class MessagesAdapter extends BaseAdapter {
                     holder.playOverlay.setVisibility(View.GONE);
                 }
                 holder.file.setVisibility(View.VISIBLE);
-                holder.file.bind(row.message, row.peer);
+                holder.file.bind(row.message, row.chatPeer != null ? row.chatPeer : row.peer);
             } else {
                 if (holder.album != null) {
                     holder.album.setVisibility(View.GONE);
@@ -613,10 +613,13 @@ public class MessagesAdapter extends BaseAdapter {
         row.chatPeer = item.peer_id;
         row.hasAvatar = hasAvatar(row.peer);
 
-        row.isVideo = item.media != null && "video".equals(item.media.type);
-        row.isPhoto = item.media != null && "photo".equals(item.media.type);
-        row.isSticker = item.media != null && "sticker".equals(item.media.type);
-        row.isFile = item.media != null && !row.isPhoto && !row.isVideo && !row.isSticker;
+        String mediaType = item.media != null ? item.media.type : null;
+        row.isVideo = "video".equals(mediaType);
+        row.isPhoto = "photo".equals(mediaType);
+        row.isSticker = "sticker".equals(mediaType);
+        row.isFile = "document".equals(mediaType)
+                || "audio".equals(mediaType)
+                || "voice".equals(mediaType);
 
         boolean localPhoto = item.out && item.id <= 0 && row.isPhoto;
         row.hasMedia = item.media != null && !item.media.hide && (item.id > 0 || localPhoto);

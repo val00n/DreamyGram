@@ -59,38 +59,6 @@ public class SettingsManager {
         prefs.edit().putBoolean(KEY_LOAD_MEDIA, value).commit();
     }
 
-    public int getDialogsCount() {
-        return prefs.getInt(KEY_DIALOGS_COUNT, DEFAULT_DIALOGS_COUNT);
-    }
-
-    public void setDialogsCount(int value) {
-        prefs.edit().putInt(KEY_DIALOGS_COUNT, value).commit();
-    }
-
-    public int getMessagesCount() {
-        return prefs.getInt(KEY_MESSAGES_COUNT, DEFAULT_MESSAGES_COUNT);
-    }
-
-    public void setMessagesCount(int value) {
-        prefs.edit().putInt(KEY_MESSAGES_COUNT, value).commit();
-    }
-
-    public int getDialogPollMillis() {
-        return prefs.getInt(KEY_DIALOG_POLL_SECS, DEFAULT_DIALOG_POLL_SECS) * 1000;
-    }
-
-    public void setDialogPollSecs(int secs) {
-        prefs.edit().putInt(KEY_DIALOG_POLL_SECS, secs).commit();
-    }
-
-    public int getMessagesPollMillis() {
-        return prefs.getInt(KEY_MESSAGES_POLL_SECS, DEFAULT_MESSAGES_POLL_SECS) * 1000;
-    }
-
-    public void setMessagesPollSecs(int secs) {
-        prefs.edit().putInt(KEY_MESSAGES_POLL_SECS, secs).commit();
-    }
-
     public boolean isDialogPollEnabled() {
         return prefs.getBoolean(KEY_DIALOG_POLL_ENABLED, DEFAULT_DIALOG_POLL_ENABLED);
     }
@@ -117,7 +85,54 @@ public class SettingsManager {
         return style;
     }
 
+    public int getDialogsCount() {
+        int val = prefs.getInt(KEY_DIALOGS_COUNT, DEFAULT_DIALOGS_COUNT);
+        return val < 1 ? DEFAULT_DIALOGS_COUNT : val;
+    }
+
+    public void setDialogsCount(int value) {
+        if (value < 1) value = 1;
+        prefs.edit().putInt(KEY_DIALOGS_COUNT, value).commit();
+    }
+
+    public int getMessagesCount() {
+        int val = prefs.getInt(KEY_MESSAGES_COUNT, DEFAULT_MESSAGES_COUNT);
+        return val < 1 ? DEFAULT_MESSAGES_COUNT : val;
+    }
+
+    public void setMessagesCount(int value) {
+        if (value < 1) value = 1;
+        prefs.edit().putInt(KEY_MESSAGES_COUNT, value).commit();
+    }
+
+    public int getDialogPollMillis() {
+        int secs = prefs.getInt(KEY_DIALOG_POLL_SECS, DEFAULT_DIALOG_POLL_SECS);
+        if (secs < 1) secs = DEFAULT_DIALOG_POLL_SECS;
+        return secs * 1000;
+    }
+
+    public void setDialogPollSecs(int secs) {
+        if (secs < 1) secs = 1;
+        prefs.edit().putInt(KEY_DIALOG_POLL_SECS, secs).commit();
+    }
+
+    public int getMessagesPollMillis() {
+        int secs = prefs.getInt(KEY_MESSAGES_POLL_SECS, DEFAULT_MESSAGES_POLL_SECS);
+        if (secs < 1) secs = DEFAULT_MESSAGES_POLL_SECS;
+        return secs * 1000;
+    }
+
+    public void setMessagesPollSecs(int secs) {
+        if (secs < 1) secs = 1;
+        prefs.edit().putInt(KEY_MESSAGES_POLL_SECS, secs).commit();
+    }
+
     public void setChatStyle(String style) {
+        if (!CHAT_STYLE_DEFAULT.equals(style)
+                && !CHAT_STYLE_COMPACT.equals(style)
+                && !CHAT_STYLE_MODERN.equals(style)) {
+            style = CHAT_STYLE_DEFAULT;
+        }
         prefs.edit().putString(KEY_CHAT_STYLE, style).commit();
     }
 }

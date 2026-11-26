@@ -48,47 +48,46 @@ public class FileMessageView extends LinearLayout {
     }
 
     public void bind(final Message msg, final String peer) {
-        if (msg == null || msg.media == null) {
-            return;
-        }
-
-        if (msg.media.mime == null || msg.media.name == null) {
-            return;
-        }
-
+        this.message = null;
+        this.peer = null;
         icon.setImageDrawable(null);
+        icon.setVisibility(View.VISIBLE);
+        name.setText("");
+        meta.setText("");
+        setOnClickListener(null);
+
+        if (msg == null || msg.media == null) {
+            setVisibility(View.GONE);
+            return;
+        }
 
         this.message = msg;
         this.peer = peer;
 
-        filename = msg.media.name;
+        filename = msg.media.name != null && msg.media.name.length() > 0
+                ? msg.media.name
+                : (msg.media.mime != null ? msg.media.mime : "file");
         mime = msg.media.mime;
-
-        /*String displayName = msg.media.name; // TODO
-        if (displayName == null || displayName.isEmpty()) {
-            displayName = msg.media.title != null ? msg.media.title : "file";
-        }
-        name.setText(displayName);
-        */
-        //if (msg.media.time > 0) { // TODO
-        //if (msg.media.artist != null) { // TODO
 
         name.setText(filename);
 
-        String metaText = "";
-        if (msg.media.size > 0) metaText = FileHelper.formatSize(msg.media.size);
-
+        String metaText = msg.media.size > 0 ? FileHelper.formatSize(msg.media.size) : "";
         meta.setText(metaText);
 
         if (msg.media.thumb) {
             App.getCacheManager().loadImage(peer, String.valueOf(msg.id), FileParams.fileThumb(), new CacheManager.ImageCallback() {
                 @Override
                 public void onLoaded(Bitmap bitmap) {
-                    icon.setImageBitmap(bitmap);
+                    if (FileMessageView.this.message == msg) {
+                        icon.setImageBitmap(bitmap);
+                    }
                 }
+
                 @Override
                 public void onError(Exception error) {
-                    icon.setVisibility(View.GONE);
+                    if (FileMessageView.this.message == msg) {
+                        icon.setVisibility(View.GONE);
+                    }
                 }
             });
         } else {
@@ -101,11 +100,9 @@ public class FileMessageView extends LinearLayout {
                 if (message == null) {
                     return;
                 }
-
                 if (MessageFileActions.openIfSaved(context, peer, message, false)) {
                     return;
                 }
-
                 if (context instanceof Activity) {
                     MessageFileActions.showSaveMenu((Activity) context, peer, message, true);
                 }

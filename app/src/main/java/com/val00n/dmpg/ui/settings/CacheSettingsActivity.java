@@ -6,6 +6,7 @@ import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -20,6 +21,10 @@ import com.val00n.dmpg.services.FileHelper;
 import com.val00n.dmpg.ui.SimpleTextWatcher;
 
 public class CacheSettingsActivity extends Activity {
+
+    private static final long APPLY_DEBOUNCE_MS = 600L;
+    private static final long MAX_LIMIT_MB = 1048576L;
+    private static final long MAX_TTL_DAYS = 36500L;
 
     private TextView globalText;
     private TextView avatarsText;
@@ -59,6 +64,25 @@ public class CacheSettingsActivity extends Activity {
     private long mediaLimitMb;
     private long chatsLimitMb;
 
+    private boolean isUpdatingUi = false;
+    private boolean hasPendingRefresh = false;
+    private final Handler uiHandler = new Handler();
+
+    private final Runnable refreshCacheRunnable = new Runnable() {
+        public void run() {
+            hasPendingRefresh = false;
+            App.getCacheManager().refreshSettings(new Runnable() {
+                public void run() {
+                    if (!isFinishing()) {
+                        loadSizes();
+                        updateSummaryTexts();
+                    }
+                }
+            });
+        }
+    };
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.cache_settings);
@@ -87,34 +111,38 @@ public class CacheSettingsActivity extends Activity {
         showValues();
 
         avatarStoreCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isUpdatingUi) return;
+                storeAvatars = isChecked;
                 sharedPreferences.edit().putBoolean("storeAvatars", isChecked).commit();
+                applyStoreFlagImmediately();
             }
         });
 
         mediaStoreCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isUpdatingUi) return;
+                storeMedia = isChecked;
                 sharedPreferences.edit().putBoolean("storeMedia", isChecked).commit();
+                applyStoreFlagImmediately();
             }
         });
 
         chatsStoreCheckBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isUpdatingUi) return;
+                storeChats = isChecked;
                 sharedPreferences.edit().putBoolean("storeChats", isChecked).commit();
+                applyStoreFlagImmediately();
             }
         });
 
         avatarClear.setOnClickListener(new View.OnClickListener() {
-            @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_avatar_cache))
                         .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
-                            @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
                                 pd.setTitle(getString(R.string.cache_settings_clearing));
@@ -123,17 +151,15 @@ public class CacheSettingsActivity extends Activity {
                                 pd.show();
 
                                 App.getCacheManager().wipeFilesCache(new Runnable() {
-                                    @Override
                                     public void run() {
-                                        pd.dismiss();
-                                        runOnUiThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_avatar_cleared, Toast.LENGTH_SHORT).show();
-                                                loadValues();
-                                                showValues();
+                                        if (!isFinishing()) {
+                                            if (pd.isShowing()) {
+                                                pd.dismiss();
                                             }
-                                        });
+                                            Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_avatar_cleared, Toast.LENGTH_SHORT).show();
+                                            loadSizes();
+                                            updateSummaryTexts();
+                                        }
                                     }
                                 }, true);
                             }
@@ -144,13 +170,11 @@ public class CacheSettingsActivity extends Activity {
         });
 
         chatsClear.setOnClickListener(new View.OnClickListener() {
-            @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_chats_cache))
                         .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
-                            @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
                                 pd.setTitle(getString(R.string.cache_settings_clearing));
@@ -159,17 +183,15 @@ public class CacheSettingsActivity extends Activity {
                                 pd.show();
 
                                 App.getCacheManager().wipeChatsCache(new Runnable() {
-                                    @Override
                                     public void run() {
-                                        pd.dismiss();
-                                        runOnUiThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_chats_cleared, Toast.LENGTH_SHORT).show();
-                                                loadValues();
-                                                showValues();
+                                        if (!isFinishing()) {
+                                            if (pd.isShowing()) {
+                                                pd.dismiss();
                                             }
-                                        });
+                                            Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_chats_cleared, Toast.LENGTH_SHORT).show();
+                                            loadSizes();
+                                            updateSummaryTexts();
+                                        }
                                     }
                                 });
                             }
@@ -180,13 +202,11 @@ public class CacheSettingsActivity extends Activity {
         });
 
         mediaClear.setOnClickListener(new View.OnClickListener() {
-            @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_media_cache))
                         .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
-                            @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 final ProgressDialog pd = new ProgressDialog(CacheSettingsActivity.this);
                                 pd.setTitle(getString(R.string.cache_settings_clearing));
@@ -195,17 +215,15 @@ public class CacheSettingsActivity extends Activity {
                                 pd.show();
 
                                 App.getCacheManager().wipeFilesCache(new Runnable() {
-                                    @Override
                                     public void run() {
-                                        pd.dismiss();
-                                        runOnUiThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_media_cleared, Toast.LENGTH_SHORT).show();
-                                                loadValues();
-                                                showValues();
+                                        if (!isFinishing()) {
+                                            if (pd.isShowing()) {
+                                                pd.dismiss();
                                             }
-                                        });
+                                            Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_media_cleared, Toast.LENGTH_SHORT).show();
+                                            loadSizes();
+                                            updateSummaryTexts();
+                                        }
                                     }
                                 }, false);
                             }
@@ -216,18 +234,16 @@ public class CacheSettingsActivity extends Activity {
         });
 
         storageClear.setOnClickListener(new View.OnClickListener() {
-            @Override
             public void onClick(View v) {
                 new AlertDialog.Builder(CacheSettingsActivity.this)
                         .setTitle(getString(R.string.cache_settings_are_you_sure))
                         .setMessage(getString(R.string.cache_settings_wipe_storage_cache))
                         .setNegativeButton(R.string.action_wipe, new DialogInterface.OnClickListener() {
-                            @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 FileHelper.deleteDirectory(false);
                                 Toast.makeText(CacheSettingsActivity.this, R.string.cache_settings_storage_cleared, Toast.LENGTH_SHORT).show();
-                                loadValues();
-                                showValues();
+                                loadSizes();
+                                updateSummaryTexts();
                             }
                         })
                         .setPositiveButton(R.string.action_cancel, null)
@@ -238,12 +254,14 @@ public class CacheSettingsActivity extends Activity {
         avatarEditText.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void onTextChanged(String s) {
+                if (isUpdatingUi) return;
                 try {
-                    long val = Long.parseLong(s);
+                    long val = clamp(Long.parseLong(s), 0L, MAX_LIMIT_MB);
                     avatarsLimitMb = val;
-                    avatarsLimit = val * 1024 * 1024;
+                    avatarsLimit = val * 1024L * 1024L;
                     sharedPreferences.edit().putLong("avatarsLimit", val).commit();
-                    App.getCacheManager().refreshSettings();
+                    updateSummaryTexts();
+                    scheduleCacheRefresh();
                 } catch (NumberFormatException ignored) {}
             }
         });
@@ -251,12 +269,14 @@ public class CacheSettingsActivity extends Activity {
         mediaEditText.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void onTextChanged(String s) {
+                if (isUpdatingUi) return;
                 try {
-                    long val = Long.parseLong(s);
+                    long val = clamp(Long.parseLong(s), 0L, MAX_LIMIT_MB);
                     mediaLimitMb = val;
-                    mediaLimit = val * 1024 * 1024;
+                    mediaLimit = val * 1024L * 1024L;
                     sharedPreferences.edit().putLong("mediaLimit", val).commit();
-                    App.getCacheManager().refreshSettings();
+                    updateSummaryTexts();
+                    scheduleCacheRefresh();
                 } catch (NumberFormatException ignored) {}
             }
         });
@@ -264,12 +284,14 @@ public class CacheSettingsActivity extends Activity {
         chatsEditText.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void onTextChanged(String s) {
+                if (isUpdatingUi) return;
                 try {
-                    long val = Long.parseLong(s);
+                    long val = clamp(Long.parseLong(s), 0L, MAX_LIMIT_MB);
                     chatsLimitMb = val;
-                    chatsLimit = val * 1024 * 1024;
+                    chatsLimit = val * 1024L * 1024L;
                     sharedPreferences.edit().putLong("chatsLimit", val).commit();
-                    App.getCacheManager().refreshSettings();
+                    updateSummaryTexts();
+                    scheduleCacheRefresh();
                 } catch (NumberFormatException ignored) {}
             }
         });
@@ -277,28 +299,70 @@ public class CacheSettingsActivity extends Activity {
         avatarTTLEditText.addTextChangedListener(new SimpleTextWatcher() {
             @Override
             public void onTextChanged(String s) {
+                if (isUpdatingUi) return;
                 try {
-                    long days = Long.parseLong(s);
-                    avatarsTTL = days * 24 * 60 * 60 * 1000;
+                    long days = clamp(Long.parseLong(s), 1L, MAX_TTL_DAYS);
+                    avatarsTTL = days * 24L * 60L * 60L * 1000L;
                     sharedPreferences.edit().putLong("avatarsTTL", days).commit();
-                    App.getCacheManager().refreshSettings();
+                    scheduleCacheRefresh();
                 } catch (NumberFormatException ignored) {}
             }
         });
 
         mediaTTLEditText.addTextChangedListener(new SimpleTextWatcher() {
-            @Override public void onTextChanged(String s) {
+            @Override
+            public void onTextChanged(String s) {
+                if (isUpdatingUi) return;
                 try {
-                    long days = Long.parseLong(s);
-                    mediaTTL = days * 24 * 60 * 60 * 1000;
+                    long days = clamp(Long.parseLong(s), 1L, MAX_TTL_DAYS);
+                    mediaTTL = days * 24L * 60L * 60L * 1000L;
                     sharedPreferences.edit().putLong("mediaTTL", days).commit();
-                    App.getCacheManager().refreshSettings();
+                    scheduleCacheRefresh();
                 } catch (NumberFormatException ignored) {}
             }
         });
     }
 
-    private void showValues() {
+    @Override
+    protected void onPause() {
+        super.onPause();
+        flushPendingCacheRefresh();
+    }
+
+    private void applyStoreFlagImmediately() {
+        uiHandler.removeCallbacks(refreshCacheRunnable);
+        hasPendingRefresh = false;
+        App.getCacheManager().refreshSettings(new Runnable() {
+            public void run() {
+                if (!isFinishing()) {
+                    loadSizes();
+                    updateSummaryTexts();
+                }
+            }
+        });
+    }
+
+    private void scheduleCacheRefresh() {
+        hasPendingRefresh = true;
+        uiHandler.removeCallbacks(refreshCacheRunnable);
+        uiHandler.postDelayed(refreshCacheRunnable, APPLY_DEBOUNCE_MS);
+    }
+
+    private void flushPendingCacheRefresh() {
+        if (hasPendingRefresh) {
+            uiHandler.removeCallbacks(refreshCacheRunnable);
+            hasPendingRefresh = false;
+            App.getCacheManager().refreshSettings();
+        }
+    }
+
+    private static long clamp(long val, long min, long max) {
+        if (val < min) return min;
+        if (val > max) return max;
+        return val;
+    }
+
+    private void updateSummaryTexts() {
         globalSize = avatarsSize + mediaSize + chatsSize;
         globalLimit = avatarsLimit + mediaLimit + chatsLimit;
 
@@ -307,38 +371,51 @@ public class CacheSettingsActivity extends Activity {
         mediaText.setText(getString(R.string.cache_settings_media, FileHelper.formatSize(mediaSize), FileHelper.formatSize(mediaLimit)));
         chatsText.setText(getString(R.string.cache_settings_chats, FileHelper.formatSize(chatsSize), FileHelper.formatSize(chatsLimit)));
         storageText.setText(getString(R.string.cache_settings_storage, FileHelper.formatSize(storageSize)));
-
-        avatarEditText.setText(String.valueOf(avatarsLimitMb));
-        mediaEditText.setText(String.valueOf(mediaLimitMb));
-        chatsEditText.setText(String.valueOf(chatsLimitMb));
-        avatarTTLEditText.setText(String.valueOf(avatarsTTL / (24 * 60 * 60 * 1000)));
-        mediaTTLEditText.setText(String.valueOf(mediaTTL / (24 * 60 * 60 * 1000)));
-
-        avatarStoreCheckBox.setChecked(storeAvatars);
-        mediaStoreCheckBox.setChecked(storeMedia);
-        chatsStoreCheckBox.setChecked(storeChats);
     }
 
-    private void loadValues() {
-        avatarsLimitMb = sharedPreferences.getLong("avatarsLimit", 16);
-        mediaLimitMb = sharedPreferences.getLong("mediaLimit", 32);
-        chatsLimitMb = sharedPreferences.getLong("chatsLimit", 16);
+    private void showValues() {
+        isUpdatingUi = true;
+        try {
+            updateSummaryTexts();
 
-        avatarsLimit = avatarsLimitMb * 1024 * 1024;
-        mediaLimit = mediaLimitMb * 1024 * 1024;
-        chatsLimit = chatsLimitMb * 1024 * 1024;
+            avatarEditText.setText(String.valueOf(avatarsLimitMb));
+            mediaEditText.setText(String.valueOf(mediaLimitMb));
+            chatsEditText.setText(String.valueOf(chatsLimitMb));
+            avatarTTLEditText.setText(String.valueOf(avatarsTTL / (24L * 60L * 60L * 1000L)));
+            mediaTTLEditText.setText(String.valueOf(mediaTTL / (24L * 60L * 60L * 1000L)));
 
-        avatarsTTL = sharedPreferences.getLong("avatarsTTL", 10) * 24 * 60 * 60 * 1000;
-        mediaTTL = sharedPreferences.getLong("mediaTTL", 30) * 24 * 60 * 60 * 1000;
+            avatarStoreCheckBox.setChecked(storeAvatars);
+            mediaStoreCheckBox.setChecked(storeMedia);
+            chatsStoreCheckBox.setChecked(storeChats);
+        } finally {
+            isUpdatingUi = false;
+        }
+    }
 
-        storeAvatars = sharedPreferences.getBoolean("storeAvatars", true);
-        storeChats = sharedPreferences.getBoolean("storeChats", true);
-        storeMedia = sharedPreferences.getBoolean("storeMedia", true);
-
+    private void loadSizes() {
         CacheManager cm = App.getCacheManager();
         avatarsSize = cm.getAvatarsSize();
         mediaSize = cm.getMediaSize();
         chatsSize = cm.getChatsSize();
         storageSize = cm.getStorageSavedSize();
+    }
+
+    private void loadValues() {
+        avatarsLimitMb = clamp(sharedPreferences.getLong("avatarsLimit", 16), 0L, MAX_LIMIT_MB);
+        mediaLimitMb = clamp(sharedPreferences.getLong("mediaLimit", 32), 0L, MAX_LIMIT_MB);
+        chatsLimitMb = clamp(sharedPreferences.getLong("chatsLimit", 16), 0L, MAX_LIMIT_MB);
+
+        avatarsLimit = avatarsLimitMb * 1024L * 1024L;
+        mediaLimit = mediaLimitMb * 1024L * 1024L;
+        chatsLimit = chatsLimitMb * 1024L * 1024L;
+
+        avatarsTTL = clamp(sharedPreferences.getLong("avatarsTTL", 10), 1L, MAX_TTL_DAYS) * 24L * 60L * 60L * 1000L;
+        mediaTTL = clamp(sharedPreferences.getLong("mediaTTL", 30), 1L, MAX_TTL_DAYS) * 24L * 60L * 60L * 1000L;
+
+        storeAvatars = sharedPreferences.getBoolean("storeAvatars", true);
+        storeChats = sharedPreferences.getBoolean("storeChats", true);
+        storeMedia = sharedPreferences.getBoolean("storeMedia", true);
+
+        loadSizes();
     }
 }

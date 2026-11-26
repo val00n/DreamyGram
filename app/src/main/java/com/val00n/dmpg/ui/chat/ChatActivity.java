@@ -218,7 +218,11 @@ public class ChatActivity extends Activity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                if (messagesAdapter != null) messagesAdapter.setSavedMessages(peerId.equals(result.id));
+                                if (isActivityDied) return;
+                                isSavedMessages = peerId != null && peerId.equals(result.id);
+                                if (messagesAdapter != null) {
+                                    messagesAdapter.setSavedMessages(isSavedMessages);
+                                }
                             }
                         });
                     }
@@ -613,6 +617,11 @@ public class ChatActivity extends Activity {
 
         if (pendingAttachmentFile != null) {
             pendingAttachmentFile.delete();
+            pendingAttachmentFile = null;
+        }
+
+        for (int i = 0; i < pendingMessages.size(); i++) {
+            deleteEntryAttachment(pendingMessages.get(i));
         }
     }
 
@@ -839,6 +848,7 @@ public class ChatActivity extends Activity {
         Message pending = new Message(caption, nextLocalMessageId--, peerId);
         pending.out = true;
         pending.date = System.currentTimeMillis() / 1000;
+        pending.from_id = App.selfId;
 
         if (replyId != null) {
             pending.reply = buildPendingReply(replyId);
@@ -1680,7 +1690,7 @@ public class ChatActivity extends Activity {
         tooltipText.setText(tooltipReplyText);
     }
 
-    private void applyEditedMessage(String id, String text) {
+    private void applyEditedMessage(final String id, final String text) {
         mpgService.editMessage(userToken, peerId, id, text, new MPGramService.ApiCallback<String>() {
             @Override
             public void onSuccess(String result) {
@@ -1688,6 +1698,11 @@ public class ChatActivity extends Activity {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
+                            if (isActivityDied) return;
+                            Message msg = findMessageById(id);
+                            if (msg != null) {
+                                msg.text = text;
+                            }
                             showMessages();
                         }
                     });
@@ -1876,9 +1891,8 @@ public class ChatActivity extends Activity {
                                 if (chat != null) canType = !chat.c && !chat.l;
                             }
                         }
-                        if (canType) {
-                            bottomContainerContent.setVisibility(View.VISIBLE);
-                        }
+
+                        bottomContainerContent.setVisibility(canType ? View.VISIBLE : View.GONE);
                         showMessages();
 
                         chatMessages.post(new Runnable() {
@@ -1900,6 +1914,9 @@ public class ChatActivity extends Activity {
                 isLoading = false;
                 initialSyncInProgress = false;
                 progressBar.setVisibility(View.GONE);
+                headerText.setVisibility(View.GONE);
+                headerProgressBar.setVisibility(View.GONE);
+                headerButton.setVisibility(View.GONE);
 
                 if (hasCachedHistory) {
                     if (networkStatusText != null) {
@@ -1939,68 +1956,84 @@ public class ChatActivity extends Activity {
         mpgService.getHistory(peerId, offsetId, offsetDate, userToken, initial, topic, new MPGramService.ApiCallback<HistoryResponse>() {
             @Override
             public void onSuccess(final HistoryResponse result) {
-               runOnUiThread(new Runnable() {
-                   @Override
-                   public void run() {
-                       loadedHistory += result.messages.size();
-                       Collections.reverse(result.messages);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        loadedHistory += result.messages.size();
+                        Collections.reverse(result.messages);
 
-                       isLoading = false;
-                       hideNetworkStatus();
+                        isLoading = false;
+                        hideNetworkStatus();
 
-                       if (initial) {
-                           boolean shouldScrollToBottom = !hasCachedHistory || atBottom;
+                        if (initial) {
+                            boolean shouldScrollToBottom = !hasCachedHistory || atBottom;
 
-                           mergeInitialHistory(result);
-                           historyGap = false;
+                            mergeInitialHistory(result);
+                            historyGap = false;
 
-                           markRead(readOut);
-                           initialLoaded = true;
+                            markRead(readOut);
+                            initialLoaded = true;
 
-                           showMessages();
+                            if (loadedHistory >= result.totalCount || result.messages.isEmpty()) {
+                                endReached = true;
 
-                           canType = true;
-                           if (peerId != null && peerId.startsWith("-")) {
-                               canType = false;
-                               if (historyResponse.chats != null) {
-                                   Chat chat = historyResponse.chats.get(peerId);
-                                   if (chat != null) {
-                                       canType = !chat.c && !chat.l;
-                                   }
-                               }
-                           }
+                                headerText.setVisibility(View.GONE);
+                                headerProgressBar.setVisibility(View.GONE);
+                                headerButton.setVisibility(View.GONE);
+                            } else {
+                                endReached = false;
 
-                           if (canType) {
-                               bottomContainerContent.setVisibility(View.VISIBLE);
-                           }
+                                headerText.setVisibility(View.VISIBLE);
+                                headerText.setText(R.string.chat_loading_messages);
+                                headerProgressBar.setVisibility(View.VISIBLE);
+                                headerButton.setVisibility(View.GONE);
+                            }
 
-                           initialSyncInProgress = false;
-                           if (!isPaused) syncLastUpdateAndStartPolling(pollToken);
+                            showMessages();
 
-                           if (shouldScrollToBottom) {
-                               chatMessages.post(new Runnable() {
-                                   @Override
-                                   public void run() {
-                                       chatMessages.setSelection(chatMessages.getCount());
-                                   }
-                               });
-                           }
-                       } else {
-                           historyResponse.add(result);
-                           markRead(readOut);
+                            canType = true;
+                            if (peerId != null && peerId.startsWith("-")) {
+                                canType = false;
+                                if (historyResponse.chats != null) {
+                                    Chat chat = historyResponse.chats.get(peerId);
+                                    if (chat != null) {
+                                        canType = !chat.c && !chat.l;
+                                    }
+                                }
+                            }
 
-                           if (loadedHistory >= result.totalCount || result.messages.isEmpty()) {
-                               endReached = true;
+                            bottomContainerContent.setVisibility(canType ? View.VISIBLE : View.GONE);
+                            if (!canType) {
+                                restoreActionMode();
+                            }
 
-                               headerText.setVisibility(View.GONE);
-                               headerProgressBar.setVisibility(View.GONE);
-                               headerButton.setVisibility(View.GONE);
-                           }
+                            initialSyncInProgress = false;
+                            if (!isPaused) syncLastUpdateAndStartPolling(pollToken);
 
-                           showMessages();
-                       }
-                   }
-               });
+                            if (shouldScrollToBottom) {
+                                chatMessages.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        chatMessages.setSelection(chatMessages.getCount());
+                                    }
+                                });
+                            }
+                        } else {
+                            historyResponse.add(result);
+                            markRead(readOut);
+
+                            if (loadedHistory >= result.totalCount || result.messages.isEmpty()) {
+                                endReached = true;
+
+                                headerText.setVisibility(View.GONE);
+                                headerProgressBar.setVisibility(View.GONE);
+                                headerButton.setVisibility(View.GONE);
+                            }
+
+                            showMessages();
+                        }
+                    }
+                });
             }
 
             @Override
@@ -2017,6 +2050,9 @@ public class ChatActivity extends Activity {
                             if (initial) {
                                 initialSyncInProgress = false;
                                 progressBar.setVisibility(View.GONE);
+                                headerText.setVisibility(View.GONE);
+                                headerProgressBar.setVisibility(View.GONE);
+                                headerButton.setVisibility(View.GONE);
 
                                 if (!hasCachedHistory) {
                                     Toast.makeText(ChatActivity.this, getString(R.string.chat_failed_load_history, error.getMessage()), Toast.LENGTH_SHORT).show();

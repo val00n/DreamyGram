@@ -84,7 +84,7 @@
             android:id="@+id/startupWarningNextButton"
             android:layout_alignParentBottom="true"
             android:layout_centerHorizontal="true"
-            android:layout_width="148dp"
+            android:layout_width="164dp"
             android:layout_height="wrap_content"
             android:text="@string/startup_continue"
             android:layout_marginTop="8dp"

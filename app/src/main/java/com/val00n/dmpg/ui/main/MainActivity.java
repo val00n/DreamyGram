@@ -516,11 +516,11 @@ public class MainActivity extends Activity {
             if (topicsRoot.getVisibility() == View.VISIBLE) {
                 topicsRoot.setVisibility(View.GONE);
                 dialogsRoot.setVisibility(View.VISIBLE);
+                return true;
             } else if (isSearchMode) {
                 searchEditText.setText("");
+                return true;
             }
-
-            return true;
         }
         return super.onKeyDown(keyCode, event);
     }

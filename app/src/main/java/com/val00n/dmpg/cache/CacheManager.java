@@ -41,6 +41,11 @@ public class CacheManager {
     private static final long DEFAULT_FILES_LIMIT = 32L * 1024 * 1024;
     private static final long DEFAULT_CHATS_LIMIT = 16L * 1024 * 1024;
 
+    private static final long MAX_TTL_DAYS = 36500L;
+    private static final long MAX_LIMIT_MB = 1048576L;
+
+    private volatile File lastTempVideoFile;
+
     private volatile long avatarTtlMillis = DEFAULT_AVATAR_TTL_MILLIS;
     private volatile long filesTtlMillis = DEFAULT_FILES_TTL_MILLIS;
     private volatile long avatarLimit = DEFAULT_AVATAR_LIMIT;
@@ -74,35 +79,96 @@ public class CacheManager {
     }
 
     private void loadSettingsFromPrefs() {
-        avatarTtlMillis = sharedPreferences.getLong("avatarsTTL", 10) * 24 * 60 * 60 * 1000;
-        filesTtlMillis = sharedPreferences.getLong("mediaTTL", 30) * 24 * 60 * 60 * 1000;
-        avatarLimit = sharedPreferences.getLong("avatarsLimit", 16) * 1024 * 1024;
-        filesLimit = sharedPreferences.getLong("mediaLimit", 32) * 1024 * 1024;
-        chatsLimit = sharedPreferences.getLong("chatsLimit", 16) * 1024 * 1024;
+        long avatarsTtlDays = clamp(sharedPreferences.getLong("avatarsTTL", 10), 1L, MAX_TTL_DAYS);
+        long mediaTtlDays = clamp(sharedPreferences.getLong("mediaTTL", 30), 1L, MAX_TTL_DAYS);
+        long avatarsLimitMb = clamp(sharedPreferences.getLong("avatarsLimit", 16), 0L, MAX_LIMIT_MB);
+        long mediaLimitMb = clamp(sharedPreferences.getLong("mediaLimit", 32), 0L, MAX_LIMIT_MB);
+        long chatsLimitMb = clamp(sharedPreferences.getLong("chatsLimit", 16), 0L, MAX_LIMIT_MB);
+
+        avatarTtlMillis = avatarsTtlDays * 24L * 60L * 60L * 1000L;
+        filesTtlMillis = mediaTtlDays * 24L * 60L * 60L * 1000L;
+        avatarLimit = avatarsLimitMb * 1024L * 1024L;
+        filesLimit = mediaLimitMb * 1024L * 1024L;
+        chatsLimit = chatsLimitMb * 1024L * 1024L;
         storeAvatars = sharedPreferences.getBoolean("storeAvatars", true);
         storeMedia = sharedPreferences.getBoolean("storeMedia", true);
         storeChats = sharedPreferences.getBoolean("storeChats", true);
     }
 
+    private static long clamp(long val, long min, long max) {
+        if (val < min) return min;
+        if (val > max) return max;
+        return val;
+    }
+
     public void refreshSettings() {
-        boolean oldStoreAvatars = storeAvatars;
-        boolean oldStoreMedia = storeMedia;
-        boolean oldStoreChats = storeChats;
+        refreshSettings(null);
+    }
+
+    public void refreshSettings(final Runnable onDone) {
+        final boolean oldStoreAvatars = storeAvatars;
+        final boolean oldStoreMedia = storeMedia;
+        final boolean oldStoreChats = storeChats;
 
         loadSettingsFromPrefs();
 
-        trimFilesDiskCache(true);
-        trimFilesDiskCache(false);
-        trimChatsDiskCache();
+        final java.util.concurrent.atomic.AtomicInteger pending =
+                new java.util.concurrent.atomic.AtomicInteger(3);
+
+        final Runnable stepDone = new Runnable() {
+            public void run() {
+                if (pending.decrementAndGet() == 0 && onDone != null) {
+                    mainHandler.post(onDone);
+                }
+            }
+        };
 
         if (oldStoreAvatars && !storeAvatars) {
-            wipeFilesCache(null, true);
+            wipeFilesCache(stepDone, true);
+        } else if (storeAvatars) {
+            ioExecutor.execute(new Runnable() {
+                public void run() {
+                    try {
+                        trimFilesDiskCache(true);
+                    } finally {
+                        stepDone.run();
+                    }
+                }
+            });
+        } else {
+            stepDone.run();
         }
+
         if (oldStoreMedia && !storeMedia) {
-            wipeFilesCache(null, false);
+            wipeFilesCache(stepDone, false);
+        } else if (storeMedia) {
+            ioExecutor.execute(new Runnable() {
+                public void run() {
+                    try {
+                        trimFilesDiskCache(false);
+                    } finally {
+                        stepDone.run();
+                    }
+                }
+            });
+        } else {
+            stepDone.run();
         }
+
         if (oldStoreChats && !storeChats) {
-            wipeChatsCache(null);
+            wipeChatsCache(stepDone);
+        } else if (storeChats) {
+            ioExecutor.execute(new Runnable() {
+                public void run() {
+                    try {
+                        trimChatsDiskCache();
+                    } finally {
+                        stepDone.run();
+                    }
+                }
+            });
+        } else {
+            stepDone.run();
         }
     }
 
@@ -321,11 +387,6 @@ public class CacheManager {
             return;
         }
 
-        if (!App.getSettingsManager().getLoadMedia()) {
-            callback.onError(new Exception("Media disabled in settings"));
-            return;
-        }
-
         if (owner) {
             ioExecutor.execute(new Runnable() {
                 @Override
@@ -466,11 +527,6 @@ public class CacheManager {
         }
         final String safeName = "vid_" + peer + "_" + messageId + "_" + safe;
 
-        if (!App.getSettingsManager().getLoadMedia()) {
-            callback.onError(new Exception("Media disabled in settings"));
-            return;
-        }
-
         ioExecutor.execute(new Runnable() {
             @Override
             public void run() {
@@ -532,6 +588,12 @@ public class CacheManager {
 
                                                     dbHelper.saveFile(freshVideo);
                                                     trimFilesDiskCache(false);
+                                                } else {
+                                                    File prev = lastTempVideoFile;
+                                                    lastTempVideoFile = file;
+                                                    if (prev != null && !prev.equals(file) && prev.exists()) {
+                                                        prev.delete();
+                                                    }
                                                 }
 
                                                 postVideoLoaded(callback, file);
@@ -579,12 +641,13 @@ public class CacheManager {
     }
 
     public void saveDialogs(final String jsonString) {
-        fileHelper.saveFileText("dialogs", jsonString, true); // bruh
+        if (!storeChats) return;
+        fileHelper.saveFileText("dialogs", jsonString, true);
     }
 
     public String loadDialogs() {
         if (!FileHelper.isFileExist("dialogs", true)) return null;
-        return fileHelper.loadFileText("dialogs", true); // bruh 2
+        return fileHelper.loadFileText("dialogs", true);
     }
 
     public boolean hasCachedDialogs() {
@@ -818,7 +881,7 @@ public class CacheManager {
                         }
                     }
 
-                    fileHelper.deleteFile("dialogs.json", true);
+                    fileHelper.deleteFile("dialogs", true);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
